@@ -1,0 +1,64 @@
+# frozen_string_literal: true
+
+VAGRANT_BOX = ENV.fetch("LOCAL_VAGRANT_BOX", "bento/ubuntu-22.04")
+CONTROL_PLANE_CPUS = ENV.fetch("CONTROL_PLANE_CPUS", "4").to_i
+CONTROL_PLANE_MEMORY_MB = ENV.fetch("CONTROL_PLANE_MEMORY_MB", "4096").to_i
+CONTROL_PLANE_DISK_SIZE = ENV.fetch("CONTROL_PLANE_DISK_SIZE", "30GB")
+WORKER_CPUS = ENV.fetch("WORKER_CPUS", "4").to_i
+WORKER_MEMORY_MB = ENV.fetch("WORKER_MEMORY_MB", "4096").to_i
+WORKER_DISK_SIZE = ENV.fetch("WORKER_DISK_SIZE", "30GB")
+
+NODES = [
+  {
+    name: "control-plane-1",
+    ip: "10.10.10.10",
+    cpus: CONTROL_PLANE_CPUS,
+    memory: CONTROL_PLANE_MEMORY_MB,
+    disk: CONTROL_PLANE_DISK_SIZE
+  },
+  {
+    name: "worker-1",
+    ip: "10.10.10.11",
+    cpus: WORKER_CPUS,
+    memory: WORKER_MEMORY_MB,
+    disk: WORKER_DISK_SIZE
+  },
+  {
+    name: "worker-2",
+    ip: "10.10.10.12",
+    cpus: WORKER_CPUS,
+    memory: WORKER_MEMORY_MB,
+    disk: WORKER_DISK_SIZE
+  }
+].freeze
+
+HOSTS = NODES.map { |node| "#{node[:ip]} #{node[:name]}" }.join("\n")
+
+Vagrant.configure("2") do |config|
+  config.vm.box = VAGRANT_BOX
+  config.ssh.insert_key = false
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+
+  NODES.each do |node|
+    config.vm.define node[:name] do |machine|
+      machine.vm.hostname = node[:name]
+      machine.vm.network "private_network", ip: node[:ip]
+      machine.vm.disk :disk, primary: true, size: node[:disk]
+
+      machine.vm.provider "vmware_desktop" do |vmware|
+        vmware.gui = false
+        vmware.vmx["memsize"] = node[:memory].to_s
+        vmware.vmx["numvcpus"] = node[:cpus].to_s
+      end
+
+      machine.vm.provision "shell", inline: <<-SHELL
+        set -eu
+        sudo hostnamectl set-hostname #{node[:name]}
+        sudo sed -i '/dev-env-bootstrap-local/d' /etc/hosts
+        cat <<'HOSTS' | sudo tee -a /etc/hosts >/dev/null
+#{HOSTS.lines.map { |line| "#{line.chomp} # dev-env-bootstrap-local" }.join("\n")}
+HOSTS
+      SHELL
+    end
+  end
+end

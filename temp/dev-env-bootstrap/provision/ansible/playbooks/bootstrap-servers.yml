@@ -1,0 +1,176 @@
+---
+- name: Bootstrap Linux servers for kubeadm
+  hosts: k8s_cluster
+  become: true
+  gather_facts: true
+
+  handlers:
+    - name: Restart containerd
+      ansible.builtin.service:
+        name: containerd
+        state: restarted
+
+  tasks:
+    - name: Install base packages
+      ansible.builtin.apt:
+        name: "{{ server_base_packages }}"
+        state: present
+        update_cache: true
+
+    - name: Install debug packages
+      ansible.builtin.apt:
+        name: "{{ server_debug_packages }}"
+        state: present
+        update_cache: true
+
+    - name: Fail when yq release architecture is unsupported
+      ansible.builtin.fail:
+        msg: "Unsupported yq release architecture: {{ ansible_facts.architecture }}"
+      when: ansible_facts.architecture not in yq_release_arch
+
+    - name: Install yq from upstream release
+      ansible.builtin.get_url:
+        url: "https://github.com/mikefarah/yq/releases/download/{{ yq_version }}/yq_linux_{{ yq_release_arch[ansible_facts.architecture] }}"
+        dest: "{{ yq_binary_path }}"
+        mode: "0755"
+        checksum: "sha256:{{ yq_release_sha256[yq_release_arch[ansible_facts.architecture]] }}"
+
+    - name: Disable swap for kubelet
+      ansible.builtin.command: swapoff -a
+      changed_when: false
+
+    - name: Remove swap entries from fstab
+      ansible.builtin.replace:
+        path: /etc/fstab
+        regexp: '^([^#].*\sswap\s.*)$'
+        replace: '# \1'
+
+    - name: Load Kubernetes kernel modules now
+      ansible.builtin.command: "modprobe {{ item }}"
+      changed_when: false
+      loop:
+        - overlay
+        - br_netfilter
+
+    - name: Persist Kubernetes kernel modules
+      ansible.builtin.copy:
+        dest: /etc/modules-load.d/k8s.conf
+        mode: "0644"
+        content: |
+          overlay
+          br_netfilter
+
+    - name: Configure Kubernetes sysctl settings
+      ansible.builtin.copy:
+        dest: /etc/sysctl.d/99-kubernetes-cri.conf
+        mode: "0644"
+        content: |
+          net.bridge.bridge-nf-call-iptables = 1
+          net.bridge.bridge-nf-call-ip6tables = 1
+          net.ipv4.ip_forward = 1
+
+    - name: Apply sysctl settings
+      ansible.builtin.command: sysctl --system
+      changed_when: false
+
+    - name: Ensure containerd config directory exists
+      ansible.builtin.file:
+        path: /etc/containerd
+        state: directory
+        mode: "0755"
+
+    - name: Generate default containerd config
+      ansible.builtin.command: containerd config default
+      register: containerd_default_config
+      changed_when: false
+
+    - name: Configure containerd to use systemd cgroup driver
+      ansible.builtin.copy:
+        dest: "{{ containerd_config_path }}"
+        mode: "0644"
+        content: "{{ containerd_default_config.stdout | regex_replace('SystemdCgroup = false', 'SystemdCgroup = true') }}"
+      notify: Restart containerd
+
+    - name: Ensure containerd is enabled
+      ansible.builtin.service:
+        name: containerd
+        enabled: true
+        state: started
+
+    - name: Ensure apt keyring directory exists
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Download Kubernetes apt Release key
+      ansible.builtin.get_url:
+        url: "https://pkgs.k8s.io/core:/stable:/{{ kubernetes_apt_release }}/deb/Release.key"
+        dest: /tmp/kubernetes-release.key
+        mode: "0644"
+
+    - name: Install Kubernetes apt keyring
+      ansible.builtin.shell: |
+        gpg --dearmor < /tmp/kubernetes-release.key > /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+      args:
+        creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+    - name: Add Kubernetes apt repository
+      ansible.builtin.copy:
+        dest: /etc/apt/sources.list.d/kubernetes.list
+        mode: "0644"
+        content: |
+          deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/{{ kubernetes_apt_release }}/deb/ /
+
+    - name: Install kubelet, kubeadm, and kubectl
+      ansible.builtin.apt:
+        name:
+          - kubelet
+          - kubeadm
+          - kubectl
+        state: present
+        update_cache: true
+
+    - name: Hold Kubernetes packages
+      ansible.builtin.dpkg_selections:
+        name: "{{ item }}"
+        selection: hold
+      loop:
+        - kubelet
+        - kubeadm
+        - kubectl
+
+    - name: Enable kubelet
+      ansible.builtin.service:
+        name: kubelet
+        enabled: true
+
+    - name: Install kubectl bash completion
+      ansible.builtin.shell: |
+        kubectl completion bash > /etc/bash_completion.d/kubectl
+      args:
+        creates: /etc/bash_completion.d/kubectl
+
+    - name: Install kubeadm bash completion
+      ansible.builtin.shell: |
+        kubeadm completion bash > /etc/bash_completion.d/kubeadm
+      args:
+        creates: /etc/bash_completion.d/kubeadm
+
+    - name: Enable kubectl alias completion for root
+      ansible.builtin.copy:
+        dest: /etc/profile.d/kubernetes-completion.sh
+        mode: "0644"
+        content: |
+          if [ -f /usr/share/bash-completion/bash_completion ]; then
+            . /usr/share/bash-completion/bash_completion
+          fi
+          alias k=kubectl
+          complete -o default -F __start_kubectl k
+
+    - name: Write bootstrap marker
+      ansible.builtin.copy:
+        dest: "{{ bootstrap_marker_path }}"
+        mode: "0644"
+        content: |
+          dev-env-bootstrap server initialization completed

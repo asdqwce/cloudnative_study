@@ -1,0 +1,115 @@
+---
+- name: Verify Kubernetes cluster result
+  hosts: kube_control_plane
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Check admin kubeconfig
+      ansible.builtin.stat:
+        path: "{{ kubernetes_admin_conf_path }}"
+      register: admin_conf
+
+    - name: Fail when cluster is not initialized
+      ansible.builtin.fail:
+        msg: "Kubernetes admin kubeconfig is missing. Run make cluster-bootstrap first."
+      when: not admin_conf.stat.exists
+
+    - name: Check registered node names
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - get
+          - nodes
+          - -o
+          - jsonpath={range .items[*]}{.metadata.name}{"\n"}{end}
+      environment:
+        KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
+      register: cluster_node_names
+      changed_when: false
+
+    - name: Fail when an expected node is missing
+      ansible.builtin.fail:
+        msg: "Missing Kubernetes nodes: {{ groups['k8s_cluster'] | difference(cluster_node_names.stdout_lines) }}"
+      when: groups['k8s_cluster'] | difference(cluster_node_names.stdout_lines) | length > 0
+
+    - name: Wait until all nodes are Ready
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - wait
+          - --for=condition=Ready
+          - nodes
+          - --all
+          - "--timeout={{ kubernetes_node_ready_timeout }}"
+      environment:
+        KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
+      changed_when: false
+
+    - name: Wait until CoreDNS is Ready
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - wait
+          - --for=condition=Ready
+          - pod
+          - -n
+          - kube-system
+          - -l
+          - k8s-app=kube-dns
+          - "--timeout={{ kubernetes_node_ready_timeout }}"
+      environment:
+        KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
+      changed_when: false
+
+    - name: Wait until Calico node agents are Ready
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - wait
+          - --for=condition=Ready
+          - pod
+          - -n
+          - kube-system
+          - -l
+          - k8s-app=calico-node
+          - "--timeout={{ kubernetes_node_ready_timeout }}"
+      environment:
+        KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
+      changed_when: false
+
+    - name: Show node summary
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - get
+          - nodes
+          - -o
+          - wide
+      environment:
+        KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
+      register: node_summary
+      changed_when: false
+
+    - name: Print node summary
+      ansible.builtin.debug:
+        var: node_summary.stdout_lines
+
+    - name: Show kube-system pods
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - get
+          - pods
+          - -n
+          - kube-system
+          - -o
+          - wide
+      environment:
+        KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
+      register: kube_system_pods
+      changed_when: false
+
+    - name: Print kube-system pods
+      ansible.builtin.debug:
+        var: kube_system_pods.stdout_lines

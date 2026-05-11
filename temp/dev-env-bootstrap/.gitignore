@@ -1,0 +1,3 @@
+.env
+provision/ansible/inventory.ini
+providers/local-vagrant/.vagrant/

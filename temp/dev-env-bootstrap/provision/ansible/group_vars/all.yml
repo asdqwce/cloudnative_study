@@ -1,0 +1,50 @@
+kubernetes_apt_release: "{{ lookup('env', 'KUBERNETES_APT_RELEASE') | default('v1.34', true) }}"
+kubernetes_admin_conf_path: /etc/kubernetes/admin.conf
+kubernetes_cri_socket: unix:///run/containerd/containerd.sock
+kubernetes_pod_network_cidr: "{{ lookup('env', 'KUBERNETES_POD_NETWORK_CIDR') | default('192.168.0.0/16', true) }}"
+kubernetes_node_ready_timeout: "{{ lookup('env', 'KUBERNETES_NODE_READY_TIMEOUT') | default('300s', true) }}"
+containerd_config_path: /etc/containerd/config.toml
+bootstrap_marker_path: /etc/dev-env-bootstrap-ready
+calico_version: "{{ lookup('env', 'CALICO_VERSION') | default('v3.31.4', true) }}"
+calico_manifest_url: "https://raw.githubusercontent.com/projectcalico/calico/{{ calico_version }}/manifests/calico.yaml"
+yq_version: v4.53.2
+yq_binary_path: /usr/local/bin/yq
+yq_release_arch:
+  amd64: amd64
+  x86_64: amd64
+  arm64: arm64
+  aarch64: arm64
+yq_release_sha256:
+  amd64: d56bf5c6819e8e696340c312bd70f849dc1678a7cda9c2ad63eebd906371d56b
+  arm64: 03061b2a50c7a498de2bbb92d7cb078ce433011f085a4994117c2726be4106ea
+
+server_base_packages:
+  - apt-transport-https
+  - bash-completion
+  - ca-certificates
+  - containerd
+  - curl
+  - git
+  - gnupg
+  - gpg
+  - jq
+  - rsync
+  - tar
+  - tmux
+  - unzip
+  - vim
+  - wget
+
+server_debug_packages:
+  - btop
+  - dnsutils
+  - htop
+  - iproute2
+  - iputils-ping
+  - lsof
+  - ncdu
+  - net-tools
+  - netcat-openbsd
+  - tcpdump
+  - traceroute
+  - tree

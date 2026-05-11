@@ -1,0 +1,175 @@
+---
+- name: Prepare kubelet node identity
+  hosts: k8s_cluster
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Configure kubelet to use the inventory node IP
+      ansible.builtin.copy:
+        dest: /etc/default/kubelet
+        mode: "0644"
+        content: |
+          KUBELET_EXTRA_ARGS=--node-ip={{ ansible_host }}
+      register: kubelet_default
+
+    - name: Check whether node already joined a cluster
+      ansible.builtin.stat:
+        path: /etc/kubernetes/kubelet.conf
+      register: kubelet_config
+
+    - name: Restart kubelet after node IP change
+      ansible.builtin.service:
+        name: kubelet
+        state: restarted
+      when:
+        - kubelet_default.changed
+        - kubelet_config.stat.exists
+
+- name: Initialize Kubernetes control plane
+  hosts: kube_control_plane
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Check whether the control plane is already initialized
+      ansible.builtin.stat:
+        path: "{{ kubernetes_admin_conf_path }}"
+      register: kubeadm_admin_conf
+
+    - name: Initialize the control plane with kubeadm
+      ansible.builtin.command:
+        argv:
+          - kubeadm
+          - init
+          - "--apiserver-advertise-address={{ ansible_host }}"
+          - "--pod-network-cidr={{ kubernetes_pod_network_cidr }}"
+          - "--cri-socket={{ kubernetes_cri_socket }}"
+        creates: "{{ kubernetes_admin_conf_path }}"
+      when: not kubeadm_admin_conf.stat.exists
+
+    - name: Ensure user kubeconfig directory exists
+      ansible.builtin.file:
+        path: "/home/{{ ansible_user }}/.kube"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0755"
+
+    - name: Install kubeconfig for the SSH user
+      ansible.builtin.copy:
+        src: "{{ kubernetes_admin_conf_path }}"
+        dest: "/home/{{ ansible_user }}/.kube/config"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0600"
+        remote_src: true
+
+    - name: Install Calico CNI
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - apply
+          - -f
+          - "{{ calico_manifest_url }}"
+      environment:
+        KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
+      register: calico_apply
+      changed_when: false
+      retries: 12
+      delay: 5
+      until: calico_apply.rc == 0
+
+    - name: Create worker join command
+      ansible.builtin.command:
+        argv:
+          - kubeadm
+          - token
+          - create
+          - --print-join-command
+          - --ttl
+          - 2h
+      register: kubeadm_join_command
+      changed_when: false
+
+- name: Join Kubernetes worker nodes
+  hosts: kube_workers
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Check whether worker already joined a cluster
+      ansible.builtin.stat:
+        path: /etc/kubernetes/kubelet.conf
+      register: kubelet_config
+
+    - name: Join worker to the cluster
+      ansible.builtin.command: "{{ hostvars[groups['kube_control_plane'][0]].kubeadm_join_command.stdout }} --cri-socket={{ kubernetes_cri_socket }}"
+      when: not kubelet_config.stat.exists
+
+- name: Wait for Kubernetes cluster readiness
+  hosts: kube_control_plane
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Wait until all expected nodes are registered
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - get
+          - nodes
+          - -o
+          - jsonpath={range .items[*]}{.metadata.name}{"\n"}{end}
+      environment:
+        KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
+      register: cluster_node_names
+      changed_when: false
+      retries: 30
+      delay: 5
+      until: groups['k8s_cluster'] | difference(cluster_node_names.stdout_lines) | length == 0
+
+    - name: Wait until all nodes are Ready
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - wait
+          - --for=condition=Ready
+          - nodes
+          - --all
+          - "--timeout={{ kubernetes_node_ready_timeout }}"
+      environment:
+        KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
+      changed_when: false
+
+    - name: Wait until CoreDNS is Ready
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - wait
+          - --for=condition=Ready
+          - pod
+          - -n
+          - kube-system
+          - -l
+          - k8s-app=kube-dns
+          - "--timeout={{ kubernetes_node_ready_timeout }}"
+      environment:
+        KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
+      changed_when: false
+
+    - name: Wait until Calico node agents are Ready
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - wait
+          - --for=condition=Ready
+          - pod
+          - -n
+          - kube-system
+          - -l
+          - k8s-app=calico-node
+          - "--timeout={{ kubernetes_node_ready_timeout }}"
+      environment:
+        KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
+      changed_when: false
