@@ -1,16 +1,18 @@
-version: '3.8'
-
 services:
   # --- Infrastructure ---
   eureka-server:
-    build: ./eureka-server
+    build:
+      context: .
+      dockerfile: eureka-server/Dockerfile
     ports:
       - "8761:8761"
     networks:
       - medical-net
 
   api-gateway:
-    build: ./api-gateway
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
     ports:
       - "8080:8080"
     environment:
@@ -50,7 +52,9 @@ services:
 
   # --- Application Services ---
   patient-service:
-    build: ./patient-service
+    build:
+      context: .
+      dockerfile: patient-service/Dockerfile
     ports:
       - "8081:8081"
     environment:
@@ -66,7 +70,9 @@ services:
       - medical-net
 
   appointment-service:
-    build: ./appointment-service
+    build:
+      context: .
+      dockerfile: appointment-service/Dockerfile
     ports:
       - "8082:8082"
     environment:
@@ -82,7 +88,9 @@ services:
       - medical-net
 
   prescription-service:
-    build: ./prescription-service
+    build:
+      context: .
+      dockerfile: prescription-service/Dockerfile
     ports:
       - "8083:8083"
     environment:
@@ -98,7 +106,9 @@ services:
       - medical-net
 
   notification-service:
-    build: ./notification-service
+    build:
+      context: .
+      dockerfile: notification-service/Dockerfile
     ports:
       - "8084:8084"
     environment:

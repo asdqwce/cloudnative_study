@@ -1,0 +1,15 @@
+.git
+.gradle
+.idea
+.vscode
+
+**/build
+**/bin
+**/out
+**/target
+
+dashboard/node_modules
+dashboard/dist
+
+.DS_Store
+*.log
