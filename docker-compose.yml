@@ -29,6 +29,11 @@ services:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
       POSTGRES_DB: patient_db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d patient_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
     networks:
       - medical-net
 
@@ -38,6 +43,11 @@ services:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
       POSTGRES_DB: appointment_db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d appointment_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
     networks:
       - medical-net
 
@@ -47,6 +57,11 @@ services:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
       POSTGRES_DB: prescription_db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d prescription_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
     networks:
       - medical-net
 
@@ -60,12 +75,15 @@ services:
     environment:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
       - SPRING_DATASOURCE_URL=jdbc:postgresql://patient-db:5432/patient_db
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
       - SPRING_DATASOURCE_USERNAME=user
       - SPRING_DATASOURCE_PASSWORD=password
       - SPRING_JPA_HIBERNATE_DDL_AUTO=update
     depends_on:
-      - eureka-server
-      - patient-db
+      eureka-server:
+        condition: service_started
+      patient-db:
+        condition: service_healthy
     networks:
       - medical-net
 
@@ -78,12 +96,15 @@ services:
     environment:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
       - SPRING_DATASOURCE_URL=jdbc:postgresql://appointment-db:5432/appointment_db
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
       - SPRING_DATASOURCE_USERNAME=user
       - SPRING_DATASOURCE_PASSWORD=password
       - SPRING_JPA_HIBERNATE_DDL_AUTO=update
     depends_on:
-      - eureka-server
-      - appointment-db
+      eureka-server:
+        condition: service_started
+      appointment-db:
+        condition: service_healthy
     networks:
       - medical-net
 
@@ -96,12 +117,15 @@ services:
     environment:
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
       - SPRING_DATASOURCE_URL=jdbc:postgresql://prescription-db:5432/prescription_db
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
       - SPRING_DATASOURCE_USERNAME=user
       - SPRING_DATASOURCE_PASSWORD=password
       - SPRING_JPA_HIBERNATE_DDL_AUTO=update
     depends_on:
-      - eureka-server
-      - prescription-db
+      eureka-server:
+        condition: service_started
+      prescription-db:
+        condition: service_healthy
     networks:
       - medical-net
 

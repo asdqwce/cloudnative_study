@@ -15,22 +15,28 @@ spring:
           uri: lb://patient-service
           predicates:
             - Path=/patient-service/**
+          filters:
+            - StripPrefix=1
         - id: appointment-service
           uri: lb://appointment-service
           predicates:
             - Path=/appointment-service/**
           filters:
+            - StripPrefix=1
             - JwtAuthenticationFilter
         - id: prescription-service
           uri: lb://prescription-service
           predicates:
             - Path=/prescription-service/**
           filters:
+            - StripPrefix=1
             - JwtAuthenticationFilter
         - id: notification-service
           uri: lb://notification-service
           predicates:
             - Path=/notification-service/**
+          filters:
+            - StripPrefix=1
 
 eureka:
   client:

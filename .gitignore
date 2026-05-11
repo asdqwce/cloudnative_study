@@ -465,4 +465,7 @@ gradle-app.setting
 # Java heap dump
 *.hprof
 
+# Newman test reports
+tests/e2e/newman/reports/
+
 # End of https://www.toptal.com/developers/gitignore/api/java,node,gradle,intellij,visualstudiocode,eclipse,macos,windows,linux

@@ -8,6 +8,11 @@ allprojects {
     group = 'com.medical'
     version = '0.0.1-SNAPSHOT'
 
+    ext {
+        testcontainersVersion = '2.0.5'
+        commonsLang3Version = '3.18.0'
+    }
+
     repositories {
         mavenCentral()
     }
@@ -22,13 +27,37 @@ subprojects {
         sourceCompatibility = '17'
     }
 
+    configurations.configureEach {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == 'org.testcontainers') {
+                details.useVersion testcontainersVersion
+            }
+            if (details.requested.group == 'org.apache.commons' && details.requested.name == 'commons-lang3') {
+                details.useVersion commonsLang3Version
+            }
+        }
+    }
+
     dependencies {
         compileOnly 'org.projectlombok:lombok'
         annotationProcessor 'org.projectlombok:lombok'
         testImplementation 'org.springframework.boot:spring-boot-starter-test'
+        testImplementation 'org.springframework.kafka:spring-kafka-test'
+        testImplementation "org.testcontainers:testcontainers-junit-jupiter:${testcontainersVersion}"
+        testImplementation "org.testcontainers:testcontainers-postgresql:${testcontainersVersion}"
+        testImplementation "org.testcontainers:testcontainers-kafka:${testcontainersVersion}"
         
         // Infrastructure-less support
         runtimeOnly 'com.h2database:h2'
+        runtimeOnly 'org.postgresql:postgresql'
+    }
+
+    sourceSets {
+        test {
+            java {
+                srcDir "$rootDir/tests/integration-support/java"
+            }
+        }
     }
 
     dependencyManagement {
@@ -36,4 +65,45 @@ subprojects {
             mavenBom "org.springframework.cloud:spring-cloud-dependencies:2023.0.0"
         }
     }
+
+    test {
+        useJUnitPlatform {
+            excludeTags 'integration'
+        }
+    }
+
+    tasks.register('testUnit', Test) {
+        group = 'verification'
+        description = 'Runs unit tests tagged with unit.'
+        useJUnitPlatform {
+            includeTags 'unit'
+        }
+    }
+
+    tasks.register('testIntegration', Test) {
+        group = 'verification'
+        description = 'Runs integration tests tagged with integration.'
+        useJUnitPlatform {
+            includeTags 'integration'
+        }
+        shouldRunAfter tasks.named('testUnit')
+    }
+}
+
+tasks.register('testUnit') {
+    group = 'verification'
+    description = 'Runs unit tests for all modules.'
+    dependsOn subprojects.collect { it.tasks.named('testUnit') }
+}
+
+tasks.register('testIntegration') {
+    group = 'verification'
+    description = 'Runs integration tests for all modules.'
+    dependsOn subprojects.collect { it.tasks.named('testIntegration') }
+}
+
+tasks.register('testAll') {
+    group = 'verification'
+    description = 'Runs unit and integration tests for all modules.'
+    dependsOn tasks.named('testUnit'), tasks.named('testIntegration')
 }

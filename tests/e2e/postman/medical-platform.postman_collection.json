@@ -1,0 +1,212 @@
+{
+  "info": {
+    "_postman_id": "64a8820f-2a82-4f02-bfc2-900ea3f78f38",
+    "name": "Medical Platform Gateway E2E",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Issue test token",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/auth/token"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('token is issued', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.token).to.be.a('string').and.not.empty;",
+              "  pm.environment.set('token', body.token);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create patient",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\":\"E2E Patient\",\"birthDate\":\"1990-01-01\",\"gender\":\"F\",\"contact\":\"010-0000-0000\"}"
+        },
+        "url": "{{baseUrl}}/patient-service/patients"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('patient is created', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.id).to.be.a('number');",
+              "  pm.expect(body.name).to.eql('E2E Patient');",
+              "  pm.environment.set('patientId', String(body.id));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get patient",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/patient-service/patients/{{patientId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('patient is returned', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.id).to.eql(Number(pm.environment.get('patientId')));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create appointment",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"patientId\":{{patientId}},\"appointmentDate\":\"2026-05-12T09:30:00\"}"
+        },
+        "url": "{{baseUrl}}/appointment-service/appointments"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('appointment is requested', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.id).to.be.a('number');",
+              "  pm.expect(body.status).to.eql('REQUESTED');",
+              "  pm.environment.set('appointmentId', String(body.id));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Confirm appointment",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": "{{baseUrl}}/appointment-service/appointments/{{appointmentId}}/confirm"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('appointment is confirmed', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.status).to.eql('CONFIRMED');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create prescription",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"patientId\":{{patientId}},\"medicine\":\"Amoxicillin\",\"dosage\":\"500mg\",\"prescriptionDate\":\"2026-05-12\"}"
+        },
+        "url": "{{baseUrl}}/prescription-service/prescriptions"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('prescription is created', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.id).to.be.a('number');",
+              "  pm.expect(body.patientId).to.eql(Number(pm.environment.get('patientId')));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List notifications",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/notification-service/notifications"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('notifications endpoint is available', function () {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.json()).to.be.an('array');",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -11,5 +11,9 @@
 dashboard/node_modules
 dashboard/dist
 
+temp
+tmp
+tests/e2e/newman/reports
+
 .DS_Store
 *.log

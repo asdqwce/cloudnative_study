@@ -17,7 +17,10 @@ import java.time.LocalDateTime;
 public class NotificationListener {
     private final NotificationRepository notificationRepository;
 
-    @KafkaListener(topics = "appointment-confirmed", groupId = "notification-group")
+    @KafkaListener(
+            topics = "${medical.kafka.topics.appointment-confirmed:appointment-confirmed}",
+            groupId = "${spring.kafka.consumer.group-id:notification-group}"
+    )
     public void handleAppointmentConfirmed(AppointmentEvent event) {
         log.info("Received appointment confirmed event: {}", event);
         

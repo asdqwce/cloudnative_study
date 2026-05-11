@@ -21,6 +21,9 @@ public class AppointmentService {
     @Value("${spring.kafka.bootstrap-servers:}")
     private String kafkaBootstrapServers;
 
+    @Value("${medical.kafka.topics.appointment-confirmed:appointment-confirmed}")
+    private String appointmentConfirmedTopic;
+
     public AppointmentService(AppointmentRepository appointmentRepository) {
         this.appointmentRepository = appointmentRepository;
     }
@@ -47,7 +50,7 @@ public class AppointmentService {
                 .build();
         
         if (kafkaTemplate != null && StringUtils.hasText(kafkaBootstrapServers)) {
-            kafkaTemplate.send("appointment-confirmed", event);
+            kafkaTemplate.send(appointmentConfirmedTopic, event);
         } else {
             // Mock propagation for demo without Kafka
             log.info("KAFKA MOCK: Appointment confirmed - {}", event);
