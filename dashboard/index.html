@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medical Nexus | MSA Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-light: #dbeafe;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+            --text-light: #64748b;
+            --accent: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --radius: 16px;
+            --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        aside {
+            width: 280px;
+            background: var(--card);
+            border-right: 1px solid #e2e8f0;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            position: fixed;
+            height: 100vh;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        nav {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .nav-item {
+            padding: 1rem;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text-light);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+        }
+
+        .nav-item:hover, .nav-item.active {
+            background: var(--primary-light);
+            color: var(--primary);
+        }
+
+        /* Main Content */
+        main {
+            margin-left: 280px;
+            flex: 1;
+            padding: 2rem;
+            max-width: 1200px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .token-status {
+            background: var(--primary-light);
+            color: var(--primary);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+        }
+
+        .card {
+            background: var(--card);
+            padding: 1.5rem;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            border: 1px solid #f1f5f9;
+            transition: transform 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+        }
+
+        h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Forms */
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            font-size: 0.875rem;
+            margin-bottom: 0.25rem;
+            color: var(--text-light);
+        }
+
+        input, select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+        }
+
+        button {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        button.outline {
+            background: transparent;
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            margin-top: 0.5rem;
+        }
+
+        /* List Styling */
+        .list-container {
+            margin-top: 1rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .list-item {
+            padding: 1rem;
+            border-bottom: 1px solid #f1f5f9;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .list-item:last-child {
+            border-bottom: none;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .status-requested { background: var(--warning); color: white; }
+        .status-confirmed { background: var(--accent); color: white; }
+
+        /* Notification Toast Area */
+        #notification-area {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            z-index: 1000;
+        }
+
+        .toast {
+            background: #1e293b;
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <aside>
+        <div class="logo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2a2 2 0 0 0-2 2v5H4a2 2 0 0 0-2 2v2c0 1.1.9 2 2 2h5v5c0 1.1.9 2 2 2h2a2 2 0 0 0 2-2v-5h5a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2h-5V4a2 2 0 0 0-2-2h-2z"/></svg>
+            Medical Nexus
+        </div>
+        <nav>
+            <div class="nav-item active">Admin Center</div>
+            <a href="user.html" class="nav-item">Patient Portal →</a>
+        </nav>
+        <div style="margin-top: auto; font-size: 0.75rem; color: var(--text-light);">
+            Connected to API Gateway v1.0
+        </div>
+    </aside>
+
+    <main>
+        <header>
+            <h1>MSA Operation Center</h1>
+            <div id="token-display" class="token-status">Token: Fetching...</div>
+        </header>
+
+        <div class="grid">
+            <!-- Patient Section -->
+            <div class="card">
+                <h2>환자 등록 (Patient Service)</h2>
+                <div class="form-group">
+                    <label>성함</label>
+                    <input type="text" id="p-name" placeholder="홍길동">
+                </div>
+                <div class="form-group">
+                    <label>연락처</label>
+                    <input type="text" id="p-contact" placeholder="010-1234-5678">
+                </div>
+                <button onclick="registerPatient()">환자 등록</button>
+                <div class="list-container" id="patient-list">
+                    <!-- List items will be injected here -->
+                </div>
+            </div>
+
+            <!-- Appointment Section -->
+            <div class="card">
+                <h2>진료 예약 (Appointment)</h2>
+                <div class="form-group">
+                    <label>환자 ID</label>
+                    <input type="number" id="a-patient-id" placeholder="1">
+                </div>
+                <div class="form-group">
+                    <label>예약 일시</label>
+                    <input type="datetime-local" id="a-date">
+                </div>
+                <button onclick="createAppointment()">예약 신청</button>
+                <div class="list-container" id="appointment-list">
+                    <!-- List items will be injected here -->
+                </div>
+            </div>
+
+            <!-- Prescription Section -->
+            <div class="card">
+                <h2>처방전 발행 (Prescription)</h2>
+                <div class="form-group">
+                    <label>환자 ID (Feign Call 검증용)</label>
+                    <input type="number" id="pr-patient-id" placeholder="1">
+                </div>
+                <div class="form-group">
+                    <label>약품명</label>
+                    <input type="text" id="pr-medicine" placeholder="타이레놀">
+                </div>
+                <button onclick="issuePrescription()">처방 발행 (서킷브레이커 적용)</button>
+            </div>
+
+            <!-- Notification Section -->
+            <div class="card">
+                <h2>알림 내역 (Notification Service)</h2>
+                <button class="outline" onclick="fetchNotifications()">새로고침 (Kafka Consumer 결과)</button>
+                <div class="list-container" id="notification-list">
+                    <!-- List items will be injected here -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="notification-area"></div>
+
+    <script>
+        const API_BASE = "http://localhost:8080";
+        let JWT_TOKEN = "";
+
+        // Initial Token Fetch
+        async function fetchToken() {
+            try {
+                const res = await fetch(`${API_BASE}/auth/token`);
+                const data = await res.json();
+                JWT_TOKEN = data.token;
+                document.getElementById('token-display').innerText = "Token: Active (JWT)";
+                console.log("Token Acquired:", JWT_TOKEN);
+                loadAll();
+            } catch (e) {
+                document.getElementById('token-display').innerText = "Token: Failed to connect";
+                document.getElementById('token-display').style.background = "#fee2e2";
+                document.getElementById('token-display').style.color = "#ef4444";
+            }
+        }
+
+        function loadAll() {
+            fetchPatients();
+            fetchAppointments();
+            fetchNotifications();
+        }
+
+        // --- Patient ---
+        async function registerPatient() {
+            const name = document.getElementById('p-name').value;
+            const contact = document.getElementById('p-contact').value;
+            const res = await fetch(`${API_BASE}/patient-service/patients`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, contact, birthDate: "1990-01-01", gender: "M" })
+            });
+            if (res.ok) {
+                showToast("환자가 등록되었습니다.");
+                fetchPatients();
+            }
+        }
+
+        async function fetchPatients() {
+            const res = await fetch(`${API_BASE}/patient-service/patients`);
+            const data = await res.json();
+            const list = document.getElementById('patient-list');
+            list.innerHTML = data.map(p => `
+                <div class="list-item">
+                    <span>ID: ${p.id} | <strong>${p.name}</strong></span>
+                    <span style="font-size: 0.8rem">${p.contact}</span>
+                </div>
+            `).join('');
+        }
+
+        // --- Appointment ---
+        async function createAppointment() {
+            const patientId = document.getElementById('a-patient-id').value;
+            const res = await fetch(`${API_BASE}/appointment-service/appointments`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${JWT_TOKEN}`
+                },
+                body: JSON.stringify({ patientId, appointmentDate: document.getElementById('a-date').value })
+            });
+            if (res.ok) {
+                showToast("예약이 신청되었습니다.");
+                fetchAppointments();
+            } else if (res.status === 401) {
+                showToast("인증 오류 (JWT Check)");
+            }
+        }
+
+        async function confirmAppointment(id) {
+            const res = await fetch(`${API_BASE}/appointment-service/appointments/${id}/confirm`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${JWT_TOKEN}` }
+            });
+            if (res.ok) {
+                showToast("예약이 확정되었습니다! (Kafka Event 발행)");
+                fetchAppointments();
+                setTimeout(fetchNotifications, 2000); // Wait for Kafka
+            }
+        }
+
+        async function fetchAppointments() {
+            const res = await fetch(`${API_BASE}/appointment-service/appointments`);
+            const data = await res.json();
+            const list = document.getElementById('appointment-list');
+            list.innerHTML = data.map(a => `
+                <div class="list-item">
+                    <span>ID: ${a.id} | P_ID: ${a.patientId} | <span class="status-badge status-${a.status.toLowerCase()}">${a.status}</span></span>
+                    ${a.status === 'REQUESTED' ? `<button style="width:auto; padding: 4px 8px; font-size:0.7rem;" onclick="confirmAppointment(${a.id})">Confirm</button>` : ''}
+                </div>
+            `).join('');
+        }
+
+        // --- Prescription ---
+        async function issuePrescription() {
+            const patientId = document.getElementById('pr-patient-id').value;
+            const medicine = document.getElementById('pr-medicine').value;
+            const res = await fetch(`${API_BASE}/prescription-service/prescriptions`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${JWT_TOKEN}`
+                },
+                body: JSON.stringify({ patientId, medicine, dosage: "1 tab, 2 times daily" })
+            });
+            if (res.ok) {
+                showToast("처방전이 발행되었습니다. (Feign Call 성공)");
+            } else {
+                showToast("처방 발행 실패 (서비스 장애 시 Fallback 동작)");
+            }
+        }
+
+        // --- Notifications ---
+        async function fetchNotifications() {
+            const res = await fetch(`${API_BASE}/notification-service/notifications`);
+            const data = await res.json();
+            const list = document.getElementById('notification-list');
+            list.innerHTML = data.map(n => `
+                <div class="list-item">
+                    <span>P_ID: ${n.patientId}</span>
+                    <span style="font-size: 0.8rem">${n.message}</span>
+                </div>
+            `).join('');
+        }
+
+        function showToast(msg) {
+            const area = document.getElementById('notification-area');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerText = msg;
+            area.appendChild(toast);
+            setTimeout(() => toast.remove(), 4000);
+        }
+
+        // Start
+        fetchToken();
+    </script>
+</body>
+</html>

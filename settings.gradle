@@ -1,0 +1,9 @@
+rootProject.name = 'medical-platform'
+
+include 'eureka-server'
+include 'api-gateway'
+include 'patient-service'
+include 'appointment-service'
+include 'prescription-service'
+include 'notification-service'
+include 'common'

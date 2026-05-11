@@ -1,0 +1,41 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      routes:
+        - id: patient-service
+          uri: lb://patient-service
+          predicates:
+            - Path=/patient-service/**
+        - id: appointment-service
+          uri: lb://appointment-service
+          predicates:
+            - Path=/appointment-service/**
+          filters:
+            - JwtAuthenticationFilter
+        - id: prescription-service
+          uri: lb://prescription-service
+          predicates:
+            - Path=/prescription-service/**
+          filters:
+            - JwtAuthenticationFilter
+        - id: notification-service
+          uri: lb://notification-service
+          predicates:
+            - Path=/notification-service/**
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+jwt:
+  secret: very-long-secret-key-that-is-at-least-32-characters

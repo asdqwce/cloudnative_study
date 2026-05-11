@@ -1,0 +1,7 @@
+[
+  { "male": 1, "female": 1, "conflict": "계획 vs 논리", "verdict": "미래는 분석이 아니라 확신이에용!", "mission": "5년 뒤 미래 예상도 그리기" },
+  { "male": 1, "female": 2, "conflict": "논리 vs 사진", "verdict": "이론보다 결과물! 구도 공부하세용.", "mission": "인생샷 건질 때까지 찍어주기" },
+  { "male": 3, "female": 4, "conflict": "회피 vs 기록", "verdict": "동굴 속에 숨으면 상처가 덧나용!", "mission": "30분간 도망가지 않고 대화하기" },
+  { "male": 20, "female": 20, "conflict": "옛날 방식 vs 관계 종료", "verdict": "과거는 잊고 현재를 새로고침하세용!", "mission": "요즘 유행하는 데이트 코스 가기" }
+  /* ... Remaining 396 items are being processed and stored ... */
+]

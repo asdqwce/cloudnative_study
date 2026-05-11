@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patient Portal | Medical Nexus</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0ea5e9;
+            --primary-dark: #0284c7;
+            --bg: #f0f9ff;
+            --card: #ffffff;
+            --text: #0f172a;
+            --text-light: #475569;
+            --radius: 20px;
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .user-id-selector {
+            background: var(--card);
+            padding: 0.5rem 1rem;
+            border-radius: 30px;
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        select {
+            border: none;
+            outline: none;
+            font-weight: 600;
+            color: var(--primary-dark);
+            background: transparent;
+            cursor: pointer;
+        }
+
+        .welcome-card {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            padding: 2.5rem;
+            border-radius: var(--radius);
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 25px -5px rgba(14, 165, 233, 0.4);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .welcome-card h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .welcome-card p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 2rem;
+        }
+
+        .card {
+            background: var(--card);
+            padding: 1.5rem;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 1.5rem;
+        }
+
+        h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1.25rem;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .list-item {
+            padding: 1rem;
+            border-bottom: 1px solid #f1f5f9;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s;
+        }
+
+        .list-item:hover {
+            background: #f8fafc;
+        }
+
+        .list-item:last-child {
+            border-bottom: none;
+        }
+
+        .badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .badge-confirmed { background: #dcfce7; color: #15803d; }
+        .badge-requested { background: #fef9c3; color: #a16207; }
+
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+        }
+
+        .btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        input, select.form-control {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            margin-bottom: 1rem;
+            outline: none;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-light);
+            font-style: italic;
+        }
+
+        #notification-feed {
+            background: #fffbeb;
+            border: 1px solid #fde68a;
+            border-radius: var(--radius);
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .notification-item {
+            font-size: 0.875rem;
+            color: #92400e;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #fef3c7;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <div style="font-weight: 700; font-size: 1.5rem; color: var(--primary-dark);">Medical Nexus</div>
+            <div class="user-id-selector">
+                <span>환자 선택:</span>
+                <select id="user-select" onchange="changeUser()">
+                    <option value="">로그인 필요</option>
+                </select>
+            </div>
+            <a href="index.html" style="text-decoration: none; color: var(--text-light); font-size: 0.8rem;">관리자 모드 →</a>
+        </header>
+
+        <div id="patient-view" style="display: none;">
+            <div class="welcome-card">
+                <h1>안녕하세요, <span id="hello-name">환자</span>님</h1>
+                <p>오늘의 건강 상태를 확인하고 새로운 예약을 관리하세요.</p>
+            </div>
+
+            <div id="notification-feed">
+                <strong>실시간 알림</strong>
+                <div id="notif-list"></div>
+            </div>
+
+            <div class="grid">
+                <div>
+                    <div class="card">
+                        <h2>내 예약 현황</h2>
+                        <div id="appt-list"></div>
+                    </div>
+
+                    <div class="card">
+                        <h2>처방전 내역</h2>
+                        <div id="presc-list"></div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="card">
+                        <h2>새 진료 예약</h2>
+                        <div class="form-group">
+                            <label>희망 과목</label>
+                            <select class="form-control">
+                                <option>내과</option>
+                                <option>이비인후과</option>
+                                <option>피부과</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>희망 일시</label>
+                            <input type="datetime-local" id="new-appt-date" class="form-control">
+                        </div>
+                        <button class="btn" onclick="bookAppointment()">예약 신청하기</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="login-view" class="empty-state">
+            상단 메뉴에서 환자를 선택하여 로그인해 주세요.
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "http://localhost:8080";
+        let currentPatientId = null;
+
+        async function init() {
+            // Load patients for selector
+            const res = await fetch(`${API_BASE}/patient-service/patients`);
+            const patients = await res.json();
+            const select = document.getElementById('user-select');
+            patients.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.innerText = `${p.name} (ID: ${p.id})`;
+                select.appendChild(opt);
+            });
+        }
+
+        async function changeUser() {
+            const id = document.getElementById('user-select').value;
+            if (!id) {
+                document.getElementById('patient-view').style.display = 'none';
+                document.getElementById('login-view').style.display = 'block';
+                return;
+            }
+            currentPatientId = id;
+            document.getElementById('patient-view').style.display = 'block';
+            document.getElementById('login-view').style.display = 'none';
+            
+            // Get Name
+            const res = await fetch(`${API_BASE}/patient-service/patients/${id}`);
+            const p = await res.json();
+            document.getElementById('hello-name').innerText = p.name;
+            
+            refreshData();
+        }
+
+        async function refreshData() {
+            if (!currentPatientId) return;
+            fetchAppointments();
+            fetchPrescriptions();
+            fetchNotifications();
+        }
+
+        async function fetchAppointments() {
+            const res = await fetch(`${API_BASE}/appointment-service/appointments?patientId=${currentPatientId}`);
+            const data = await res.json();
+            const list = document.getElementById('appt-list');
+            if (data.length === 0) {
+                list.innerHTML = '<div class="empty-state">예약 내역이 없습니다.</div>';
+                return;
+            }
+            list.innerHTML = data.map(a => `
+                <div class="list-item">
+                    <div>
+                        <div style="font-weight: 600;">진료 예약</div>
+                        <div style="font-size: 0.8rem; color: var(--text-light);">${a.appointmentDate}</div>
+                    </div>
+                    <span class="badge badge-${a.status.toLowerCase()}">${a.status}</span>
+                </div>
+            `).join('');
+        }
+
+        async function fetchPrescriptions() {
+            const res = await fetch(`${API_BASE}/prescription-service/prescriptions?patientId=${currentPatientId}`);
+            const data = await res.json();
+            const list = document.getElementById('presc-list');
+            if (data.length === 0) {
+                list.innerHTML = '<div class="empty-state">처방 내역이 없습니다.</div>';
+                return;
+            }
+            list.innerHTML = data.map(p => `
+                <div class="list-item">
+                    <div>
+                        <div style="font-weight: 600;">${p.medicine}</div>
+                        <div style="font-size: 0.8rem; color: var(--text-light);">${p.dosage}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function fetchNotifications() {
+            const res = await fetch(`${API_BASE}/notification-service/notifications?patientId=${currentPatientId}`);
+            const data = await res.json();
+            const list = document.getElementById('notif-list');
+            if (data.length === 0) {
+                list.innerHTML = '<div style="font-size: 0.8rem; color: #d97706;">새로운 알림이 없습니다.</div>';
+                return;
+            }
+            list.innerHTML = data.map(n => `
+                <div class="notification-item">
+                    • ${n.message} <span style="font-size: 0.7rem; opacity: 0.7;">(${n.sentDate})</span>
+                </div>
+            `).join('');
+        }
+
+        async function bookAppointment() {
+            const date = document.getElementById('new-appt-date').value;
+            if (!date) return alert("날짜를 선택해 주세요.");
+            
+            const res = await fetch(`${API_BASE}/appointment-service/appointments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ patientId: currentPatientId, appointmentDate: date })
+            });
+            if (res.ok) {
+                alert("예약 신청이 완료되었습니다.");
+                refreshData();
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>
