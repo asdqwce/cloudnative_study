@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: prescription-db
+spec:
+  serviceName: prescription-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prescription-db
+  template:
+    metadata:
+      labels:
+        app: prescription-db
+    spec:
+      containers:
+        - name: prescription-db
+          image: postgres:15
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: user
+            - name: POSTGRES_PASSWORD
+              value: password
+            - name: POSTGRES_DB
+              value: prescription_db
+          volumeMounts:
+            - name: prescription-db-storage
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: prescription-db-storage
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
