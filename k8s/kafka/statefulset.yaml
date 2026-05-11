@@ -16,6 +16,8 @@ spec:
       containers:
         - name: kafka
           image: apache/kafka:latest
+          securityContext:
+            runAsUser: 0
           ports:
             - containerPort: 9092
           env:
@@ -35,7 +37,7 @@ spec:
               value: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
           volumeMounts:
             - name: kafka-storage
-              mountPath: /bitnami/kafka
+              mountPath: /tmp/kafka-logs
   volumeClaimTemplates:
     - metadata:
         name: kafka-storage
