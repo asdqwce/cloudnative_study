@@ -1,3 +1,5 @@
 .env
-provision/ansible/inventory.ini
+.vagrant/
 providers/local-vagrant/.vagrant/
+*.retry
+*.log
