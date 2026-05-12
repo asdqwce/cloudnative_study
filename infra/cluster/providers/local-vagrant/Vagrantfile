@@ -1,12 +1,25 @@
 # frozen_string_literal: true
 
+env_file = File.expand_path("../../.env", __dir__)
+if File.exist?(env_file)
+  File.readlines(env_file).each do |line|
+    line = line.strip
+    next if line.empty? || line.start_with?("#")
+
+    key, value = line.split("=", 2)
+    ENV[key] ||= value if key && value
+  end
+end
+
 VAGRANT_BOX = ENV.fetch("LOCAL_VAGRANT_BOX", "bento/ubuntu-22.04")
-CONTROL_PLANE_CPUS = ENV.fetch("CONTROL_PLANE_CPUS", "4").to_i
-CONTROL_PLANE_MEMORY_MB = ENV.fetch("CONTROL_PLANE_MEMORY_MB", "4096").to_i
-CONTROL_PLANE_DISK_SIZE = ENV.fetch("CONTROL_PLANE_DISK_SIZE", "30GB")
-WORKER_CPUS = ENV.fetch("WORKER_CPUS", "4").to_i
-WORKER_MEMORY_MB = ENV.fetch("WORKER_MEMORY_MB", "4096").to_i
-WORKER_DISK_SIZE = ENV.fetch("WORKER_DISK_SIZE", "30GB")
+
+CONTROL_PLANE_CPUS = ENV.fetch("CONTROL_PLANE_CPUS", "2").to_i
+CONTROL_PLANE_MEMORY_MB = ENV.fetch("CONTROL_PLANE_MEMORY_MB", "3072").to_i
+CONTROL_PLANE_DISK_SIZE = ENV.fetch("CONTROL_PLANE_DISK_SIZE", "30270").to_i
+
+WORKER_CPUS = ENV.fetch("WORKER_CPUS", "2").to_i
+WORKER_MEMORY_MB = ENV.fetch("WORKER_MEMORY_MB", "2048").to_i
+WORKER_DISK_SIZE = ENV.fetch("WORKER_DISK_SIZE", "30270").to_i
 
 NODES = [
   {
@@ -36,7 +49,7 @@ HOSTS = NODES.map { |node| "#{node[:ip]} #{node[:name]}" }.join("\n")
 
 Vagrant.configure("2") do |config|
   config.vm.box = VAGRANT_BOX
-  config.ssh.insert_key = false
+  config.ssh.insert_key = true
   config.vm.synced_folder ".", "/vagrant", disabled: true
 
   NODES.each do |node|
@@ -54,9 +67,9 @@ Vagrant.configure("2") do |config|
       machine.vm.provision "shell", inline: <<-SHELL
         set -eu
         sudo hostnamectl set-hostname #{node[:name]}
-        sudo sed -i '/dev-env-bootstrap-local/d' /etc/hosts
+        sudo sed -i '/cloudnative-local-cluster/d' /etc/hosts
         cat <<'HOSTS' | sudo tee -a /etc/hosts >/dev/null
-#{HOSTS.lines.map { |line| "#{line.chomp} # dev-env-bootstrap-local" }.join("\n")}
+#{HOSTS.lines.map { |line| "#{line.chomp} # cloudnative-local-cluster" }.join("\n")}
 HOSTS
       SHELL
     end
