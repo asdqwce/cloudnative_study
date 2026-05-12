@@ -118,6 +118,7 @@ WSL에는 Vagrant를 설치하지 않아도 됩니다. WSL에서는 Ansible로 V
 ## Ansible SSH key 주의사항
 
 Windows 경로를 WSL에서 보면 private key 권한이 `0777`처럼 보일 수 있습니다. 이 경우 SSH가 다음 오류로 key 사용을 거부합니다.
+wsl이 아닌 로컬 환경의 경우 오류 발생 가능성이 적으니 아래는 무시하셔도 됩니다.
 
 ```text
 WARNING: UNPROTECTED PRIVATE KEY FILE
