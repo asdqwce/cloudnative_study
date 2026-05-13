@@ -42,7 +42,7 @@ LOCAL_REGISTRY_PORT ?= 5000
 LOCAL_REGISTRY ?= $(LOCAL_REGISTRY_HOST):$(LOCAL_REGISTRY_PORT)
 LOCAL_REGISTRY_STORAGE_PATH ?= /var/lib/docker-registry
 LOCAL_REGISTRY_CA_LOCAL_PATH ?= $(HOME)/.docker/certs.d/$(LOCAL_REGISTRY)/ca.crt
-LOCAL_VM_SSH_PRIVATE_KEY ?= $(HOME)/.ssh/cloudnative-vagrant/control-plane-1
+LOCAL_VM_SSH_PRIVATE_KEY ?=
 APP_NAMESPACE ?= medical-platform
 METRICS_SERVER_VERSION ?= v0.8.1
 METRICS_SERVER_WAIT_TIMEOUT ?= 300s
@@ -252,8 +252,7 @@ local-vms-reset:
 	$(MAKE) local-k8s-bootstrap
 
 local-inventory:
-	@test -f $(ANSIBLE_INVENTORY) || (printf "%s\n" "missing: $(ANSIBLE_INVENTORY)" && exit 1)
-	@printf "%s\n" "확인 완료: $(ANSIBLE_INVENTORY)"
+	./scripts/generate-ansible-inventory.sh "$(ANSIBLE_INVENTORY)" "providers/$(LOCAL_PROVIDER)"
 
 ansible-ping:
 	ansible $(ANSIBLE_FLAGS) -i $(ANSIBLE_INVENTORY) all -m ping

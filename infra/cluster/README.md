@@ -137,7 +137,7 @@ Apple Silicon Mac은 VMware Fusion에서 사용할 수 있는 ARM64 Ubuntu Vagra
 
 이 프로젝트는 비밀번호를 Git에 커밋하지 않습니다.
 
-`provision/ansible/inventory.ini`에는 SSH private key의 경로만 들어갑니다. 실제 private key 파일은 Vagrant가 로컬에 생성하며 `.gitignore`로 제외됩니다.
+`provision/ansible/inventory.ini`에는 SSH private key의 경로만 들어갑니다. `make local-inventory`가 Vagrant SSH 설정을 읽어 로컬 환경에 맞게 생성합니다. 실제 private key 파일은 Vagrant가 로컬에 생성하며 `.gitignore`로 제외됩니다.
 
 ```text
 providers/local-vagrant/.vagrant/
@@ -277,7 +277,7 @@ make local-dev-down
 | `make local-vms-ssh-config` | Vagrant SSH 설정 출력 |
 | `make local-vms-halt` | VM 종료 |
 | `make local-vms-destroy` | VM과 디스크 삭제 |
-| `make local-inventory` | Ansible inventory 파일 존재 확인 |
+| `make local-inventory` | Vagrant SSH 설정으로 Ansible inventory 생성 |
 | `make ansible-ping` | 모든 VM에 Ansible 접속 확인 |
 | `make servers-bootstrap` | containerd와 Kubernetes 패키지 설치 |
 | `make servers-verify` | 서버 기본 설정 검증 |

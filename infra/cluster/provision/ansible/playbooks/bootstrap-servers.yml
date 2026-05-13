@@ -23,18 +23,6 @@
         state: present
         update_cache: true
 
-    - name: Fail when yq release architecture is unsupported
-      ansible.builtin.fail:
-        msg: "Unsupported yq release architecture: {{ ansible_facts.architecture }}"
-      when: ansible_facts.architecture not in yq_release_arch
-
-    - name: Install yq from upstream release
-      ansible.builtin.get_url:
-        url: "https://github.com/mikefarah/yq/releases/download/{{ yq_version }}/yq_linux_{{ yq_release_arch[ansible_facts.architecture] }}"
-        dest: "{{ yq_binary_path }}"
-        mode: "0755"
-        checksum: "sha256:{{ yq_release_sha256[yq_release_arch[ansible_facts.architecture]] }}"
-
     - name: Disable swap for kubelet
       ansible.builtin.command: swapoff -a
       changed_when: false

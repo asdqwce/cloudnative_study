@@ -3,7 +3,7 @@ set -euo pipefail
 
 registry="${LOCAL_REGISTRY:-10.10.10.10:5000}"
 registry_host="${LOCAL_REGISTRY_HOST:-10.10.10.10}"
-ssh_key="${LOCAL_VM_SSH_PRIVATE_KEY:-$HOME/.ssh/cloudnative-vagrant/control-plane-1}"
+inventory_path="${ANSIBLE_INVENTORY:-provision/ansible/inventory.ini}"
 cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/cloudnative-study/infra-cluster"
 cache_ca="${cache_dir}/${registry}-ca.crt"
 
@@ -15,12 +15,45 @@ is_wsl() {
   grep -qiE "microsoft|wsl" /proc/version 2>/dev/null
 }
 
+if [ ! -f "${inventory_path}" ]; then
+  log "missing: ${inventory_path}"
+  log "run this first: make local-inventory"
+  exit 1
+fi
+
+inventory_value() {
+  local name="$1"
+  awk -v name="${name}" '
+    $1 == "control-plane-1" {
+      for (i = 2; i <= NF; i++) {
+        if ($i ~ "^" name "=") {
+          sub("^" name "=", "", $i)
+          print $i
+          exit
+        }
+      }
+    }
+  ' "${inventory_path}"
+}
+
+ssh_user="${LOCAL_VM_SSH_USER:-$(inventory_value ansible_user)}"
+ssh_host="${LOCAL_VM_SSH_HOST:-$(inventory_value ansible_host)}"
+ssh_port="${LOCAL_VM_SSH_PORT:-$(inventory_value ansible_port)}"
+ssh_key="${LOCAL_VM_SSH_PRIVATE_KEY:-$(inventory_value ansible_ssh_private_key_file)}"
+
+if [ -z "${ssh_user}" ] || [ -z "${ssh_host}" ] || [ -z "${ssh_port}" ] || [ -z "${ssh_key}" ]; then
+  log "missing: control-plane-1 SSH settings in ${inventory_path}"
+  log "run this first: make local-inventory"
+  exit 1
+fi
+
 fetch_ca() {
   mkdir -p "${cache_dir}"
   if ! ssh -i "${ssh_key}" \
+    -p "${ssh_port}" \
     -o StrictHostKeyChecking=no \
     -o UserKnownHostsFile=/dev/null \
-    "vagrant@${registry_host}" \
+    "${ssh_user}@${ssh_host}" \
     "sudo test -f /etc/docker/registry/tls/ca.crt"; then
     log "missing: /etc/docker/registry/tls/ca.crt on ${registry_host}"
     log "run this first: make registry-bootstrap"
@@ -28,9 +61,10 @@ fetch_ca() {
   fi
 
   ssh -i "${ssh_key}" \
+    -p "${ssh_port}" \
     -o StrictHostKeyChecking=no \
     -o UserKnownHostsFile=/dev/null \
-    "vagrant@${registry_host}" \
+    "${ssh_user}@${ssh_host}" \
     "sudo cat /etc/docker/registry/tls/ca.crt" > "${cache_ca}"
   log "fetched: ${cache_ca}"
 }
