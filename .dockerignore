@@ -1,9 +1,11 @@
 .git
 .gradle
+.vagrant
 .idea
 .vscode
 
 **/build
+**/.vagrant
 **/bin
 **/out
 **/target
