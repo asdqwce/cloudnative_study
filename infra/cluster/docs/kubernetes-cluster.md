@@ -17,7 +17,7 @@
 ## 전체 실행
 
 ```bash
-cd "/Users/danghamo/Documents/New project/dev-env-bootstrap"
+cd "/path/to/cloudnative_study/infra/cluster"
 make local-bootstrap
 ```
 
@@ -49,7 +49,7 @@ make cluster-verify
 control-plane VM에 접속한다.
 
 ```bash
-cd "/Users/danghamo/Documents/New project/dev-env-bootstrap/providers/local-vagrant"
+cd "/path/to/cloudnative_study/infra/cluster/providers/local-vagrant"
 vagrant ssh control-plane-1
 ```
 

@@ -19,9 +19,9 @@ docker compose version
 
 Docker Desktop 대신 Colima, Rancher Desktop 같은 대안을 사용해도 된다. 이 경우에도 `docker compose version`이 동작해야 한다.
 
-## 2. VMware Fusion
+## 2. VMware Workstation / Fusion
 
-VMware Fusion을 설치하고 한 번 실행해 둔다. Vagrant가 VM을 만들 때 VMware Fusion backend를 사용한다.
+Windows는 VMware Workstation, macOS는 VMware Fusion을 설치하고 한 번 실행해 둔다. Vagrant가 VM을 만들 때 VMware backend를 사용한다.
 
 확인:
 
@@ -61,7 +61,7 @@ vagrant --version
 
 ## 5. Vagrant VMware provider
 
-Vagrant가 VMware Fusion을 제어하려면 VMware provider plugin과 VMware Utility가 필요하다.
+Vagrant가 VMware를 제어하려면 VMware provider plugin과 VMware Utility가 필요하다.
 
 VMware Utility:
 
@@ -118,7 +118,7 @@ Apple Silicon Mac에서는 VMware Fusion이 ARM guest를 실행하므로, 위 bo
 ## 8. 최종 확인
 
 ```bash
-cd dev-env-bootstrap
+cd infra/cluster
 make check-local-dev-tools
 make check-tools
 ```

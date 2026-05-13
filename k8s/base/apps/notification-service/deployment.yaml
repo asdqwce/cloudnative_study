@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      containers:
+        - name: notification-service
+          image: zexpand/notification-service:latest
+          ports:
+            - containerPort: 8084
+          env:
+            - name: EUREKA_CLIENT_ENABLED
+              value: "false"
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:+UseSerialGC -Xms48m -Xmx96m -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=48m -Xss256k -Djava.security.egd=file:/dev/./urandom"
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:h2:mem:notification_db
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 256Mi

@@ -3,6 +3,7 @@
 `cloudnative_study`의 의료 MSA 서비스를 Kubernetes 환경에 배포하기 위한 로컬 클러스터 구성입니다.
 
 VMware 위에 Vagrant로 Ubuntu VM 3대를 생성하고, Ansible로 `containerd`, `kubeadm`, `kubelet`, `kubectl`을 설치한 뒤 kubeadm 기반 Kubernetes 클러스터를 구성합니다.
+클러스터가 준비되면 control-plane VM의 local registry와 Metrics Server를 붙이고, 현재 repo의 `k8s/overlays/local/**` Kustomize entrypoint를 VM 안에서 직접 `kubectl apply -k`하는 반복 배포 흐름까지 제공합니다.
 
 ## 구성 목표
 
@@ -22,6 +23,8 @@ VMware 위에 Vagrant로 Ubuntu VM 3대를 생성하고, Ansible로 `containerd`
 | Container Runtime | containerd |
 | Kubernetes 설치 | kubeadm |
 | CNI | Calico |
+| Local Registry | docker-registry on `control-plane-1` |
+| Metrics | Kubernetes Metrics Server |
 
 ## 디렉터리 구조
 
@@ -43,7 +46,12 @@ infra/cluster/
 │        ├─ bootstrap-servers.yml
 │        ├─ verify-servers.yml
 │        ├─ bootstrap-cluster.yml
-│        └─ verify-cluster.yml
+│        ├─ verify-cluster.yml
+│        ├─ bootstrap-registry.yml
+│        ├─ verify-registry.yml
+│        ├─ bootstrap-metrics-server.yml
+│        └─ verify-metrics-server.yml
+├─ local-dev/
 ├─ docs/
 └─ scripts/
 ```
@@ -89,12 +97,20 @@ macOS 사용자는 Terminal에서 Vagrant와 Ansible을 모두 실행할 수 있
 - Vagrant VMware Utility
 - Ansible
 - Make
+- Docker 또는 Docker Desktop
+- kubectl
 
 도구 확인:
 
 ```bash
 cd infra/cluster
 make check-tools
+```
+
+macOS에서는 자동 설치 보조 스크립트를 사용할 수 있습니다.
+
+```bash
+make install-tools
 ```
 
 ## 환경 파일 생성
@@ -183,10 +199,72 @@ make cluster-bootstrap
 make cluster-verify
 ```
 
+6. Metrics Server 구성
+
+```bash
+make metrics-bootstrap
+make metrics-verify
+```
+
 전체 과정을 한 번에 실행하려면:
 
 ```bash
 make local-bootstrap
+```
+
+## Local Registry와 직접 배포 루프
+
+`control-plane-1`에는 HTTPS local registry를 구성할 수 있습니다.
+
+```bash
+make registry-bootstrap
+make registry-verify
+make registry-ca-install
+```
+
+macOS Docker Desktop에서 `docker push`가 `x509` 오류를 내면 `registry-ca-install` 후 Docker Desktop을 재시작합니다. 인증서 자체가 맞는지는 다음 명령으로 확인합니다.
+
+```bash
+make registry-ca-curl-verify
+```
+
+local-k8s target은 `k8s/` 디렉터리를 control-plane VM에 업로드한 뒤 VM 내부의 `/etc/kubernetes/admin.conf`로 Kustomize overlay를 직접 적용합니다.
+
+| 적용 범위 | Kustomize 경로 | Make target |
+|---|---|---|
+| 전체 | `k8s/overlays/local/all` | `make local-k8s-apply` |
+| 의존성 | `k8s/overlays/local/deps` | `make local-k8s-deps-apply` |
+| 앱 | `k8s/overlays/local/apps` | `make local-k8s-app-apply` |
+
+```bash
+make local-k8s-deps-apply
+make local-k8s-deps-verify
+make local-k8s-app-apply
+make local-k8s-app-verify
+make local-k8s-status
+make local-k8s-top
+```
+
+앱 이미지를 다시 만들고 registry push, manifest tag 갱신, 앱 재적용까지 한 번에 실행하려면 다음 명령을 사용합니다.
+
+```bash
+make local-k8s-deploy IMAGE_TAG=dev-001
+```
+
+실제 VM/cluster bootstrap까지 포함한 최초 준비는 다음 target입니다.
+
+```bash
+make local-k8s-bootstrap
+```
+
+## Local Dev Compose
+
+Kubernetes와 별개로 개인 장비에서 PostgreSQL, Redis, Kafka만 빠르게 띄울 수 있습니다.
+
+```bash
+make local-dev-up
+make local-dev-ps
+make local-dev-down
 ```
 
 ## 주요 명령
@@ -205,7 +283,15 @@ make local-bootstrap
 | `make servers-verify` | 서버 기본 설정 검증 |
 | `make cluster-bootstrap` | kubeadm 클러스터 구성 |
 | `make cluster-verify` | Kubernetes 노드와 시스템 Pod 상태 검증 |
-| `make local-reset` | VM 삭제 후 처음부터 재구성 |
+| `make metrics-bootstrap` | Metrics Server 설치와 로컬 kubelet TLS 옵션 적용 |
+| `make metrics-verify` | `kubectl top nodes/pods` 동작 검증 |
+| `make registry-bootstrap` | control-plane VM에 HTTPS local registry 구성 |
+| `make registry-verify` | 모든 노드에서 local registry API 접근 검증 |
+| `make registry-ca-install` | 호스트 Docker가 local registry CA를 신뢰하도록 설치 |
+| `make local-k8s-deploy` | 앱 image build/push, local apps overlay tag 갱신, 앱 apply/verify |
+| `make local-k8s-status` | 앱 pod/service/PVC/event 확인 |
+| `make local-k8s-top` | node와 pod/container 리소스 사용량 확인 |
+| `make local-vms-reset` | VM 삭제 후 처음부터 재구성 |
 
 ## 검증 기준
 
@@ -213,6 +299,7 @@ make local-bootstrap
 
 ```bash
 make cluster-verify
+make metrics-verify
 ```
 
 control-plane 노드에서 직접 확인하려면:
@@ -235,3 +322,5 @@ kubectl get pods -A
 | [docs/kubernetes-cluster.md](docs/kubernetes-cluster.md) | kubeadm 클러스터 구성과 검증 |
 | [docs/installed-server-components.md](docs/installed-server-components.md) | Ansible이 설치하는 서버 구성 요소 |
 | [docs/migration.md](docs/migration.md) | 로컬 VM 구성에서 클라우드 VM 구성으로 확장하는 기준 |
+| [docs/local-k8s-deployment.md](docs/local-k8s-deployment.md) | local registry와 직접 apply 배포 루프 |
+| [local-dev/README.md](local-dev/README.md) | Docker Compose 기반 개인 로컬 의존성 |

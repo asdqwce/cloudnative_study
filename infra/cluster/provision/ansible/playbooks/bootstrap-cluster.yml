@@ -26,6 +26,23 @@
         - kubelet_default.changed
         - kubelet_config.stat.exists
 
+    - name: Pre-pull Calico images from upstream registry
+      ansible.builtin.command:
+        argv:
+          - timeout
+          - "{{ calico_image_pull_timeout }}"
+          - crictl
+          - --runtime-endpoint
+          - "{{ kubernetes_cri_socket }}"
+          - pull
+          - "{{ item }}"
+      loop: "{{ calico_images }}"
+      register: calico_image_pull
+      changed_when: false
+      retries: 6
+      delay: 10
+      until: calico_image_pull.rc == 0
+
 - name: Initialize Kubernetes control plane
   hosts: kube_control_plane
   become: true
@@ -37,9 +54,28 @@
         path: "{{ kubernetes_admin_conf_path }}"
       register: kubeadm_admin_conf
 
+    - name: Pre-pull Kubernetes control-plane images
+      ansible.builtin.command:
+        argv:
+          - timeout
+          - "{{ kubeadm_image_pull_timeout }}"
+          - kubeadm
+          - config
+          - images
+          - pull
+          - "--cri-socket={{ kubernetes_cri_socket }}"
+      register: kubeadm_image_pull
+      changed_when: false
+      retries: 3
+      delay: 10
+      until: kubeadm_image_pull.rc == 0
+      when: not kubeadm_admin_conf.stat.exists
+
     - name: Initialize the control plane with kubeadm
       ansible.builtin.command:
         argv:
+          - timeout
+          - "{{ kubeadm_init_timeout }}"
           - kubeadm
           - init
           - "--apiserver-advertise-address={{ ansible_host }}"
@@ -129,6 +165,42 @@
       delay: 5
       until: groups['k8s_cluster'] | difference(cluster_node_names.stdout_lines) | length == 0
 
+    - name: Wait until Calico node pods are scheduled on every node
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - get
+          - pods
+          - -n
+          - kube-system
+          - -l
+          - k8s-app=calico-node
+          - -o
+          - jsonpath={range .items[*]}{.spec.nodeName}{"\n"}{end}
+      environment:
+        KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
+      register: calico_node_pod_nodes
+      changed_when: false
+      retries: 30
+      delay: 5
+      until: groups['k8s_cluster'] | difference(calico_node_pod_nodes.stdout_lines) | length == 0
+
+    - name: Wait until Calico node agents are Ready
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - wait
+          - --for=condition=Ready
+          - pod
+          - -n
+          - kube-system
+          - -l
+          - k8s-app=calico-node
+          - "--timeout={{ calico_node_ready_timeout }}"
+      environment:
+        KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
+      changed_when: false
+
     - name: Wait until all nodes are Ready
       ansible.builtin.command:
         argv:
@@ -146,29 +218,11 @@
       ansible.builtin.command:
         argv:
           - kubectl
-          - wait
-          - --for=condition=Ready
-          - pod
+          - rollout
+          - status
+          - deployment/coredns
           - -n
           - kube-system
-          - -l
-          - k8s-app=kube-dns
-          - "--timeout={{ kubernetes_node_ready_timeout }}"
-      environment:
-        KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
-      changed_when: false
-
-    - name: Wait until Calico node agents are Ready
-      ansible.builtin.command:
-        argv:
-          - kubectl
-          - wait
-          - --for=condition=Ready
-          - pod
-          - -n
-          - kube-system
-          - -l
-          - k8s-app=calico-node
           - "--timeout={{ kubernetes_node_ready_timeout }}"
       environment:
         KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
