@@ -12,11 +12,13 @@ crictl_config_path: /etc/crictl.yaml
 bootstrap_marker_path: /etc/cloudnative-cluster-ready
 calico_version: "{{ lookup('env', 'CALICO_VERSION') | default('v3.31.4', true) }}"
 calico_manifest_url: "https://raw.githubusercontent.com/projectcalico/calico/{{ calico_version }}/manifests/calico.yaml"
+calico_local_manifest_path: "/tmp/calico-{{ calico_version }}-local-registry.yaml"
 calico_image_pull_timeout: "{{ lookup('env', 'CALICO_IMAGE_PULL_TIMEOUT') | default('300s', true) }}"
 calico_images:
   - "quay.io/calico/cni:{{ calico_version }}"
   - "quay.io/calico/node:{{ calico_version }}"
   - "quay.io/calico/kube-controllers:{{ calico_version }}"
+calico_local_images: "{{ calico_images | map('regex_replace', '^', local_registry_endpoint ~ '/') | list }}"
 local_registry_host: "{{ lookup('env', 'LOCAL_REGISTRY_HOST') | default('10.10.10.10', true) }}"
 local_registry_port: "{{ lookup('env', 'LOCAL_REGISTRY_PORT') | default('5000', true) }}"
 local_registry_endpoint: "{{ local_registry_host }}:{{ local_registry_port }}"

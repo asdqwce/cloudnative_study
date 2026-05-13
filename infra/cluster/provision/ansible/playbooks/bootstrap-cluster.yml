@@ -26,7 +26,7 @@
         - kubelet_default.changed
         - kubelet_config.stat.exists
 
-    - name: Pre-pull Calico images from upstream registry
+    - name: Pre-pull Calico images from local registry
       ansible.builtin.command:
         argv:
           - timeout
@@ -36,7 +36,7 @@
           - "{{ kubernetes_cri_socket }}"
           - pull
           - "{{ item }}"
-      loop: "{{ calico_images }}"
+      loop: "{{ calico_local_images }}"
       register: calico_image_pull
       changed_when: false
       retries: 6
@@ -101,13 +101,27 @@
         mode: "0600"
         remote_src: true
 
+    - name: Download Calico manifest for local registry rendering
+      ansible.builtin.get_url:
+        url: "{{ calico_manifest_url }}"
+        dest: "{{ calico_local_manifest_path }}"
+        mode: "0644"
+        force: true
+
+    - name: Rewrite Calico images to local registry
+      ansible.builtin.replace:
+        path: "{{ calico_local_manifest_path }}"
+        regexp: "{{ item | regex_escape }}"
+        replace: "{{ local_registry_endpoint }}/{{ item }}"
+      loop: "{{ calico_images }}"
+
     - name: Install Calico CNI
       ansible.builtin.command:
         argv:
           - kubectl
           - apply
           - -f
-          - "{{ calico_manifest_url }}"
+          - "{{ calico_local_manifest_path }}"
       environment:
         KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
       register: calico_apply

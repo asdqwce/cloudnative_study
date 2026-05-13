@@ -212,9 +212,11 @@ make metrics-verify
 make local-bootstrap
 ```
 
+`local-bootstrap`은 서버 초기 설정 후 local registry를 먼저 준비하고, Calico/PostgreSQL/Kafka/BusyBox 이미지를 registry에 mirror한 뒤 kubeadm 클러스터와 Metrics Server를 구성합니다.
+
 ## Local Registry와 직접 배포 루프
 
-`control-plane-1`에는 HTTPS local registry를 구성할 수 있습니다.
+`control-plane-1`에는 HTTPS local registry를 구성할 수 있습니다. `local-k8s-bootstrap`은 Calico와 PostgreSQL/Kafka/BusyBox 이미지를 이 registry로 mirror한 뒤 VM Kubernetes에서 사용합니다.
 
 ```bash
 make registry-bootstrap

@@ -35,6 +35,7 @@ KUBEADM_INIT_TIMEOUT ?= 600s
 CALICO_NODE_READY_TIMEOUT ?= 600s
 CALICO_IMAGE_PULL_TIMEOUT ?= 300s
 CALICO_VERSION ?= v3.31.4
+CALICO_IMAGES ?= quay.io/calico/cni:$(CALICO_VERSION) quay.io/calico/node:$(CALICO_VERSION) quay.io/calico/kube-controllers:$(CALICO_VERSION)
 
 REPO_ROOT ?= $(abspath ../..)
 LOCAL_REGISTRY_HOST ?= 10.10.10.10
@@ -60,6 +61,10 @@ DASHBOARD_SERVICE ?= dashboard
 APP_DEPLOYMENTS ?= deployment/api-gateway deployment/patient-service deployment/appointment-service deployment/prescription-service deployment/notification-service deployment/dashboard
 DEPENDENCY_STATEFULSETS ?= statefulset/patient-db statefulset/appointment-db statefulset/prescription-db statefulset/kafka
 REGISTRY_PULL_TEST_IMAGE ?= $(LOCAL_REGISTRY)/api-gateway:$(IMAGE_TAG)
+LOCAL_K8S_DEP_IMAGES ?= postgres:15 apache/kafka:3.8.1 busybox:1.36
+LOCAL_K8S_MIRROR_IMAGES ?= $(CALICO_IMAGES) $(LOCAL_K8S_DEP_IMAGES)
+EXTRA_THIRD_PARTY_IMAGES ?=
+THIRD_PARTY_IMAGES ?= $(LOCAL_K8S_MIRROR_IMAGES) $(EXTRA_THIRD_PARTY_IMAGES)
 
 export LOCAL_VAGRANT_BOX
 export CONTROL_PLANE_CPUS
@@ -92,7 +97,7 @@ export LOCAL_DEV_REDIS_PORT
 export LOCAL_DEV_KAFKA_PORT
 export LOCAL_DEV_KAFKA_ADVERTISED_HOST
 
-.PHONY: help install-tools check-tools check-kubectl local-vms-up local-vms-status local-vms-ssh local-vms-ssh-config local-vms-stop local-vms-halt local-vms-destroy local-vms-reset local-inventory ansible-ping servers-bootstrap servers-verify cluster-bootstrap cluster-verify local-bootstrap \
+.PHONY: help install-tools check-tools check-kubectl local-vms-up local-vms-status local-vms-ssh local-vms-ssh-config local-vms-stop local-vms-halt local-vms-destroy local-vms-reset local-inventory ansible-ping servers-bootstrap servers-verify cluster-bootstrap cluster-verify local-servers-bootstrap local-cluster-bootstrap local-bootstrap \
 	registry-bootstrap registry-verify registry-pull-verify registry-ca-install registry-ca-install-mac registry-ca-install-linux registry-ca-install-wsl registry-ca-trust-macos registry-ca-curl-verify \
 	metrics-bootstrap metrics-verify \
 	check-local-dev-tools local-dev-config local-dev-up local-dev-kafka-up local-dev-down local-dev-reset local-dev-ps local-dev-logs \
@@ -138,12 +143,7 @@ help:
 	@printf "%s\n" "로컬 Kubernetes 직접 적용 루프"
 	@printf "%s\n" "  make registry-bootstrap     control-plane VM에 local registry를 구성합니다."
 	@printf "%s\n" "  make registry-verify        모든 노드에서 local registry API 접근을 확인합니다."
-	@printf "%s\n" "  make registry-pull-verify   모든 노드에서 local registry 이미지를 pull할 수 있는지 확인합니다."
 	@printf "%s\n" "  make registry-ca-install    현재 OS Docker가 HTTPS local registry를 신뢰하도록 CA를 설치합니다."
-	@printf "%s\n" "  make registry-ca-curl-verify CA 파일로 HTTPS registry 검증을 확인합니다."
-	@printf "%s\n" "  make app-images-push        앱 이미지를 $(LOCAL_REGISTRY)에 build/push합니다."
-	@printf "%s\n" "  make local-kustomize-tag    IMAGE_TAG 기준으로 local apps overlay 이미지 태그를 갱신합니다."
-	@printf "%s\n" "  make third-party-images-push 선택 사항입니다. THIRD_PARTY_IMAGES를 local registry에 mirror합니다."
 	@printf "%s\n" "  make local-k8s-bootstrap    클러스터, registry, Metrics Server와 앱 의존성을 준비합니다."
 	@printf "%s\n" "  make local-k8s-render       k8s/overlays/local/all 렌더링 결과를 출력합니다."
 	@printf "%s\n" "  make local-k8s-apply        k8s/overlays/local/all 전체 manifest를 직접 적용합니다."
@@ -159,7 +159,6 @@ help:
 	@printf "%s\n" "  make local-k8s-node-top     VM Kubernetes node CPU/메모리 사용량을 확인합니다."
 	@printf "%s\n" "  make local-k8s-app-top      medical-platform pod/container CPU/메모리 사용량을 확인합니다."
 	@printf "%s\n" "  make local-k8s-top          node와 pod/container 리소스 사용량을 확인합니다."
-	@printf "%s\n" "  make local-k8s-crud-smoke   API Gateway NodePort로 환자 생성/조회 smoke를 실행합니다."
 	@printf "%s\n" "  make local-k8s-deploy       앱 image build/push부터 앱 apply, rollout/status/top 확인까지 실행합니다."
 	@printf "%s\n" ""
 	@printf "%s\n" "정리"
@@ -332,11 +331,26 @@ third-party-images-push: check-local-dev-tools
 		fi; \
 	done
 
-local-bootstrap: local-vms-up local-inventory ansible-ping servers-bootstrap servers-verify cluster-bootstrap cluster-verify metrics-bootstrap metrics-verify
+local-servers-bootstrap:
+	$(MAKE) local-vms-up
+	$(MAKE) local-inventory
+	$(MAKE) ansible-ping
+	$(MAKE) servers-bootstrap
+	$(MAKE) servers-verify
+
+local-cluster-bootstrap:
+	$(MAKE) cluster-bootstrap
+	$(MAKE) cluster-verify
+	$(MAKE) metrics-bootstrap
+	$(MAKE) metrics-verify
+
+local-bootstrap:
+	$(MAKE) local-servers-bootstrap
+	$(MAKE) local-k8s-deps-prepare
+	$(MAKE) local-cluster-bootstrap
 
 local-k8s-bootstrap:
 	$(MAKE) local-bootstrap
-	$(MAKE) local-k8s-deps-prepare
 	$(MAKE) local-k8s-deps-apply
 	$(MAKE) local-k8s-deps-verify
 
@@ -344,6 +358,7 @@ local-k8s-deps-prepare:
 	$(MAKE) registry-bootstrap
 	$(MAKE) registry-verify
 	$(MAKE) registry-ca-install
+	$(MAKE) third-party-images-push THIRD_PARTY_IMAGES="$(LOCAL_K8S_MIRROR_IMAGES) $(EXTRA_THIRD_PARTY_IMAGES)"
 
 local-k8s-render: check-kubectl
 	@kubectl kustomize "$(LOCAL_K8S_ALL_DIR)"

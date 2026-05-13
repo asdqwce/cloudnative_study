@@ -43,13 +43,14 @@ make local-k8s-bootstrap
 이 명령은 다음 순서로 실행됩니다.
 
 ```bash
-make local-bootstrap
-make registry-bootstrap
-make registry-verify
-make registry-ca-install
+make local-servers-bootstrap
+make local-k8s-deps-prepare
+make local-cluster-bootstrap
 make local-k8s-deps-apply
 make local-k8s-deps-verify
 ```
+
+`local-k8s-deps-prepare`는 local registry를 구성하고 Calico, PostgreSQL, Kafka, BusyBox 이미지를 호스트 Docker로 받아 registry에 mirror합니다. 이후 Calico와 DB/Kafka manifest는 VM에서 upstream registry 대신 local registry 이미지를 사용합니다.
 
 실제 VM 생성이나 bootstrap은 오래 걸리고 로컬 장비 상태에 영향을 줍니다. dry-run으로 명령 연결만 확인하려면 `make -n local-k8s-bootstrap`을 사용합니다.
 
