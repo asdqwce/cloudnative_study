@@ -1,10 +1,15 @@
 SHELL := /bin/bash
 
+ENV_CLUSTER_TOPOLOGY := $(CLUSTER_TOPOLOGY)
 -include .env
+ifneq ($(ENV_CLUSTER_TOPOLOGY),)
+CLUSTER_TOPOLOGY := $(ENV_CLUSTER_TOPOLOGY)
+endif
 
 LOCAL_PROVIDER ?= local-vagrant
 LOCAL_VAGRANT_PROVIDER ?= vmware_desktop
 LOCAL_VAGRANT_BOX ?= bento/ubuntu-22.04
+CLUSTER_TOPOLOGY ?= compact
 
 CONTROL_PLANE_CPUS ?= 2
 CONTROL_PLANE_MEMORY_MB ?= 3072
@@ -14,8 +19,38 @@ WORKER_CPUS ?= 2
 WORKER_MEMORY_MB ?= 2048
 WORKER_DISK_SIZE ?= 30GB
 
+ROLE_SEPARATED_CONTROL_PLANE_CPUS ?= 2
+ROLE_SEPARATED_CONTROL_PLANE_MEMORY_MB ?= 2048
+ROLE_SEPARATED_CONTROL_PLANE_DISK_SIZE ?= 25GB
+ROLE_SEPARATED_PLATFORM_CPUS ?= 2
+ROLE_SEPARATED_PLATFORM_MEMORY_MB ?= 3072
+ROLE_SEPARATED_PLATFORM_DISK_SIZE ?= 40GB
+ROLE_SEPARATED_APP_CPUS ?= 1
+ROLE_SEPARATED_APP_MEMORY_MB ?= 1536
+ROLE_SEPARATED_APP_DISK_SIZE ?= 20GB
+ROLE_SEPARATED_POSTGRES_CPUS ?= 1
+ROLE_SEPARATED_POSTGRES_MEMORY_MB ?= 1536
+ROLE_SEPARATED_POSTGRES_DISK_SIZE ?= 30GB
+ROLE_SEPARATED_KAFKA_CPUS ?= 2
+ROLE_SEPARATED_KAFKA_MEMORY_MB ?= 2048
+ROLE_SEPARATED_KAFKA_DISK_SIZE ?= 40GB
+
+BALANCED_CONTROL_PLANE_CPUS ?= 2
+BALANCED_CONTROL_PLANE_MEMORY_MB ?= 2048
+BALANCED_CONTROL_PLANE_DISK_SIZE ?= 25GB
+BALANCED_PLATFORM_CPUS ?= 2
+BALANCED_PLATFORM_MEMORY_MB ?= 3072
+BALANCED_PLATFORM_DISK_SIZE ?= 45GB
+BALANCED_APP_CPUS ?= 2
+BALANCED_APP_MEMORY_MB ?= 2048
+BALANCED_APP_DISK_SIZE ?= 25GB
+BALANCED_DATA_CPUS ?= 2
+BALANCED_DATA_MEMORY_MB ?= 2048
+BALANCED_DATA_DISK_SIZE ?= 45GB
+
 ANSIBLE_INVENTORY ?= provision/ansible/inventory.ini
 ANSIBLE_FLAGS ?=
+HELM_FLAGS ?=
 
 LOCAL_DEV_PROJECT ?= cloudnative-local
 LOCAL_DEV_COMPOSE_FILE ?= local-dev/docker-compose.yml
@@ -47,6 +82,24 @@ LOCAL_VM_SSH_PRIVATE_KEY ?=
 APP_NAMESPACE ?= medical-platform
 METRICS_SERVER_VERSION ?= v0.8.1
 METRICS_SERVER_WAIT_TIMEOUT ?= 300s
+HELM_VERSION ?= v3.15.4
+OBSERVABILITY_NAMESPACE ?= observability
+OBSERVABILITY_DIR ?= stacks/observability
+OBSERVABILITY_REMOTE_ARCHIVE ?= /tmp/cloudnative-study-observability.tgz
+OBSERVABILITY_REMOTE_DIR ?= /tmp/cloudnative-study-observability
+OBSERVABILITY_GRAFANA_LOCAL_PORT ?= 3000
+KUBE_PROMETHEUS_STACK_RELEASE ?= kube-prometheus-stack
+KUBE_PROMETHEUS_STACK_CHART ?= kube-prometheus-stack
+KUBE_PROMETHEUS_STACK_REPO ?= https://prometheus-community.github.io/helm-charts
+LOKI_RELEASE ?= loki
+LOKI_CHART ?= loki
+LOKI_REPO ?= https://grafana.github.io/helm-charts
+ALLOY_RELEASE ?= alloy
+ALLOY_CHART ?= alloy
+ALLOY_REPO ?= https://grafana.github.io/helm-charts
+TEMPO_RELEASE ?= tempo
+TEMPO_CHART ?= tempo
+TEMPO_REPO ?= https://grafana.github.io/helm-charts
 IMAGE_TAG ?= latest
 LOCAL_K8S_ALL_DIR ?= $(REPO_ROOT)/k8s/overlays/local/all
 LOCAL_K8S_APPS_DIR ?= $(REPO_ROOT)/k8s/overlays/local/apps
@@ -59,20 +112,63 @@ LOCAL_API_GATEWAY_URL ?= http://$(LOCAL_REGISTRY_HOST):30080
 APP_SERVICES ?= api-gateway patient-service appointment-service prescription-service notification-service
 DASHBOARD_SERVICE ?= dashboard
 APP_DEPLOYMENTS ?= deployment/api-gateway deployment/patient-service deployment/appointment-service deployment/prescription-service deployment/notification-service deployment/dashboard
+APP_POD_SELECTOR ?= app in (api-gateway,patient-service,appointment-service,prescription-service,notification-service,dashboard)
 DEPENDENCY_STATEFULSETS ?= statefulset/patient-db statefulset/appointment-db statefulset/prescription-db statefulset/kafka
 REGISTRY_PULL_TEST_IMAGE ?= $(LOCAL_REGISTRY)/api-gateway:$(IMAGE_TAG)
 LOCAL_K8S_DEP_IMAGES ?= postgres:15 apache/kafka:3.8.1 busybox:1.36
+OBSERVABILITY_IMAGES ?= docker.io/grafana/grafana:13.0.1 \
+	docker.io/library/busybox:1.37.0 \
+	quay.io/kiwigrid/k8s-sidecar:2.7.3 \
+	quay.io/prometheus-operator/prometheus-operator:v0.90.1 \
+	quay.io/prometheus-operator/prometheus-config-reloader:v0.90.1 \
+	ghcr.io/jkroepke/kube-webhook-certgen:1.8.2 \
+	quay.io/prometheus/node-exporter:v1.11.1-distroless \
+	registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.18.0 \
+	quay.io/prometheus/prometheus:v3.11.3-distroless \
+	docker.io/grafana/loki:3.6.7 \
+	docker.io/kiwigrid/k8s-sidecar:2.5.0 \
+	docker.io/grafana/alloy:v1.16.1 \
+	quay.io/prometheus-operator/prometheus-config-reloader:v0.81.0 \
+	docker.io/grafana/tempo:2.9.0
 LOCAL_K8S_MIRROR_IMAGES ?= $(CALICO_IMAGES) $(LOCAL_K8S_DEP_IMAGES)
 EXTRA_THIRD_PARTY_IMAGES ?=
 THIRD_PARTY_IMAGES ?= $(LOCAL_K8S_MIRROR_IMAGES) $(EXTRA_THIRD_PARTY_IMAGES)
 
 export LOCAL_VAGRANT_BOX
+export CLUSTER_TOPOLOGY
 export CONTROL_PLANE_CPUS
 export CONTROL_PLANE_MEMORY_MB
 export CONTROL_PLANE_DISK_SIZE
 export WORKER_CPUS
 export WORKER_MEMORY_MB
 export WORKER_DISK_SIZE
+export ROLE_SEPARATED_CONTROL_PLANE_CPUS
+export ROLE_SEPARATED_CONTROL_PLANE_MEMORY_MB
+export ROLE_SEPARATED_CONTROL_PLANE_DISK_SIZE
+export ROLE_SEPARATED_PLATFORM_CPUS
+export ROLE_SEPARATED_PLATFORM_MEMORY_MB
+export ROLE_SEPARATED_PLATFORM_DISK_SIZE
+export ROLE_SEPARATED_APP_CPUS
+export ROLE_SEPARATED_APP_MEMORY_MB
+export ROLE_SEPARATED_APP_DISK_SIZE
+export ROLE_SEPARATED_POSTGRES_CPUS
+export ROLE_SEPARATED_POSTGRES_MEMORY_MB
+export ROLE_SEPARATED_POSTGRES_DISK_SIZE
+export ROLE_SEPARATED_KAFKA_CPUS
+export ROLE_SEPARATED_KAFKA_MEMORY_MB
+export ROLE_SEPARATED_KAFKA_DISK_SIZE
+export BALANCED_CONTROL_PLANE_CPUS
+export BALANCED_CONTROL_PLANE_MEMORY_MB
+export BALANCED_CONTROL_PLANE_DISK_SIZE
+export BALANCED_PLATFORM_CPUS
+export BALANCED_PLATFORM_MEMORY_MB
+export BALANCED_PLATFORM_DISK_SIZE
+export BALANCED_APP_CPUS
+export BALANCED_APP_MEMORY_MB
+export BALANCED_APP_DISK_SIZE
+export BALANCED_DATA_CPUS
+export BALANCED_DATA_MEMORY_MB
+export BALANCED_DATA_DISK_SIZE
 export KUBERNETES_APT_RELEASE
 export KUBERNETES_POD_NETWORK_CIDR
 export KUBERNETES_NODE_READY_TIMEOUT
@@ -89,6 +185,7 @@ export LOCAL_VM_SSH_PRIVATE_KEY
 export APP_NAMESPACE
 export METRICS_SERVER_VERSION
 export METRICS_SERVER_WAIT_TIMEOUT
+export HELM_VERSION
 export LOCAL_DEV_POSTGRES_PORT
 export LOCAL_DEV_POSTGRES_DB
 export LOCAL_DEV_POSTGRES_USER
@@ -97,11 +194,11 @@ export LOCAL_DEV_REDIS_PORT
 export LOCAL_DEV_KAFKA_PORT
 export LOCAL_DEV_KAFKA_ADVERTISED_HOST
 
-.PHONY: help install-tools check-tools check-kubectl local-vms-up local-vms-status local-vms-ssh local-vms-ssh-config local-vms-stop local-vms-halt local-vms-destroy local-vms-reset local-inventory ansible-ping servers-bootstrap servers-verify cluster-bootstrap cluster-verify local-servers-bootstrap local-cluster-bootstrap local-bootstrap \
+.PHONY: help install-tools check-tools check-kubectl check-helm local-vms-up local-vms-status local-vms-ssh local-vms-ssh-config local-vms-stop local-vms-halt local-vms-destroy local-vms-reset local-inventory ansible-ping servers-bootstrap servers-verify cluster-bootstrap cluster-verify helm-bootstrap observability-storage-bootstrap local-servers-bootstrap local-cluster-bootstrap local-bootstrap \
 	registry-bootstrap registry-verify registry-pull-verify registry-ca-install registry-ca-install-mac registry-ca-install-linux registry-ca-install-wsl registry-ca-trust-macos registry-ca-curl-verify \
-	metrics-bootstrap metrics-verify \
+	metrics-bootstrap metrics-verify observability-images-push observability-template observability-install observability-status grafana observability-grafana-port-forward \
 	check-local-dev-tools local-dev-config local-dev-up local-dev-kafka-up local-dev-down local-dev-reset local-dev-ps local-dev-logs \
-	local-kustomize-tag app-images-build app-images-push third-party-images-push local-k8s-bootstrap local-k8s-render local-k8s-apply local-k8s-deps-prepare local-k8s-deps-apply local-k8s-app-apply local-k8s-deps-verify local-k8s-app-verify local-k8s-verify local-k8s-pods local-k8s-app-pods local-k8s-app-services local-k8s-status local-k8s-node-top local-k8s-app-top local-k8s-top local-k8s-crud-smoke local-k8s-deploy clean
+	local-kustomize-tag app-images-build app-images-push third-party-images-push local-k8s-bootstrap local-k8s-render local-k8s-apply local-k8s-deps-prepare local-k8s-deps-apply local-k8s-app-apply local-k8s-app-stop local-k8s-app-pods-delete local-k8s-deps-verify local-k8s-app-verify local-k8s-verify local-k8s-pods local-k8s-app-pods local-k8s-app-services local-k8s-status local-k8s-node-top local-k8s-app-top local-k8s-top local-k8s-crud-smoke local-k8s-deploy clean
 
 help:
 	@printf "%s\n" "사용법: make <target>"
@@ -121,7 +218,7 @@ help:
 	@printf "%s\n" "  make local-dev-reset        컨테이너와 볼륨 데이터를 삭제합니다."
 	@printf "%s\n" ""
 	@printf "%s\n" "Vagrant VM 관리"
-	@printf "%s\n" "  make local-vms-up           Kubernetes용 VM 3대를 생성하거나 시작합니다."
+	@printf "%s\n" "  make local-vms-up           선택된 topology의 Kubernetes용 VM을 생성하거나 시작합니다."
 	@printf "%s\n" "  make local-vms-status       현재 VM 상태를 확인합니다."
 	@printf "%s\n" "  make local-vms-ssh          control-plane VM에 SSH로 접속합니다."
 	@printf "%s\n" "  make local-vms-ssh-config   Vagrant가 생성한 SSH 접속 설정을 출력합니다."
@@ -140,6 +237,13 @@ help:
 	@printf "%s\n" "  make metrics-verify         kubectl top nodes/pods가 동작하는지 확인합니다."
 	@printf "%s\n" "  make local-bootstrap        VM 생성부터 Metrics Server 검증까지 전체 과정을 실행합니다."
 	@printf "%s\n" ""
+	@printf "%s\n" "Observability stack"
+	@printf "%s\n" "  make helm-bootstrap         control-plane VM에 Helm을 설치합니다."
+	@printf "%s\n" "  make observability-template Helm chart 렌더링으로 Prometheus/Grafana/Loki/Alloy/Tempo 설정을 검증합니다."
+	@printf "%s\n" "  make observability-install  control-plane VM 안에서 Helm 기반 stack을 설치합니다."
+	@printf "%s\n" "  make observability-status   control-plane VM 안에서 release와 pod 상태를 확인합니다."
+	@printf "%s\n" "  make grafana                Grafana를 http://10.10.10.10:3000 으로 열 수 있게 연결합니다."
+	@printf "%s\n" ""
 	@printf "%s\n" "로컬 Kubernetes 직접 적용 루프"
 	@printf "%s\n" "  make registry-bootstrap     control-plane VM에 local registry를 구성합니다."
 	@printf "%s\n" "  make registry-verify        모든 노드에서 local registry API 접근을 확인합니다."
@@ -149,6 +253,7 @@ help:
 	@printf "%s\n" "  make local-k8s-apply        k8s/overlays/local/all 전체 manifest를 직접 적용합니다."
 	@printf "%s\n" "  make local-k8s-deps-apply   k8s/overlays/local/deps PostgreSQL/Kafka manifest를 직접 적용합니다."
 	@printf "%s\n" "  make local-k8s-app-apply    k8s/overlays/local/apps 앱 Deployment/Service manifest만 직접 적용합니다."
+	@printf "%s\n" "  make local-k8s-app-stop     앱 Deployment를 0 replicas로 내려 실행 중인 앱 pod를 종료합니다."
 	@printf "%s\n" "  make local-k8s-deps-verify  DB/Kafka StatefulSet rollout 상태를 확인합니다."
 	@printf "%s\n" "  make local-k8s-app-verify   앱 Deployment rollout 상태를 확인합니다."
 	@printf "%s\n" "  make local-k8s-verify       앱 Deployment rollout 상태를 확인합니다."
@@ -168,7 +273,7 @@ help:
 
 check-tools:
 	@missing=0; \
-	for bin in vagrant ansible ansible-playbook make; do \
+	for bin in vagrant ansible ansible-playbook helm make; do \
 		if ! command -v $$bin >/dev/null 2>&1; then \
 			printf "missing: %s\n" "$$bin"; \
 			missing=1; \
@@ -192,6 +297,13 @@ check-kubectl:
 		exit 1; \
 	fi
 	@printf "ok: kubectl -> %s\n" "$$(command -v kubectl)" >&2
+
+check-helm:
+	@if ! command -v helm >/dev/null 2>&1; then \
+		printf "missing: helm\n" >&2; \
+		exit 1; \
+	fi
+	@printf "ok: helm -> %s\n" "$$(command -v helm)" >&2
 
 install-tools:
 	./scripts/install-local-tools.sh
@@ -274,6 +386,50 @@ metrics-bootstrap:
 metrics-verify:
 	ansible-playbook $(ANSIBLE_FLAGS) -i $(ANSIBLE_INVENTORY) provision/ansible/playbooks/verify-metrics-server.yml
 
+helm-bootstrap:
+	ansible-playbook $(ANSIBLE_FLAGS) -i $(ANSIBLE_INVENTORY) provision/ansible/playbooks/bootstrap-helm.yml
+
+observability-storage-bootstrap:
+	ansible-playbook $(ANSIBLE_FLAGS) -i $(ANSIBLE_INVENTORY) provision/ansible/playbooks/bootstrap-observability-storage.yml
+
+observability-template: check-helm
+	@printf "%s\n" "--- # namespace"
+	@sed -n '1,200p' "$(OBSERVABILITY_DIR)/manifests/namespace.yaml"
+	@printf "%s\n" "--- # local-pv"
+	@sed -n '1,260p' "$(OBSERVABILITY_DIR)/manifests/local-pv.yaml"
+	@printf "%s\n" "--- # kube-prometheus-stack"
+	helm template $(HELM_FLAGS) $(KUBE_PROMETHEUS_STACK_RELEASE) $(KUBE_PROMETHEUS_STACK_CHART) --repo $(KUBE_PROMETHEUS_STACK_REPO) --namespace $(OBSERVABILITY_NAMESPACE) -f "$(OBSERVABILITY_DIR)/values/kube-prometheus-stack.yaml" >/dev/null
+	@printf "%s\n" "rendered: $(KUBE_PROMETHEUS_STACK_CHART)"
+	@printf "%s\n" "--- # loki"
+	helm template $(HELM_FLAGS) $(LOKI_RELEASE) $(LOKI_CHART) --repo $(LOKI_REPO) --namespace $(OBSERVABILITY_NAMESPACE) -f "$(OBSERVABILITY_DIR)/values/loki.yaml" >/dev/null
+	@printf "%s\n" "rendered: $(LOKI_CHART)"
+	@printf "%s\n" "--- # alloy"
+	helm template $(HELM_FLAGS) $(ALLOY_RELEASE) $(ALLOY_CHART) --repo $(ALLOY_REPO) --namespace $(OBSERVABILITY_NAMESPACE) -f "$(OBSERVABILITY_DIR)/values/alloy.yaml" >/dev/null
+	@printf "%s\n" "rendered: $(ALLOY_CHART)"
+	@printf "%s\n" "--- # tempo"
+	helm template $(HELM_FLAGS) $(TEMPO_RELEASE) $(TEMPO_CHART) --repo $(TEMPO_REPO) --namespace $(OBSERVABILITY_NAMESPACE) -f "$(OBSERVABILITY_DIR)/values/tempo.yaml" >/dev/null
+	@printf "%s\n" "rendered: $(TEMPO_CHART)"
+
+observability-install: observability-images-push helm-bootstrap observability-storage-bootstrap
+	@archive="$$(mktemp)"; \
+	trap 'rm -f "$$archive"' EXIT; \
+	tar_args=(); \
+	if tar --help 2>&1 | grep -q -- '--disable-copyfile'; then tar_args+=(--disable-copyfile); fi; \
+	if tar --help 2>&1 | grep -q -- '--no-xattrs'; then tar_args+=(--no-xattrs); fi; \
+	COPYFILE_DISABLE=1 tar "$${tar_args[@]}" -C "." -czf "$$archive" "$(OBSERVABILITY_DIR)"; \
+	(cd providers/$(LOCAL_PROVIDER) && vagrant upload "$$archive" "$(OBSERVABILITY_REMOTE_ARCHIVE)" control-plane-1); \
+	(cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo rm -rf "$(OBSERVABILITY_REMOTE_DIR)" && sudo mkdir -p "$(OBSERVABILITY_REMOTE_DIR)" && sudo tar -xzf "$(OBSERVABILITY_REMOTE_ARCHIVE)" -C "$(OBSERVABILITY_REMOTE_DIR)" && sudo env KUBECONFIG=/etc/kubernetes/admin.conf OBSERVABILITY_NAMESPACE="$(OBSERVABILITY_NAMESPACE)" HELM_FLAGS="$(HELM_FLAGS)" KUBE_PROMETHEUS_STACK_RELEASE="$(KUBE_PROMETHEUS_STACK_RELEASE)" KUBE_PROMETHEUS_STACK_CHART="$(KUBE_PROMETHEUS_STACK_CHART)" KUBE_PROMETHEUS_STACK_REPO="$(KUBE_PROMETHEUS_STACK_REPO)" LOKI_RELEASE="$(LOKI_RELEASE)" LOKI_CHART="$(LOKI_CHART)" LOKI_REPO="$(LOKI_REPO)" ALLOY_RELEASE="$(ALLOY_RELEASE)" ALLOY_CHART="$(ALLOY_CHART)" ALLOY_REPO="$(ALLOY_REPO)" TEMPO_RELEASE="$(TEMPO_RELEASE)" TEMPO_CHART="$(TEMPO_CHART)" TEMPO_REPO="$(TEMPO_REPO)" bash -lc '"'"'set -euo pipefail; cd "$(OBSERVABILITY_REMOTE_DIR)/$(OBSERVABILITY_DIR)"; bash install.sh'"'"'')
+
+observability-status:
+	cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo env KUBECONFIG=/etc/kubernetes/admin.conf bash -lc '"'"'helm list -n $(OBSERVABILITY_NAMESPACE); kubectl get pods,svc,pvc -n $(OBSERVABILITY_NAMESPACE) -o wide'"'"''
+
+grafana:
+	@printf "%s\n" "Grafana URL: http://10.10.10.10:$(OBSERVABILITY_GRAFANA_LOCAL_PORT)"
+	@printf "%s\n" "login: admin / admin"
+	cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo env KUBECONFIG=/etc/kubernetes/admin.conf kubectl -n $(OBSERVABILITY_NAMESPACE) port-forward svc/$(KUBE_PROMETHEUS_STACK_RELEASE)-grafana $(OBSERVABILITY_GRAFANA_LOCAL_PORT):80 --address 0.0.0.0'
+
+observability-grafana-port-forward: grafana
+
 registry-bootstrap:
 	ansible-playbook $(ANSIBLE_FLAGS) -i $(ANSIBLE_INVENTORY) provision/ansible/playbooks/bootstrap-registry.yml
 
@@ -331,6 +487,9 @@ third-party-images-push: check-local-dev-tools
 		fi; \
 	done
 
+observability-images-push:
+	$(MAKE) third-party-images-push THIRD_PARTY_IMAGES="$(OBSERVABILITY_IMAGES)"
+
 local-servers-bootstrap:
 	$(MAKE) local-vms-up
 	$(MAKE) local-inventory
@@ -353,6 +512,11 @@ local-k8s-bootstrap:
 	$(MAKE) local-bootstrap
 	$(MAKE) local-k8s-deps-apply
 	$(MAKE) local-k8s-deps-verify
+	@if [ "$(CLUSTER_TOPOLOGY)" = "role-separated" ] || [ "$(CLUSTER_TOPOLOGY)" = "balanced" ]; then \
+		$(MAKE) observability-install; \
+	else \
+		printf "%s\n" "skip observability-install: CLUSTER_TOPOLOGY=$(CLUSTER_TOPOLOGY)"; \
+	fi
 
 local-k8s-deps-prepare:
 	$(MAKE) registry-bootstrap
@@ -400,6 +564,11 @@ local-k8s-app-verify:
 	cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo env KUBECONFIG=/etc/kubernetes/admin.conf kubectl -n $(APP_NAMESPACE) rollout status $(APP_DEPLOYMENTS) --timeout=$(LOCAL_K8S_WAIT_TIMEOUT)'
 
 local-k8s-verify: local-k8s-app-verify
+
+local-k8s-app-stop:
+	(cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo env KUBECONFIG=/etc/kubernetes/admin.conf APP_NAMESPACE="$(APP_NAMESPACE)" APP_DEPLOYMENTS="$(APP_DEPLOYMENTS)" APP_POD_SELECTOR="$(APP_POD_SELECTOR)" LOCAL_K8S_WAIT_TIMEOUT="$(LOCAL_K8S_WAIT_TIMEOUT)" bash -s') < scripts/stop-local-k8s-apps.sh
+
+local-k8s-app-pods-delete: local-k8s-app-stop
 
 local-k8s-pods:
 	cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo env KUBECONFIG=/etc/kubernetes/admin.conf kubectl get pods -A -o wide'

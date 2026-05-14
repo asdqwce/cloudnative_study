@@ -1,0 +1,69 @@
+cluster_topology: role-separated
+description: Optional role-separated local topology for platform, app, and data workloads.
+nodes:
+  - name: control-plane-1
+    ip: 10.10.10.10
+    role: control-plane
+    ansible_groups: control_plane
+    cpus_env: ROLE_SEPARATED_CONTROL_PLANE_CPUS
+    cpus: 2
+    memory_env: ROLE_SEPARATED_CONTROL_PLANE_MEMORY_MB
+    memory_mb: 2048
+    disk_env: ROLE_SEPARATED_CONTROL_PLANE_DISK_SIZE
+    disk_size: 25GB
+    labels:
+  - name: platform-1
+    ip: 10.10.10.11
+    role: platform
+    ansible_groups: workers,platform_nodes
+    cpus_env: ROLE_SEPARATED_PLATFORM_CPUS
+    cpus: 2
+    memory_env: ROLE_SEPARATED_PLATFORM_MEMORY_MB
+    memory_mb: 3072
+    disk_env: ROLE_SEPARATED_PLATFORM_DISK_SIZE
+    disk_size: 40GB
+    labels: node-role.kubernetes.io/platform=true workload.medical-platform.io/tier=platform
+  - name: app-a-1
+    ip: 10.10.10.12
+    role: app
+    ansible_groups: workers,app_nodes
+    cpus_env: ROLE_SEPARATED_APP_CPUS
+    cpus: 1
+    memory_env: ROLE_SEPARATED_APP_MEMORY_MB
+    memory_mb: 1536
+    disk_env: ROLE_SEPARATED_APP_DISK_SIZE
+    disk_size: 20GB
+    labels: node-role.kubernetes.io/app=true workload.medical-platform.io/tier=app topology.kubernetes.io/zone=az-a
+  - name: app-b-1
+    ip: 10.10.10.13
+    role: app
+    ansible_groups: workers,app_nodes
+    cpus_env: ROLE_SEPARATED_APP_CPUS
+    cpus: 1
+    memory_env: ROLE_SEPARATED_APP_MEMORY_MB
+    memory_mb: 1536
+    disk_env: ROLE_SEPARATED_APP_DISK_SIZE
+    disk_size: 20GB
+    labels: node-role.kubernetes.io/app=true workload.medical-platform.io/tier=app topology.kubernetes.io/zone=az-b
+  - name: postgres-1
+    ip: 10.10.10.14
+    role: postgres
+    ansible_groups: workers,postgres_nodes
+    cpus_env: ROLE_SEPARATED_POSTGRES_CPUS
+    cpus: 1
+    memory_env: ROLE_SEPARATED_POSTGRES_MEMORY_MB
+    memory_mb: 1536
+    disk_env: ROLE_SEPARATED_POSTGRES_DISK_SIZE
+    disk_size: 30GB
+    labels: node-role.kubernetes.io/data=true workload.medical-platform.io/tier=data workload.medical-platform.io/component=postgres
+  - name: kafka-1
+    ip: 10.10.10.15
+    role: kafka
+    ansible_groups: workers,kafka_nodes
+    cpus_env: ROLE_SEPARATED_KAFKA_CPUS
+    cpus: 2
+    memory_env: ROLE_SEPARATED_KAFKA_MEMORY_MB
+    memory_mb: 2048
+    disk_env: ROLE_SEPARATED_KAFKA_DISK_SIZE
+    disk_size: 40GB
+    labels: node-role.kubernetes.io/data=true workload.medical-platform.io/tier=data workload.medical-platform.io/component=kafka

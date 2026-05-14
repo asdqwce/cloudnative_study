@@ -2,7 +2,8 @@
 
 `cloudnative_study`의 의료 MSA 서비스를 Kubernetes 환경에 배포하기 위한 로컬 클러스터 구성입니다.
 
-VMware 위에 Vagrant로 Ubuntu VM 3대를 생성하고, Ansible로 `containerd`, `kubeadm`, `kubelet`, `kubectl`을 설치한 뒤 kubeadm 기반 Kubernetes 클러스터를 구성합니다.
+기본값은 VMware 위에 Vagrant로 Ubuntu VM 3대를 생성하는 `compact` topology입니다. Observability까지 로컬에서 확인하려면 `CLUSTER_TOPOLOGY=balanced`로 4VM 중간 구성을 선택하고, 역할 분리를 더 세밀하게 실험하려면 `CLUSTER_TOPOLOGY=role-separated`로 6VM 구성을 선택할 수 있습니다.
+Ansible로 `containerd`, `kubeadm`, `kubelet`, `kubectl`을 설치한 뒤 kubeadm 기반 Kubernetes 클러스터를 구성합니다.
 클러스터가 준비되면 control-plane VM의 local registry와 Metrics Server를 붙이고, 현재 repo의 `k8s/overlays/local/**` Kustomize entrypoint를 VM 안에서 직접 `kubectl apply -k`하는 반복 배포 흐름까지 제공합니다.
 
 ## 구성 목표
@@ -14,17 +15,18 @@ VMware 위에 Vagrant로 Ubuntu VM 3대를 생성하고, Ansible로 `containerd`
 
 ## 기술 스택
 
-| 구분 | 기술 |
-|---|---|
-| VM Provider | VMware Workstation / VMware Fusion |
-| VM 생성 | Vagrant |
-| Guest OS | Ubuntu 22.04 LTS |
-| 서버 설정 | Ansible |
-| Container Runtime | containerd |
-| Kubernetes 설치 | kubeadm |
-| CNI | Calico |
-| Local Registry | docker-registry on `control-plane-1` |
-| Metrics | Kubernetes Metrics Server |
+| 구분              | 기술                                            |
+| ----------------- | ----------------------------------------------- |
+| VM Provider       | VMware Workstation / VMware Fusion              |
+| VM 생성           | Vagrant                                         |
+| Guest OS          | Ubuntu 22.04 LTS                                |
+| 서버 설정         | Ansible                                         |
+| Container Runtime | containerd                                      |
+| Kubernetes 설치   | kubeadm                                         |
+| CNI               | Calico                                          |
+| Local Registry    | docker-registry on `control-plane-1`            |
+| Metrics           | Kubernetes Metrics Server                       |
+| Helm stack        | Prometheus, Grafana, Loki, Grafana Alloy, Tempo |
 
 ## 디렉터리 구조
 
@@ -36,6 +38,16 @@ infra/cluster/
 ├─ providers/
 │  └─ local-vagrant/
 │     ├─ Vagrantfile
+│     └─ README.md
+├─ topologies/
+│  ├─ compact/
+│  │  ├─ nodes.yml
+│  │  └─ README.md
+│  ├─ balanced/
+│  │  ├─ nodes.yml
+│  │  └─ README.md
+│  └─ role-separated/
+│     ├─ nodes.yml
 │     └─ README.md
 ├─ provision/
 │  └─ ansible/
@@ -51,39 +63,68 @@ infra/cluster/
 │        ├─ verify-registry.yml
 │        ├─ bootstrap-metrics-server.yml
 │        └─ verify-metrics-server.yml
+├─ stacks/
+│  └─ observability/
 ├─ local-dev/
 ├─ docs/
 └─ scripts/
 ```
 
-## VM 구성
+## Topology
 
-| VM | IP | 역할 |
-|---|---|---|
-| `control-plane-1` | `10.10.10.10` | Kubernetes control-plane, etcd, API server, scheduler, controller manager |
-| `worker-1` | `10.10.10.11` | 애플리케이션 Pod 실행 노드 |
-| `worker-2` | `10.10.10.12` | 애플리케이션 Pod 실행 노드 |
+`CLUSTER_TOPOLOGY` 기본값은 `compact`입니다.
 
-기본 리소스는 16GB RAM 노트북에서도 실행 가능하도록 낮게 잡았습니다.
+| Topology         | 목적                                          | VM                                                                             | 기본 리소스              |
+| ---------------- | --------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------ |
+| `compact`        | 16GB 팀원도 실행 가능한 공통 기본 구성        | `control-plane-1`, `worker-1`, `worker-2`                                      | `6 vCPU`, `7GB RAM`      |
+| `balanced`       | Observability 실험용 4VM 중간 구성            | `control-plane-1`, `platform-1`, `app-1`, `data-1`                             | `8 vCPU`, `9GB RAM`      |
+| `role-separated` | platform/app/data 역할 배치와 node label 실험 | `control-plane-1`, `platform-1`, `app-a-1`, `app-b-1`, `postgres-1`, `kafka-1` | `10 vCPU`, `11GB RAM`    |
 
-| 설정 | 기본값 |
-|---|---:|
-| `CONTROL_PLANE_CPUS` | `2` |
+`compact` 기본 리소스는 16GB RAM 노트북에서도 실행 가능하도록 낮게 잡았습니다. 기존 `CONTROL_PLANE_*`, `WORKER_*` 설정은 이 기본 topology용으로 유지합니다.
+
+| 설정                      | 기본값 |
+| ------------------------- | -----: |
+| `CONTROL_PLANE_CPUS`      |    `2` |
 | `CONTROL_PLANE_MEMORY_MB` | `3072` |
 | `CONTROL_PLANE_DISK_SIZE` | `30GB` |
-| `WORKER_CPUS` | `2` |
-| `WORKER_MEMORY_MB` | `2048` |
-| `WORKER_DISK_SIZE` | `30GB` |
+| `WORKER_CPUS`             |    `2` |
+| `WORKER_MEMORY_MB`        | `2048` |
+| `WORKER_DISK_SIZE`        | `30GB` |
+
+`balanced`는 `compact`보다 큰 관측성 실험용 구성이고, `role-separated`보다 VM 오버헤드가 작은 구성입니다. Prometheus/Grafana/Loki/Tempo는 `platform-1`에 배치하고, `data-1`은 PostgreSQL과 Kafka 후보 역할을 함께 맡습니다.
+
+| VM                | 역할                             | 기본 CPU | 기본 Memory | 기본 Disk |
+| ----------------- | -------------------------------- | -------: | ----------: | --------: |
+| `control-plane-1` | Kubernetes control-plane          |      `2` |    `2048MB` |    `25GB` |
+| `platform-1`      | Prometheus/Grafana/Loki/Tempo     |      `2` |    `3072MB` |    `45GB` |
+| `app-1`           | application workload              |      `2` |    `2048MB` |    `25GB` |
+| `data-1`          | PostgreSQL + Kafka 후보           |      `2` |    `2048MB` |    `45GB` |
+
+`.env`에 다음처럼 설정한 뒤 새 VM을 구성합니다.
+
+```bash
+CLUSTER_TOPOLOGY=balanced
+```
+
+`balanced` VM은 역할별 `BALANCED_*` 환경 변수로 조정합니다. 총합은 `8 vCPU`, `9GB RAM`, `140GB disk`입니다. `app-1`과 `data-1`은 Java 앱 5개와 Kafka가 동시에 올라오는 로컬 실험을 고려해 각각 `2GB`로 둡니다. `platform-1`에는 `workload.medical-platform.io/tier=platform` label이 붙고, `data-1`은 inventory에서 `postgres_nodes`와 `kafka_nodes` 양쪽 그룹에 들어갑니다.
+
+`role-separated`도 선택형입니다. `.env`에 다음처럼 설정한 뒤 새 VM을 구성합니다.
+
+```bash
+CLUSTER_TOPOLOGY=role-separated
+```
+
+`role-separated` VM은 역할별 `ROLE_SEPARATED_*` 환경 변수로 조정합니다. 기존 VM을 다른 topology로 바꾸려면 VM 재생성이 필요할 수 있으므로, `local-vms-destroy` 또는 `local-vms-reset`은 별도 승인 후 실행합니다.
 
 ## 실행 위치
 
 Windows 사용자는 명령 실행 위치를 분리합니다.
 
-| 작업 | 실행 위치 |
-|---|---|
-| Vagrant VM 생성/삭제 | Windows PowerShell |
-| Ansible 실행 | WSL |
-| Git 작업 | Windows PowerShell 또는 WSL 중 하나로 통일 |
+| 작업                 | 실행 위치                                  |
+| -------------------- | ------------------------------------------ |
+| Vagrant VM 생성/삭제 | Windows PowerShell                         |
+| Ansible 실행         | WSL                                        |
+| Git 작업             | Windows PowerShell 또는 WSL 중 하나로 통일 |
 
 macOS 사용자는 Terminal에서 Vagrant와 Ansible을 모두 실행할 수 있습니다.
 
@@ -206,6 +247,29 @@ make metrics-bootstrap
 make metrics-verify
 ```
 
+7. Observability stack 설치와 확인
+
+```bash
+make observability-install
+make observability-status
+make grafana
+```
+
+`observability-install`은 호스트 Docker로 필요한 chart image를 local registry에 먼저 mirror한 뒤, control-plane VM에 Helm을 설치하고 VM 안에서 `/etc/kubernetes/admin.conf`를 사용해 `observability` namespace에 Prometheus/Grafana/Loki/Grafana Alloy/Tempo를 설치합니다.
+
+`CLUSTER_TOPOLOGY=balanced` 또는 `CLUSTER_TOPOLOGY=role-separated`인 경우 `make local-k8s-bootstrap` 마지막에 `observability-install`이 자동 실행됩니다. `compact`는 16GB 기본 구성을 유지하기 위해 자동 설치하지 않습니다.
+
+Grafana는 port-forward target을 실행한 뒤 브라우저에서 접속합니다. 이 명령은 실행 중인 터미널을 계속 열어 두어야 합니다.
+
+```bash
+make grafana
+```
+
+```text
+http://10.10.10.10:3000
+admin / admin
+```
+
 전체 과정을 한 번에 실행하려면:
 
 ```bash
@@ -232,11 +296,11 @@ make registry-ca-curl-verify
 
 local-k8s target은 `k8s/` 디렉터리를 control-plane VM에 업로드한 뒤 VM 내부의 `/etc/kubernetes/admin.conf`로 Kustomize overlay를 직접 적용합니다.
 
-| 적용 범위 | Kustomize 경로 | Make target |
-|---|---|---|
-| 전체 | `k8s/overlays/local/all` | `make local-k8s-apply` |
-| 의존성 | `k8s/overlays/local/deps` | `make local-k8s-deps-apply` |
-| 앱 | `k8s/overlays/local/apps` | `make local-k8s-app-apply` |
+| 적용 범위 | Kustomize 경로            | Make target                 |
+| --------- | ------------------------- | --------------------------- |
+| 전체      | `k8s/overlays/local/all`  | `make local-k8s-apply`      |
+| 의존성    | `k8s/overlays/local/deps` | `make local-k8s-deps-apply` |
+| 앱        | `k8s/overlays/local/apps` | `make local-k8s-app-apply`  |
 
 ```bash
 make local-k8s-deps-apply
@@ -271,29 +335,34 @@ make local-dev-down
 
 ## 주요 명령
 
-| 명령 | 설명 |
-|---|---|
-| `make check-tools` | Vagrant, Ansible, VMware plugin 설치 여부 확인 |
-| `make local-vms-up` | VM 3대 생성 또는 시작 |
-| `make local-vms-status` | VM 상태 확인 |
-| `make local-vms-ssh-config` | Vagrant SSH 설정 출력 |
-| `make local-vms-halt` | VM 종료 |
-| `make local-vms-destroy` | VM과 디스크 삭제 |
-| `make local-inventory` | Vagrant SSH 설정으로 Ansible inventory 생성 |
-| `make ansible-ping` | 모든 VM에 Ansible 접속 확인 |
-| `make servers-bootstrap` | containerd와 Kubernetes 패키지 설치 |
-| `make servers-verify` | 서버 기본 설정 검증 |
-| `make cluster-bootstrap` | kubeadm 클러스터 구성 |
-| `make cluster-verify` | Kubernetes 노드와 시스템 Pod 상태 검증 |
-| `make metrics-bootstrap` | Metrics Server 설치와 로컬 kubelet TLS 옵션 적용 |
-| `make metrics-verify` | `kubectl top nodes/pods` 동작 검증 |
-| `make registry-bootstrap` | control-plane VM에 HTTPS local registry 구성 |
-| `make registry-verify` | 모든 노드에서 local registry API 접근 검증 |
-| `make registry-ca-install` | 호스트 Docker가 local registry CA를 신뢰하도록 설치 |
-| `make local-k8s-deploy` | 앱 image build/push, local apps overlay tag 갱신, 앱 apply/verify |
-| `make local-k8s-status` | 앱 pod/service/PVC/event 확인 |
-| `make local-k8s-top` | node와 pod/container 리소스 사용량 확인 |
-| `make local-vms-reset` | VM 삭제 후 처음부터 재구성 |
+| 명령                         | 설명                                                              |
+| ---------------------------- | ----------------------------------------------------------------- |
+| `make check-tools`           | Vagrant, Ansible, Helm, VMware plugin 설치 여부 확인              |
+| `make local-vms-up`          | 선택된 topology의 VM 생성 또는 시작                               |
+| `make local-vms-status`      | VM 상태 확인                                                      |
+| `make local-vms-ssh-config`  | Vagrant SSH 설정 출력                                             |
+| `make local-vms-halt`        | VM 종료                                                           |
+| `make local-vms-destroy`     | VM과 디스크 삭제                                                  |
+| `make local-inventory`       | Vagrant SSH 설정으로 Ansible inventory 생성                       |
+| `make ansible-ping`          | 모든 VM에 Ansible 접속 확인                                       |
+| `make servers-bootstrap`     | containerd와 Kubernetes 패키지 설치                               |
+| `make servers-verify`        | 서버 기본 설정 검증                                               |
+| `make cluster-bootstrap`     | kubeadm 클러스터 구성                                             |
+| `make cluster-verify`        | Kubernetes 노드와 시스템 Pod 상태 검증                            |
+| `make metrics-bootstrap`     | Metrics Server 설치와 로컬 kubelet TLS 옵션 적용                  |
+| `make metrics-verify`        | `kubectl top nodes/pods` 동작 검증                                |
+| `make helm-bootstrap`        | control-plane VM에 Helm 설치                                      |
+| `make observability-images-push` | Observability chart image를 local registry로 mirror            |
+| `make observability-install` | control-plane VM 안에서 Observability stack 설치                  |
+| `make observability-status`  | control-plane VM 안에서 Observability 상태 확인                   |
+| `make grafana`               | Grafana 접속용 port-forward 실행                                  |
+| `make registry-bootstrap`    | control-plane VM에 HTTPS local registry 구성                      |
+| `make registry-verify`       | 모든 노드에서 local registry API 접근 검증                        |
+| `make registry-ca-install`   | 호스트 Docker가 local registry CA를 신뢰하도록 설치               |
+| `make local-k8s-deploy`      | 앱 image build/push, local apps overlay tag 갱신, 앱 apply/verify |
+| `make local-k8s-status`      | 앱 pod/service/PVC/event 확인                                     |
+| `make local-k8s-top`         | node와 pod/container 리소스 사용량 확인                           |
+| `make local-vms-reset`       | VM 삭제 후 처음부터 재구성                                        |
 
 ## 검증 기준
 
@@ -315,14 +384,14 @@ kubectl get pods -A
 
 ## 참고 문서
 
-| 문서 | 내용 |
-|---|---|
-| [docs/prerequisites.md](docs/prerequisites.md) | 실행 전에 필요한 로컬 도구 |
-| [docs/manual-install.md](docs/manual-install.md) | 자동 설치 실패 시 수동 설치 방법 |
-| [docs/vm-spec.md](docs/vm-spec.md) | VM, IP, CPU, 메모리, 디스크 구성 |
-| [docs/vagrant-cheatsheet.md](docs/vagrant-cheatsheet.md) | Vagrant 명령 요약 |
-| [docs/kubernetes-cluster.md](docs/kubernetes-cluster.md) | kubeadm 클러스터 구성과 검증 |
-| [docs/installed-server-components.md](docs/installed-server-components.md) | Ansible이 설치하는 서버 구성 요소 |
-| [docs/migration.md](docs/migration.md) | 로컬 VM 구성에서 클라우드 VM 구성으로 확장하는 기준 |
-| [docs/local-k8s-deployment.md](docs/local-k8s-deployment.md) | local registry와 직접 apply 배포 루프 |
-| [local-dev/README.md](local-dev/README.md) | Docker Compose 기반 개인 로컬 의존성 |
+| 문서                                                                       | 내용                                                |
+| -------------------------------------------------------------------------- | --------------------------------------------------- |
+| [docs/prerequisites.md](docs/prerequisites.md)                             | 실행 전에 필요한 로컬 도구                          |
+| [docs/manual-install.md](docs/manual-install.md)                           | 자동 설치 실패 시 수동 설치 방법                    |
+| [docs/vm-spec.md](docs/vm-spec.md)                                         | VM, IP, CPU, 메모리, 디스크 구성                    |
+| [docs/vagrant-cheatsheet.md](docs/vagrant-cheatsheet.md)                   | Vagrant 명령 요약                                   |
+| [docs/kubernetes-cluster.md](docs/kubernetes-cluster.md)                   | kubeadm 클러스터 구성과 검증                        |
+| [docs/installed-server-components.md](docs/installed-server-components.md) | Ansible이 설치하는 서버 구성 요소                   |
+| [docs/migration.md](docs/migration.md)                                     | 로컬 VM 구성에서 클라우드 VM 구성으로 확장하는 기준 |
+| [docs/local-k8s-deployment.md](docs/local-k8s-deployment.md)               | local registry와 직접 apply 배포 루프               |
+| [local-dev/README.md](local-dev/README.md)                                 | Docker Compose 기반 개인 로컬 의존성                |

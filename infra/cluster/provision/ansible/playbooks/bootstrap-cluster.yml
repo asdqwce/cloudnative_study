@@ -44,7 +44,7 @@
       until: calico_image_pull.rc == 0
 
 - name: Initialize Kubernetes control plane
-  hosts: kube_control_plane
+  hosts: control_plane
   become: true
   gather_facts: false
 
@@ -143,7 +143,7 @@
       changed_when: false
 
 - name: Join Kubernetes worker nodes
-  hosts: kube_workers
+  hosts: workers
   become: true
   gather_facts: false
 
@@ -154,11 +154,11 @@
       register: kubelet_config
 
     - name: Join worker to the cluster
-      ansible.builtin.command: "{{ hostvars[groups['kube_control_plane'][0]].kubeadm_join_command.stdout }} --cri-socket={{ kubernetes_cri_socket }}"
+      ansible.builtin.command: "{{ hostvars[groups['control_plane'][0]].kubeadm_join_command.stdout }} --cri-socket={{ kubernetes_cri_socket }}"
       when: not kubelet_config.stat.exists
 
 - name: Wait for Kubernetes cluster readiness
-  hosts: kube_control_plane
+  hosts: control_plane
   become: true
   gather_facts: false
 
@@ -228,6 +228,23 @@
         KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
       changed_when: false
 
+    - name: Set CoreDNS replica to 1 on local control-plane cluster
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - -n
+          - kube-system
+          - patch
+          - deployment
+          - coredns
+          - --type=merge
+          - -p
+          - '{"spec":{"replicas":1}}'
+      environment:
+        KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
+      register: coredns_replica_patch
+      changed_when: "'patched' in coredns_replica_patch.stdout and 'no change' not in coredns_replica_patch.stdout"
+
     - name: Wait until CoreDNS is Ready
       ansible.builtin.command:
         argv:
@@ -241,3 +258,13 @@
       environment:
         KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
       changed_when: false
+
+    - name: Apply configured node labels
+      ansible.builtin.command: "kubectl label node {{ item }} {{ hostvars[item].node_labels }} --overwrite"
+      environment:
+        KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
+      loop: "{{ groups['k8s_cluster'] }}"
+      changed_when: false
+      when:
+        - hostvars[item].node_labels is defined
+        - hostvars[item].node_labels | length > 0

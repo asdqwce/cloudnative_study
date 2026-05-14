@@ -1,6 +1,6 @@
 ---
 - name: Bootstrap Kubernetes Metrics Server
-  hosts: kube_control_plane
+  hosts: control_plane
   become: true
   gather_facts: false
 
@@ -60,6 +60,23 @@
         KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
       register: metrics_server_patch
       changed_when: "'patched' in metrics_server_patch.stdout"
+
+    - name: Tune Metrics Server resources for local memory budget
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - -n
+          - kube-system
+          - patch
+          - deployment
+          - metrics-server
+          - --type=json
+          - -p
+          - '[{"op":"add","path":"/spec/template/spec/containers/0/resources","value":{"requests":{"cpu":"50m","memory":"64Mi"},"limits":{"cpu":"150m","memory":"128Mi"}}}]'
+      environment:
+        KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
+      register: metrics_server_resources
+      changed_when: "'patched' in metrics_server_resources.stdout"
 
     - name: Restart Metrics Server pods after local runtime configuration
       ansible.builtin.command:

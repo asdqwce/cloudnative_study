@@ -1,10 +1,20 @@
 # Local Vagrant Provider
 
-VMware Workstation / Fusion 위에 Kubernetes 노드용 Ubuntu VM 3대를 생성하는 Vagrant provider입니다.
+VMware Workstation / Fusion 위에 Kubernetes 노드용 Ubuntu VM을 생성하는 Vagrant provider입니다.
 
 이 provider는 VM 생성까지만 담당합니다. VM 내부에 `containerd`, `kubeadm`, `kubelet`, `kubectl`을 설치하고 Kubernetes 클러스터를 구성하는 작업은 `infra/cluster/provision/ansible`이 담당합니다.
 
-## VM 구성
+## Topology
+
+노드 목록은 `infra/cluster/topologies/<name>/nodes.yml`에서 읽습니다. 기본값은 `CLUSTER_TOPOLOGY=compact`입니다.
+
+| Topology | 목적 |
+|---|---|
+| `compact` | 기존 3VM 팀 공통 기본 구성 |
+| `balanced` | Observability stack을 포함하는 4VM 중간 구성 |
+| `role-separated` | platform/app/data 역할 분리형 6VM 선택 구성 |
+
+## compact VM 구성
 
 | VM | IP | 역할 | 기본 CPU | 기본 Memory |
 |---|---|---|---:|---:|
@@ -12,7 +22,29 @@ VMware Workstation / Fusion 위에 Kubernetes 노드용 Ubuntu VM 3대를 생성
 | `worker-1` | `10.10.10.11` | 애플리케이션 Pod 실행 노드 | `2` | `2048MB` |
 | `worker-2` | `10.10.10.12` | 애플리케이션 Pod 실행 노드 | `2` | `2048MB` |
 
-기본값은 `infra/cluster/.env.example`에서 관리합니다. 실행 전에 `.env.example`을 `.env`로 복사한 뒤 필요하면 CPU, 메모리, Vagrant box 값을 조정합니다.
+## balanced VM 구성
+
+| VM | IP | 역할 | 기본 CPU | 기본 Memory |
+|---|---|---|---:|---:|
+| `control-plane-1` | `10.10.10.10` | Kubernetes control-plane | `2` | `2048MB` |
+| `platform-1` | `10.10.10.11` | Prometheus/Grafana/Loki/Tempo 배치 대상 | `2` | `3072MB` |
+| `app-1` | `10.10.10.12` | application workload 배치 대상 | `2` | `2048MB` |
+| `data-1` | `10.10.10.13` | PostgreSQL + Kafka 후보 배치 대상 | `2` | `2048MB` |
+
+총합은 `8 vCPU`, `9GB RAM`, `140GB disk`입니다. Java 앱 5개와 Kafka가 동시에 올라오는 로컬 실험에서 `app-1`, `data-1`에 안정 버퍼를 두고, `compact`보다 관측성 실험에 적합하며 `role-separated`보다 VM 오버헤드가 작습니다.
+
+## role-separated VM 구성
+
+| VM | IP | 역할 | 기본 CPU | 기본 Memory |
+|---|---|---|---:|---:|
+| `control-plane-1` | `10.10.10.10` | Kubernetes control-plane 전용 | `2` | `2048MB` |
+| `platform-1` | `10.10.10.11` | Prometheus/Grafana/Loki/Tempo 배치 대상 | `2` | `3072MB` |
+| `app-a-1` | `10.10.10.12` | Python application workload, AZ A | `1` | `1536MB` |
+| `app-b-1` | `10.10.10.13` | Python application workload, AZ B | `1` | `1536MB` |
+| `postgres-1` | `10.10.10.14` | PostgreSQL StatefulSet/PVC 배치 대상 | `1` | `1536MB` |
+| `kafka-1` | `10.10.10.15` | Kafka StatefulSet/PVC 배치 대상 | `2` | `2048MB` |
+
+기본값은 `infra/cluster/.env.example`에서 관리합니다. 실행 전에 `.env.example`을 `.env`로 복사한 뒤 필요하면 topology, CPU, 메모리, Vagrant box 값을 조정합니다.
 
 ## 사전 준비
 
@@ -77,6 +109,18 @@ cd infra/cluster
 cp .env.example .env
 ```
 
+기본값은 `CLUSTER_TOPOLOGY=compact`입니다. Observability 실험용 중간 구성을 만들 때는 `.env`에서 다음 값을 바꿉니다.
+
+```bash
+CLUSTER_TOPOLOGY=balanced
+```
+
+역할 분리형 VM을 만들 때는 다음 값을 사용합니다.
+
+```bash
+CLUSTER_TOPOLOGY=role-separated
+```
+
 Apple Silicon Mac은 ARM64 Ubuntu Vagrant box가 필요할 수 있습니다. 이 경우 `.env`의 `LOCAL_VAGRANT_BOX` 값을 해당 환경에 맞게 변경합니다.
 
 ## VM 생성
@@ -101,6 +145,10 @@ control-plane-1   running
 worker-1          running
 worker-2          running
 ```
+
+`CLUSTER_TOPOLOGY=role-separated`에서는 `platform-1`, `app-a-1`, `app-b-1`, `postgres-1`, `kafka-1`도 함께 표시됩니다.
+
+`CLUSTER_TOPOLOGY=balanced`에서는 `platform-1`, `app-1`, `data-1`도 함께 표시됩니다.
 
 ## SSH 접속
 
@@ -139,6 +187,8 @@ chmod 600 ~/.ssh/cloudnative-vagrant/control-plane-1
 chmod 600 ~/.ssh/cloudnative-vagrant/worker-1
 chmod 600 ~/.ssh/cloudnative-vagrant/worker-2
 ```
+
+`balanced` topology에서는 생성된 VM 이름에 맞춰 `platform-1`, `app-1`, `data-1` key도 같은 방식으로 복사합니다. `role-separated` topology에서는 `platform-1`, `app-a-1`, `app-b-1`, `postgres-1`, `kafka-1` key도 복사합니다. 일반적으로는 `make local-inventory`가 Vagrant SSH 설정을 읽어 inventory를 다시 생성하므로, 수동 복사는 WSL private key 권한 문제가 있을 때만 필요합니다.
 
 그 다음 `infra/cluster/provision/ansible/inventory.ini`의 `ansible_ssh_private_key_file` 값을 WSL 홈 경로로 맞춥니다.
 

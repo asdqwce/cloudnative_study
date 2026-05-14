@@ -39,10 +39,23 @@ inventory_value() {
 ssh_user="${LOCAL_VM_SSH_USER:-$(inventory_value ansible_user)}"
 ssh_host="${LOCAL_VM_SSH_HOST:-$(inventory_value ansible_host)}"
 ssh_port="${LOCAL_VM_SSH_PORT:-$(inventory_value ansible_port)}"
-ssh_key="${LOCAL_VM_SSH_PRIVATE_KEY:-$(inventory_value ansible_ssh_private_key_file)}"
+inventory_ssh_key="$(inventory_value ansible_ssh_private_key_file)"
+ssh_key="${LOCAL_VM_SSH_PRIVATE_KEY:-${inventory_ssh_key}}"
 
 if [ -z "${ssh_user}" ] || [ -z "${ssh_host}" ] || [ -z "${ssh_port}" ] || [ -z "${ssh_key}" ]; then
   log "missing: control-plane-1 SSH settings in ${inventory_path}"
+  log "run this first: make local-inventory"
+  exit 1
+fi
+
+if [ ! -f "${ssh_key}" ] && [ -n "${inventory_ssh_key}" ] && [ -f "${inventory_ssh_key}" ]; then
+  log "warning: LOCAL_VM_SSH_PRIVATE_KEY is not accessible: ${ssh_key}"
+  log "using inventory key instead: ${inventory_ssh_key}"
+  ssh_key="${inventory_ssh_key}"
+fi
+
+if [ ! -f "${ssh_key}" ]; then
+  log "missing: SSH private key ${ssh_key}"
   log "run this first: make local-inventory"
   exit 1
 fi

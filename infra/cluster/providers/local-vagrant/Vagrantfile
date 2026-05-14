@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "yaml"
+
 env_file = File.expand_path("../../.env", __dir__)
 if File.exist?(env_file)
   File.readlines(env_file).each do |line|
@@ -12,38 +14,36 @@ if File.exist?(env_file)
 end
 
 VAGRANT_BOX = ENV.fetch("LOCAL_VAGRANT_BOX", "bento/ubuntu-22.04")
+CLUSTER_TOPOLOGY = ENV.fetch("CLUSTER_TOPOLOGY", "compact")
 
-CONTROL_PLANE_CPUS = ENV.fetch("CONTROL_PLANE_CPUS", "2").to_i
-CONTROL_PLANE_MEMORY_MB = ENV.fetch("CONTROL_PLANE_MEMORY_MB", "3072").to_i
-CONTROL_PLANE_DISK_SIZE = ENV.fetch("CONTROL_PLANE_DISK_SIZE", "30270").to_i
+TOPOLOGY_FILE = File.expand_path("../../topologies/#{CLUSTER_TOPOLOGY}/nodes.yml", __dir__)
+unless File.exist?(TOPOLOGY_FILE)
+  raise "Unknown CLUSTER_TOPOLOGY=#{CLUSTER_TOPOLOGY}. Expected nodes.yml at #{TOPOLOGY_FILE}"
+end
 
-WORKER_CPUS = ENV.fetch("WORKER_CPUS", "2").to_i
-WORKER_MEMORY_MB = ENV.fetch("WORKER_MEMORY_MB", "2048").to_i
-WORKER_DISK_SIZE = ENV.fetch("WORKER_DISK_SIZE", "30270").to_i
+def env_int(name, default)
+  ENV.fetch(name, default.to_s).to_i
+end
 
-NODES = [
+def env_value(name, default)
+  ENV.fetch(name, default.to_s)
+end
+
+def disk_size(name, default)
+  value = env_value(name, default)
+  value.match?(/\A\d+\z/) ? value.to_i : value
+end
+
+topology = YAML.load_file(TOPOLOGY_FILE)
+NODES = topology.fetch("nodes").map do |node|
   {
-    name: "control-plane-1",
-    ip: "10.10.10.10",
-    cpus: CONTROL_PLANE_CPUS,
-    memory: CONTROL_PLANE_MEMORY_MB,
-    disk: CONTROL_PLANE_DISK_SIZE
-  },
-  {
-    name: "worker-1",
-    ip: "10.10.10.11",
-    cpus: WORKER_CPUS,
-    memory: WORKER_MEMORY_MB,
-    disk: WORKER_DISK_SIZE
-  },
-  {
-    name: "worker-2",
-    ip: "10.10.10.12",
-    cpus: WORKER_CPUS,
-    memory: WORKER_MEMORY_MB,
-    disk: WORKER_DISK_SIZE
+    name: node.fetch("name"),
+    ip: node.fetch("ip"),
+    cpus: env_int(node.fetch("cpus_env"), node.fetch("cpus")),
+    memory: env_int(node.fetch("memory_env"), node.fetch("memory_mb")),
+    disk: disk_size(node.fetch("disk_env"), node.fetch("disk_size"))
   }
-].freeze
+end.freeze
 
 HOSTS = NODES.map { |node| "#{node[:ip]} #{node[:name]}" }.join("\n")
 

@@ -37,6 +37,9 @@ registry_pull_test_image: "{{ lookup('env', 'REGISTRY_PULL_TEST_IMAGE') | defaul
 metrics_server_version: "{{ lookup('env', 'METRICS_SERVER_VERSION') | default('v0.8.1', true) }}"
 metrics_server_manifest_url: "{{ lookup('env', 'METRICS_SERVER_MANIFEST_URL') | default('https://github.com/kubernetes-sigs/metrics-server/releases/download/' ~ metrics_server_version ~ '/components.yaml', true) }}"
 metrics_server_wait_timeout: "{{ lookup('env', 'METRICS_SERVER_WAIT_TIMEOUT') | default('300s', true) }}"
+helm_version: "{{ lookup('env', 'HELM_VERSION') | default('v3.15.4', true) }}"
+helm_install_script_url: "{{ lookup('env', 'HELM_INSTALL_SCRIPT_URL') | default('https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3', true) }}"
+helm_install_script_path: /tmp/get-helm-3
 
 server_base_packages:
   - apt-transport-https

@@ -42,7 +42,7 @@
         creates: "{{ local_registry_host_ca_cert_path }}"
 
 - name: Bootstrap local container registry on the control plane
-  hosts: kube_control_plane
+  hosts: control_plane
   become: true
   gather_facts: false
 
@@ -262,7 +262,7 @@
       ansible.builtin.slurp:
         src: "{{ local_registry_ca_cert_path }}"
       register: local_registry_ca
-      delegate_to: "{{ groups['kube_control_plane'][0] }}"
+      delegate_to: "{{ groups['control_plane'][0] }}"
       run_once: true
 
     - name: Install local registry CA for containerd

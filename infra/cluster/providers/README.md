@@ -6,13 +6,16 @@ Provider는 Kubernetes 노드로 사용할 VM을 생성하는 계층입니다. V
 
 | Provider | 상태 | 역할 |
 |---|---|---|
-| `local-vagrant` | 구현됨 | VMware Workstation / Fusion 위에 로컬 VM 3대를 생성 |
+| `local-vagrant` | 구현됨 | VMware Workstation / Fusion 위에 선택된 topology의 로컬 VM을 생성 |
 
 ## 책임 분리
 
 ```text
 providers/
-  VM 생성, 네트워크 IP, CPU, 메모리, SSH 접속 기반 제공
+  VM 생성 방식, 네트워크, SSH 접속 기반 제공
+
+topologies/
+  compact, balanced, role-separated 같은 노드 모양, IP, 역할, 기본 스펙 정의
 
 provision/ansible/
   containerd, kubeadm, kubelet, kubectl 설치
@@ -28,11 +31,12 @@ provision/ansible/
 로컬 VMware 기반 클러스터는 다음 순서로 구성합니다.
 
 ```text
-1. local-vagrant provider가 VM 3대 생성
-2. Vagrant가 각 VM의 SSH key 생성
-3. Ansible inventory가 VM IP와 SSH key 경로를 사용
-4. Ansible이 VM에 Kubernetes 실행 기반 설치
-5. kubeadm으로 control-plane과 worker node 구성
+1. topologies/<name>/nodes.yml이 노드 목록과 역할 정의
+2. local-vagrant provider가 선택된 topology의 VM 생성
+3. Vagrant가 각 VM의 SSH key 생성
+4. Ansible inventory가 VM IP와 SSH key 경로, node label 값을 사용
+5. Ansible이 VM에 Kubernetes 실행 기반 설치
+6. kubeadm으로 control-plane과 worker node 구성
 ```
 
 자세한 실행 방법은 [local-vagrant/README.md](local-vagrant/README.md)를 참고합니다.

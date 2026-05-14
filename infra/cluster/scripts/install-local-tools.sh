@@ -131,6 +131,7 @@ if has_command brew; then
   install_brew_cask vagrant
   install_brew_cask vagrant-vmware-utility || warn "Automatic VMware Utility cask install failed. Follow the manual install guide in README.md."
   install_brew_package ansible
+  install_brew_package helm
 else
   warn "Homebrew is unavailable. Skipping automatic CLI installation."
 fi

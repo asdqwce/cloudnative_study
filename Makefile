@@ -17,10 +17,11 @@ INFRA_MAKE := $(MAKE) -C $(INFRA_CLUSTER_DIR)
 
 .PHONY: help list \
 	test-runner-build test-unit test-integration test test-all test-e2e e2e-up e2e-wait e2e-newman e2e-down clean-test \
-	install-tools check-tools check-kubectl check-local-dev-tools local-dev-config local-dev-up local-dev-kafka-up local-dev-ps local-dev-logs local-dev-down local-dev-reset \
-	local-bootstrap local-k8s-bootstrap registry-bootstrap registry-verify registry-pull-verify registry-ca-install registry-ca-curl-verify metrics-bootstrap metrics-verify \
+	install-tools check-tools check-kubectl check-helm check-local-dev-tools local-dev-config local-dev-up local-dev-kafka-up local-dev-ps local-dev-logs local-dev-down local-dev-reset \
+	local-bootstrap local-k8s-bootstrap registry-bootstrap registry-verify registry-pull-verify registry-ca-install registry-ca-curl-verify metrics-bootstrap metrics-verify helm-bootstrap observability-images-push \
+	observability-install observability-status grafana observability-grafana-port-forward \
 	local-vms-up local-vms-status local-vms-ssh local-vms-ssh-config local-vms-stop local-vms-halt local-vms-destroy local-vms-reset local-inventory ansible-ping servers-bootstrap servers-verify cluster-bootstrap cluster-verify \
-	app-images-build app-images-push local-kustomize-tag third-party-images-push local-k8s-render local-k8s-apply local-k8s-deps-prepare local-k8s-deps-apply local-k8s-app-apply local-k8s-deps-verify local-k8s-app-verify local-k8s-verify local-k8s-pods local-k8s-app-pods local-k8s-app-services local-k8s-status local-k8s-node-top local-k8s-app-top local-k8s-top local-k8s-crud-smoke local-k8s-deploy
+	app-images-build app-images-push local-kustomize-tag third-party-images-push local-k8s-render local-k8s-apply local-k8s-deps-prepare local-k8s-deps-apply local-k8s-app-apply local-k8s-app-stop local-k8s-app-pods-delete local-k8s-deps-verify local-k8s-app-verify local-k8s-verify local-k8s-pods local-k8s-app-pods local-k8s-app-services local-k8s-status local-k8s-node-top local-k8s-app-top local-k8s-top local-k8s-crud-smoke local-k8s-deploy
 
 help:
 	@printf '%s\n' 'Medical Platform commands'
@@ -44,8 +45,13 @@ help:
 	@printf '%s\n' '로컬 k8s 환경 설치'
 	@printf '  %-28s %s\n' 'make local-k8s-bootstrap' 'VM, Kubernetes, registry, Metrics Server, 앱 의존성을 한 번에 준비합니다.'
 	@printf '%s\n' ''
+	@printf '%s\n' 'Topology 선택 예시'
+	@printf '  %-48s %s\n' 'CLUSTER_TOPOLOGY=compact make local-k8s-bootstrap' '3VM 기본 구성입니다.'
+	@printf '  %-48s %s\n' 'CLUSTER_TOPOLOGY=balanced make local-k8s-bootstrap' '4VM 관측성 실험 구성입니다.'
+	@printf '  %-48s %s\n' 'CLUSTER_TOPOLOGY=role-separated make local-k8s-bootstrap' '6VM 역할 분리 구성입니다.'
+	@printf '%s\n' ''
 	@printf '%s\n' 'VM 조작'
-	@printf '  %-28s %s\n' 'make local-vms-up' 'Vagrant VM 3대를 생성하거나 시작합니다.'
+	@printf '  %-28s %s\n' 'make local-vms-up' '선택된 topology의 Vagrant VM을 생성하거나 시작합니다.'
 	@printf '  %-28s %s\n' 'make local-vms-status' '현재 Vagrant VM 상태를 확인합니다.'
 	@printf '  %-28s %s\n' 'make local-vms-ssh' 'control-plane VM에 SSH로 접속합니다.'
 	@printf '  %-28s %s\n' 'make local-vms-stop' 'VM을 종료합니다. 디스크는 유지합니다.'
@@ -57,6 +63,7 @@ help:
 	@printf '  %-28s %s\n' 'make local-k8s-apply' 'k8s/overlays/local/all 전체 manifest를 control-plane VM에서 적용합니다.'
 	@printf '  %-28s %s\n' 'make local-k8s-deps-apply' 'k8s/overlays/local/deps PostgreSQL/Kafka manifest를 적용합니다.'
 	@printf '  %-28s %s\n' 'make local-k8s-app-apply' 'k8s/overlays/local/apps 앱 manifest를 적용합니다.'
+	@printf '  %-28s %s\n' 'make local-k8s-app-stop' '앱 Deployment를 0 replicas로 내려 앱 pod를 종료합니다.'
 	@printf '  %-28s %s\n' 'make local-k8s-pods' 'VM Kubernetes 전체 namespace의 pod 상태를 확인합니다.'
 	@printf '  %-28s %s\n' 'make local-k8s-app-pods' 'medical-platform namespace의 pod 상태를 확인합니다.'
 	@printf '  %-28s %s\n' 'make local-k8s-app-services' 'medical-platform namespace의 service 상태를 확인합니다.'
@@ -64,6 +71,10 @@ help:
 	@printf '  %-28s %s\n' 'make local-k8s-node-top' 'VM Kubernetes node CPU/메모리 사용량을 확인합니다.'
 	@printf '  %-28s %s\n' 'make local-k8s-app-top' 'medical-platform pod/container CPU/메모리 사용량을 확인합니다.'
 	@printf '  %-28s %s\n' 'make local-k8s-top' 'node와 pod/container 리소스 사용량을 함께 확인합니다.'
+	@printf '  %-28s %s\n' 'make helm-bootstrap' 'control-plane VM에 Helm을 설치합니다.'
+	@printf '  %-28s %s\n' 'make observability-install' 'control-plane VM 안에서 Observability stack을 설치합니다.'
+	@printf '  %-28s %s\n' 'make observability-status' 'control-plane VM 안에서 release와 pod 상태를 확인합니다.'
+	@printf '  %-28s %s\n' 'make grafana' 'Grafana를 http://10.10.10.10:3000 으로 열 수 있게 연결합니다.'
 	@printf '%s\n' ''
 	@printf '%s\n' '주의: local-vms-destroy와 local-vms-reset은 VM 디스크를 삭제합니다.'
 
@@ -106,8 +117,9 @@ e2e-down:
 clean-test: e2e-down
 	docker volume rm $(GRADLE_CACHE_VOLUME) || true
 
-install-tools check-tools check-kubectl check-local-dev-tools local-dev-config local-dev-up local-dev-kafka-up local-dev-ps local-dev-logs local-dev-down local-dev-reset \
-	local-bootstrap local-k8s-bootstrap registry-bootstrap registry-verify registry-pull-verify registry-ca-install registry-ca-curl-verify metrics-bootstrap metrics-verify \
+install-tools check-tools check-kubectl check-helm check-local-dev-tools local-dev-config local-dev-up local-dev-kafka-up local-dev-ps local-dev-logs local-dev-down local-dev-reset \
+	local-bootstrap local-k8s-bootstrap registry-bootstrap registry-verify registry-pull-verify registry-ca-install registry-ca-curl-verify metrics-bootstrap metrics-verify helm-bootstrap observability-images-push \
+	observability-install observability-status grafana observability-grafana-port-forward \
 local-vms-up local-vms-status local-vms-ssh local-vms-ssh-config local-vms-stop local-vms-halt local-vms-destroy local-vms-reset local-inventory ansible-ping servers-bootstrap servers-verify cluster-bootstrap cluster-verify \
-app-images-build app-images-push local-kustomize-tag third-party-images-push local-k8s-render local-k8s-apply local-k8s-deps-prepare local-k8s-deps-apply local-k8s-app-apply local-k8s-deps-verify local-k8s-app-verify local-k8s-verify local-k8s-pods local-k8s-app-pods local-k8s-app-services local-k8s-status local-k8s-node-top local-k8s-app-top local-k8s-top local-k8s-crud-smoke local-k8s-deploy:
+app-images-build app-images-push local-kustomize-tag third-party-images-push local-k8s-render local-k8s-apply local-k8s-deps-prepare local-k8s-deps-apply local-k8s-app-apply local-k8s-app-stop local-k8s-app-pods-delete local-k8s-deps-verify local-k8s-app-verify local-k8s-verify local-k8s-pods local-k8s-app-pods local-k8s-app-services local-k8s-status local-k8s-node-top local-k8s-app-top local-k8s-top local-k8s-crud-smoke local-k8s-deploy:
 	$(INFRA_MAKE) $@

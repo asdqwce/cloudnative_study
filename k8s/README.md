@@ -72,7 +72,11 @@ k8s/overlays/local/all   namespace, deps, apps 전체 entrypoint
 | 앱 | `k8s/overlays/local/apps` | `make local-k8s-app-apply` |
 | 의존성 | `k8s/overlays/local/deps` | `make local-k8s-deps-apply` |
 
+`balanced`에서는 `app-1`, `data-1`의 메모리를 2GB로 두고 운영한다. Java 앱 5개와 Kafka가 동시에 올라오는 구성을 기준으로, 플랫폼 관측성 컴포넌트는 platform 노드로 고정 배치하고 CoreDNS는 로컬 single control-plane에서 1 replica로 유지한다.
+
 `k8s/overlays/local/deps/local-pv.yaml`은 로컬 VM hostPath Kafka PV다. Kafka는 같은 `medical-platform` 네임스페이스에서 `kafka:9092`로 접근한다.
+
+로컬 overlay는 세 topology를 함께 지원하기 위해 hostname 기반 node affinity를 사용한다. 앱은 app 노드 또는 compact worker에, PostgreSQL은 data/postgres 노드 또는 compact worker에, Kafka는 data/kafka 노드 또는 compact worker에 배치된다. balanced에서는 앱이 `app-1`, 데이터 의존성이 `data-1`로 모이고, role-separated에서는 앱/DB/Kafka가 각 전용 노드로 분리된다.
 
 ## 반복 확인
 

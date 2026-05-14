@@ -1,0 +1,47 @@
+cluster_topology: balanced
+description: Memory-efficient four VM topology for Observability and application/data workload experiments.
+nodes:
+  - name: control-plane-1
+    ip: 10.10.10.10
+    role: control-plane
+    ansible_groups: control_plane
+    cpus_env: BALANCED_CONTROL_PLANE_CPUS
+    cpus: 2
+    memory_env: BALANCED_CONTROL_PLANE_MEMORY_MB
+    memory_mb: 2048
+    disk_env: BALANCED_CONTROL_PLANE_DISK_SIZE
+    disk_size: 25GB
+    labels:
+  - name: platform-1
+    ip: 10.10.10.11
+    role: platform
+    ansible_groups: workers,platform_nodes
+    cpus_env: BALANCED_PLATFORM_CPUS
+    cpus: 2
+    memory_env: BALANCED_PLATFORM_MEMORY_MB
+    memory_mb: 3072
+    disk_env: BALANCED_PLATFORM_DISK_SIZE
+    disk_size: 45GB
+    labels: node-role.kubernetes.io/platform=true workload.medical-platform.io/tier=platform
+  - name: app-1
+    ip: 10.10.10.12
+    role: app
+    ansible_groups: workers,app_nodes
+    cpus_env: BALANCED_APP_CPUS
+    cpus: 2
+    memory_env: BALANCED_APP_MEMORY_MB
+    memory_mb: 2048
+    disk_env: BALANCED_APP_DISK_SIZE
+    disk_size: 25GB
+    labels: node-role.kubernetes.io/app=true workload.medical-platform.io/tier=app
+  - name: data-1
+    ip: 10.10.10.13
+    role: data
+    ansible_groups: workers,postgres_nodes,kafka_nodes
+    cpus_env: BALANCED_DATA_CPUS
+    cpus: 2
+    memory_env: BALANCED_DATA_MEMORY_MB
+    memory_mb: 2048
+    disk_env: BALANCED_DATA_DISK_SIZE
+    disk_size: 45GB
+    labels: node-role.kubernetes.io/data=true workload.medical-platform.io/tier=data

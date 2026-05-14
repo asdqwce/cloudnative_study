@@ -11,17 +11,65 @@
         state: restarted
 
   tasks:
+    - name: Clean stale apt package cache
+      ansible.builtin.command: apt-get clean
+      changed_when: false
+
+    - name: Remove stale partial apt downloads
+      ansible.builtin.file:
+        path: /var/cache/apt/archives/partial
+        state: absent
+
+    - name: Recreate apt partial download directory
+      ansible.builtin.file:
+        path: /var/cache/apt/archives/partial
+        state: directory
+        owner: _apt
+        group: root
+        mode: "0700"
+
+    - name: Refresh apt package cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 0
+      register: apt_cache_refresh
+      retries: 3
+      delay: 10
+      until: apt_cache_refresh is succeeded
+
     - name: Install base packages
       ansible.builtin.apt:
         name: "{{ server_base_packages }}"
         state: present
-        update_cache: true
+      register: base_package_install
+      retries: 3
+      delay: 15
+      until: base_package_install is succeeded
 
     - name: Install debug packages
       ansible.builtin.apt:
         name: "{{ server_debug_packages }}"
         state: present
-        update_cache: true
+      register: debug_package_install
+      retries: 3
+      delay: 15
+      until: debug_package_install is succeeded
+
+    - name: Collect Ubuntu service state for local cleanup
+      ansible.builtin.service_facts:
+
+    - name: Disable unnecessary background services for local experiments
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+      loop:
+        - snapd.service
+        - multipathd.service
+        - multipathd.socket
+      loop_control:
+        label: "{{ item }}"
+      when: item in ansible_facts.services
 
     - name: Disable swap for kubelet
       ansible.builtin.command: swapoff -a

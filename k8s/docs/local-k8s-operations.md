@@ -41,6 +41,10 @@ make local-k8s-deploy IMAGE_TAG=dev-001
 
 Kafka는 `medical-platform` 네임스페이스의 `kafka` Service로 노출되며 앱은 `kafka:9092`를 사용한다. 로컬 hostPath Kafka PV는 `k8s/overlays/local/deps/local-pv.yaml`에 둔다.
 
+로컬 overlay는 topology별 역할 노드에 맞춰 workload 배치를 제한한다. 앱 Deployment는 `app-1`, `app-a-1`, `app-b-1` 또는 compact fallback인 `worker-1`, `worker-2`에만 배치한다. PostgreSQL은 `data-1`, `postgres-1`, `worker-1`, `worker-2`에, Kafka는 `data-1`, `kafka-1`, `worker-1`, `worker-2`에 배치한다. 이 방식은 compact 기본 구성을 유지하면서 balanced와 role-separated에서 플랫폼 노드로 앱/데이터 workload가 섞이지 않도록 한다.
+
+`balanced` 경량화 기준에서는 `app-1`, `data-1`을 각각 `2GB`로 두고 Java 5개 서비스 + Kafka 메모리 상향 여유를 확보한다. platform 관련 관측성 컴포넌트(`Prometheus/Grafana/Loki/Tempo/kube-state-metrics`)는 `platform-1`로 모은다.
+
 ## 직접 kubectl 명령
 
 Kustomize 렌더링은 호스트에서 확인한다.
