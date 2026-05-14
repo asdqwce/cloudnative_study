@@ -1,150 +1,116 @@
-# 의료 MSA 플랫폼 - K8s 인프라 구성 가이드
+# 의료 MSA 플랫폼 로컬 Kubernetes 배포
 
-## 프로젝트 개요
-Spring Boot 기반 MSA 의료 플랫폼을 Kubernetes 환경에서 운영하기 위한 인프라 구성 가이드입니다.
+이 디렉터리는 Vagrant로 만든 로컬 Kubernetes 클러스터에 의료 MSA manifest를 배포하는 구성을 담는다. 로컬 개발과 실험의 기본 루프는 Kustomize entrypoint를 골라 `kubectl apply -k`로 직접 적용하는 방식이다.
 
-## 기술 스택
-- **K8s**: kubeadm 1.31.14
-- **OS**: Rocky Linux 9
-- **Container Runtime**: containerd
-- **Network Plugin**: Flannel
-- **Image Registry**: DockerHub (zexpand)
-- **빌드**: Java 17, Gradle 8.7
+로컬에서 먼저 확인할 것은 pod Ready, 서비스 통신, resource request/limit, `kubectl top`, 간단한 CRUD 흐름이다.
 
----
+## 먼저 고를 것
 
-## 서비스 구성
+| 방식 | 언제 사용하나 | 문서 |
+|---|---|---|
+| 자동 설치 | 로컬 도구 설치까지 스크립트로 먼저 시도할 때 | `../infra/cluster/README.md` |
+| 수동 설치 | Docker, Vagrant, Ansible을 직접 설치하거나 실패 지점을 확인할 때 | `../infra/cluster/docs/manual-install.md` |
 
-| 서비스 | 이미지 | 포트 |
-|--------|--------|------|
-| eureka-server | zexpand/eureka-server:latest | 8761 |
-| api-gateway | zexpand/api-gateway:latest | 8080 |
-| patient-service | zexpand/patient-service:latest | 8081 |
-| appointment-service | zexpand/appointment-service:latest | 8082 |
-| prescription-service | zexpand/prescription-service:latest | 8083 |
-| notification-service | zexpand/notification-service:latest | 8084 |
-| dashboard | zexpand/dashboard:latest | 80 |
-| patient-db | postgres:15 | 5432 |
-| appointment-db | postgres:15 | 5432 |
-| prescription-db | postgres:15 | 5432 |
-| kafka | apache/kafka:latest | 9092 |
+## 최초 준비
 
----
+프로젝트 루트에서 bootstrap 디렉터리로 이동한다.
 
-## 사전 준비
-
-### 1. K8s 클러스터 초기화 (node1)
 ```bash
-kubeadm init --pod-network-cidr=10.244.0.0/16 \
-  --cri-socket unix:///var/run/containerd/containerd.sock \
-  --ignore-preflight-errors=Mem \
-  --node-name=node1
+cd infra/cluster
+cp .env.example .env
+make local-k8s-bootstrap
 ```
 
-### 2. kubectl 설정
+`local-k8s-bootstrap`은 Vagrant VM, kubeadm 클러스터, Metrics Server, local registry, Kubernetes PostgreSQL manifest, Kubernetes Kafka StatefulSet을 준비한다.
+
+로컬 overlay는 `medical-platform` 네임스페이스 안에 Kafka broker를 함께 올린다. appointment-service와 notification-service는 기존처럼 `SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092`로 접속한다.
+
+앱 코드를 새로 빌드해야 할 때만 이미지 push와 태그 갱신을 실행한다.
+
 ```bash
-mkdir -p $HOME/.kube
-cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-chown $(id -u):$(id -g) $HOME/.kube/config
+make app-images-push IMAGE_TAG=dev-001
+make local-kustomize-tag IMAGE_TAG=dev-001
 ```
 
-### 3. Flannel 네트워크 플러그인 설치
+이미지 build/push부터 상태 확인까지 한 번에 실행하려면 다음 명령을 사용한다.
+
 ```bash
-kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+make local-k8s-deploy IMAGE_TAG=dev-001
 ```
 
-### 4. taint 제거 (단일 노드 사용 시)
+manifest만 바뀐 경우에는 이미지 빌드 없이 바로 적용한다.
+
 ```bash
-kubectl taint nodes node1 node-role.kubernetes.io/control-plane:NoSchedule-
+make local-k8s-app-apply
+make local-k8s-app-verify
 ```
 
----
+PostgreSQL 또는 Kafka 의존성 manifest를 바꿨을 때만 다음 명령을 사용한다.
 
-## 이미지 빌드 & 푸시
-
-### 1. 코드 clone 및 빌드
 ```bash
-git clone https://github.com/asdqwce/cloudnative_study.git
-cd cloudnative_study
-./gradlew clean build -x test
+make local-k8s-deps-apply
+make local-k8s-deps-verify
 ```
 
-### 2. Docker 이미지 빌드 & 푸시
-```bash
-docker login
+## Kustomize 구조
 
-docker build -t zexpand/eureka-server:latest ./eureka-server && docker push zexpand/eureka-server:latest
-docker build -t zexpand/api-gateway:latest ./api-gateway && docker push zexpand/api-gateway:latest
-docker build -t zexpand/patient-service:latest ./patient-service && docker push zexpand/patient-service:latest
-docker build -t zexpand/appointment-service:latest ./appointment-service && docker push zexpand/appointment-service:latest
-docker build -t zexpand/prescription-service:latest ./prescription-service && docker push zexpand/prescription-service:latest
-docker build -t zexpand/notification-service:latest ./notification-service && docker push zexpand/notification-service:latest
-docker build -t zexpand/dashboard:latest ./dashboard && docker push zexpand/dashboard:latest
+`k8s/`는 앱과 의존성의 라이프사이클을 entrypoint로 분리한다.
+
+```text
+k8s/base/apps      앱 Deployment/Service 원본
+k8s/base/deps      PostgreSQL/Kafka 원본
+k8s/overlays/local/apps  로컬 앱 배포 entrypoint
+k8s/overlays/local/deps  로컬 PostgreSQL/Kafka 배포 entrypoint
+k8s/overlays/local/all   namespace, deps, apps 전체 entrypoint
 ```
 
-> 각 서비스 Dockerfile은 아래 형식 사용 (멀티스테이지 빌드 RAM 부족 시 대체)
-> ```dockerfile
-> FROM eclipse-temurin:17-jdk-jammy
-> WORKDIR /app
-> COPY build/libs/*.jar app.jar
-> EXPOSE {포트}
-> ENTRYPOINT ["java", "-jar", "app.jar"]
-> ```
+명령도 같은 경계를 따른다.
 
----
+| 적용 범위 | Kustomize 경로 | Make target |
+|---|---|---|
+| 전체 | `k8s/overlays/local/all` | `make local-k8s-apply` |
+| 앱 | `k8s/overlays/local/apps` | `make local-k8s-app-apply` |
+| 의존성 | `k8s/overlays/local/deps` | `make local-k8s-deps-apply` |
 
-## 배포
+`k8s/overlays/local/deps/local-pv.yaml`은 로컬 VM hostPath Kafka PV다. Kafka는 같은 `medical-platform` 네임스페이스에서 `kafka:9092`로 접근한다.
 
-### 1. PV 생성
+## 반복 확인
+
 ```bash
-kubectl apply -f k8s/pv.yaml
+make local-k8s-verify
+make local-k8s-status
+make local-k8s-top
+make local-k8s-crud-smoke
 ```
 
-### 2. DB 먼저 배포
-```bash
-kubectl apply -f k8s/db/patient-db/
-kubectl apply -f k8s/db/appointment-db/
-kubectl apply -f k8s/db/prescription-db/
+각 명령의 의미는 다음과 같다.
+
+| 확인 | 명령 | 보는 것 |
+|---|---|---|
+| manifest 렌더링 | `kubectl kustomize k8s/overlays/local/all` 또는 `make local-k8s-render` | Kustomize 출력이 정상인지 |
+| 전체 직접 적용 | `make local-k8s-apply` | `k8s/overlays/local/all` 전체를 클러스터에 반영해야 하는지 |
+| 앱 직접 적용 | `make local-k8s-app-apply` | 앱 Deployment/Service만 클러스터에 반영되는지 |
+| 의존성 직접 적용 | `make local-k8s-deps-apply` | PostgreSQL/Kafka manifest 변경분이 클러스터에 반영되는지 |
+| pod Ready | `make local-k8s-verify` | 앱 Deployment rollout 완료 여부 |
+| service 통신 | `make local-k8s-status` | Service, endpoint로 이어질 pod 상태 |
+| resource limit | `kubectl -n medical-platform get deploy patient-service -o yaml` | `JAVA_TOOL_OPTIONS`, `resources` 반영 여부 |
+| runtime 사용량 | `make local-k8s-top` | Metrics Server 기반 CPU/메모리 사용량 |
+| CRUD 흐름 | `make local-k8s-crud-smoke` | API Gateway NodePort를 통한 환자 생성/조회 |
+
+VM kubeadm 클러스터에는 cloud LoadBalancer가 없으므로 `EXTERNAL-IP`가 생기지 않는다. 로컬 overlay는 `NodePort`로 Dashboard와 API Gateway를 연다.
+
+```text
+Dashboard:   http://10.10.10.10:30088
+API Gateway: http://10.10.10.10:30080
 ```
 
-### 3. Kafka 배포
-```bash
-kubectl apply -f k8s/kafka/
-```
+API Gateway는 Eureka가 아니라 Kubernetes Service DNS로 내부 서비스를 호출한다.
 
-### 4. 서비스 배포
-```bash
-kubectl apply -f k8s/eureka-server/
-kubectl apply -f k8s/api-gateway/
-kubectl apply -f k8s/patient-service/
-kubectl apply -f k8s/appointment-service/
-kubectl apply -f k8s/prescription-service/
-kubectl apply -f k8s/notification-service/
-kubectl apply -f k8s/dashboard/
-```
+## 더 보기
 
----
-
-## 상태 확인
-```bash
-kubectl get pods
-kubectl get services
-```
-
----
-
-## 서비스 접속
-
-### Eureka 대시보드
-```bash
-kubectl port-forward service/eureka-server 8761:8761 --address=0.0.0.0
-```
-브라우저: `http://서버IP:8761`
-
-### Dashboard UI
-```bash
-kubectl port-forward service/dashboard 80:80 --address=0.0.0.0
-```
-브라우저: `http://서버IP:80`
-
-
+| 문서 | 내용 |
+|---|---|
+| `docs/local-k8s-operations.md` | 직접 apply 운영 확인과 문제 해결 명령 |
+| `docs/resource-footprint-experiment.md` | Java, PostgreSQL, Kafka 리소스 제한 실험 기준 |
+| `../infra/cluster/docs/local-k8s-deployment.md` | local registry와 직접 apply 배포 루프 |
+| `../infra/cluster/docs/kubernetes-cluster.md` | Vagrant VM과 kubeadm 클러스터 구성 |

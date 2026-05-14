@@ -15,20 +15,20 @@
 확인 명령:
 
 ```bash
-cd dev-env-bootstrap
+cd infra/cluster
 make check-local-dev-tools
 ```
 
 ## 공용 DEV 클러스터 검증
 
-공용 DEV 클러스터 구성을 로컬에서 검증할 때는 VMware Fusion, Vagrant, Ansible을 사용한다.
+공용 DEV 클러스터 구성을 로컬에서 검증할 때는 VMware Workstation 또는 VMware Fusion, Vagrant, Ansible을 사용한다.
 
 | 도구 | 필요한 이유 |
 |---|---|
-| VMware Fusion | 로컬에서 VM 기반 Kubernetes 노드를 실행하기 위해 필요 |
+| VMware Workstation 또는 VMware Fusion | 로컬에서 VM 기반 Kubernetes 노드를 실행하기 위해 필요 |
 | Vagrant | 로컬 VM 3대를 코드로 생성하고 삭제하기 위해 필요 |
-| vagrant-vmware-desktop | Vagrant가 VMware Fusion을 제어하기 위해 필요 |
-| Vagrant VMware Utility | Vagrant VMware provider가 VMware Fusion과 통신하기 위해 필요 |
+| vagrant-vmware-desktop | Vagrant가 VMware를 제어하기 위해 필요 |
+| Vagrant VMware Utility | Vagrant VMware provider가 VMware와 통신하기 위해 필요 |
 | Ansible | 생성된 VM에 서버 초기 설정을 자동 적용하기 위해 필요 |
 | Python 3 | Ansible 실행 런타임으로 필요 |
 | Make | 긴 명령을 짧은 실행 단위로 감싸기 위해 필요 |
@@ -36,6 +36,6 @@ make check-local-dev-tools
 확인 명령:
 
 ```bash
-cd dev-env-bootstrap
+cd infra/cluster
 make check-tools
 ```

@@ -33,6 +33,42 @@
         msg: "Missing Kubernetes nodes: {{ groups['k8s_cluster'] | difference(cluster_node_names.stdout_lines) }}"
       when: groups['k8s_cluster'] | difference(cluster_node_names.stdout_lines) | length > 0
 
+    - name: Wait until Calico node pods are scheduled on every node
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - get
+          - pods
+          - -n
+          - kube-system
+          - -l
+          - k8s-app=calico-node
+          - -o
+          - jsonpath={range .items[*]}{.spec.nodeName}{"\n"}{end}
+      environment:
+        KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
+      register: calico_node_pod_nodes
+      changed_when: false
+      retries: 30
+      delay: 5
+      until: groups['k8s_cluster'] | difference(calico_node_pod_nodes.stdout_lines) | length == 0
+
+    - name: Wait until Calico node agents are Ready
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - wait
+          - --for=condition=Ready
+          - pod
+          - -n
+          - kube-system
+          - -l
+          - k8s-app=calico-node
+          - "--timeout={{ calico_node_ready_timeout }}"
+      environment:
+        KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
+      changed_when: false
+
     - name: Wait until all nodes are Ready
       ansible.builtin.command:
         argv:
@@ -57,22 +93,6 @@
           - kube-system
           - -l
           - k8s-app=kube-dns
-          - "--timeout={{ kubernetes_node_ready_timeout }}"
-      environment:
-        KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
-      changed_when: false
-
-    - name: Wait until Calico node agents are Ready
-      ansible.builtin.command:
-        argv:
-          - kubectl
-          - wait
-          - --for=condition=Ready
-          - pod
-          - -n
-          - kube-system
-          - -l
-          - k8s-app=calico-node
           - "--timeout={{ kubernetes_node_ready_timeout }}"
       environment:
         KUBECONFIG: "{{ kubernetes_admin_conf_path }}"

@@ -12,24 +12,60 @@ COMPOSE_NETWORK ?= $(COMPOSE_PROJECT_NAME)_medical-net
 DOCKER_COMPOSE ?= docker compose
 NEWMAN_IMAGE ?= postman/newman:6-alpine
 CURL_IMAGE ?= curlimages/curl:8.7.1
+INFRA_CLUSTER_DIR ?= infra/cluster
+INFRA_MAKE := $(MAKE) -C $(INFRA_CLUSTER_DIR)
 
-.PHONY: help list test-runner-build test-unit test-integration test test-all test-e2e e2e-up e2e-wait e2e-newman e2e-down clean-test
+.PHONY: help list \
+	test-runner-build test-unit test-integration test test-all test-e2e e2e-up e2e-wait e2e-newman e2e-down clean-test \
+	install-tools check-tools check-kubectl check-local-dev-tools local-dev-config local-dev-up local-dev-kafka-up local-dev-ps local-dev-logs local-dev-down local-dev-reset \
+	local-bootstrap local-k8s-bootstrap registry-bootstrap registry-verify registry-pull-verify registry-ca-install registry-ca-curl-verify metrics-bootstrap metrics-verify \
+	local-vms-up local-vms-status local-vms-ssh local-vms-ssh-config local-vms-stop local-vms-halt local-vms-destroy local-vms-reset local-inventory ansible-ping servers-bootstrap servers-verify cluster-bootstrap cluster-verify \
+	app-images-build app-images-push local-kustomize-tag third-party-images-push local-k8s-render local-k8s-apply local-k8s-deps-prepare local-k8s-deps-apply local-k8s-app-apply local-k8s-deps-verify local-k8s-app-verify local-k8s-verify local-k8s-pods local-k8s-app-pods local-k8s-app-services local-k8s-status local-k8s-node-top local-k8s-app-top local-k8s-top local-k8s-crud-smoke local-k8s-deploy
 
 help:
-	@printf '%s\n' 'Medical Platform test commands'
+	@printf '%s\n' 'Medical Platform commands'
 	@printf '%s\n' ''
-	@printf '  %-24s %s\n' 'make help' '사용 가능한 명령 목록을 출력합니다.'
-	@printf '  %-24s %s\n' 'make list' '사용 가능한 명령 목록을 출력합니다.'
-	@printf '  %-24s %s\n' 'make test-unit' 'Docker Gradle 러너에서 단위 테스트를 실행합니다.'
-	@printf '  %-24s %s\n' 'make test-integration' 'Docker Gradle 러너에서 통합 테스트를 실행합니다.'
-	@printf '  %-24s %s\n' 'make test-e2e' 'Docker Compose 서비스와 Newman E2E 테스트를 실행합니다.'
-	@printf '  %-24s %s\n' 'make test' '단위, 통합, E2E 테스트를 순서대로 실행합니다.'
-	@printf '  %-24s %s\n' 'make test-all' 'make test와 같은 전체 테스트 명령입니다.'
-	@printf '  %-24s %s\n' 'make e2e-up' 'E2E Docker Compose 서비스를 시작합니다.'
-	@printf '  %-24s %s\n' 'make e2e-wait' 'E2E 서비스 준비 상태를 확인합니다.'
-	@printf '  %-24s %s\n' 'make e2e-newman' '실행 중인 E2E 서비스에 Newman을 실행합니다.'
-	@printf '  %-24s %s\n' 'make e2e-down' 'E2E Docker Compose 서비스를 정리합니다.'
-	@printf '  %-24s %s\n' 'make clean-test' 'E2E 서비스와 Gradle 캐시 볼륨을 정리합니다.'
+	@printf '%s\n' '기본'
+	@printf '  %-28s %s\n' 'make help' '사용 가능한 명령 목록을 출력합니다.'
+	@printf '  %-28s %s\n' 'make list' '사용 가능한 명령 목록을 출력합니다.'
+	@printf '%s\n' ''
+	@printf '%s\n' '테스트'
+	@printf '  %-28s %s\n' 'make test-unit' 'Docker Gradle 러너에서 단위 테스트를 실행합니다.'
+	@printf '  %-28s %s\n' 'make test-integration' 'Docker Gradle 러너에서 통합 테스트를 실행합니다.'
+	@printf '  %-28s %s\n' 'make test-e2e' 'Docker Compose 서비스와 Newman E2E 테스트를 실행합니다.'
+	@printf '  %-28s %s\n' 'make test' '단위, 통합, E2E 테스트를 순서대로 실행합니다.'
+	@printf '  %-28s %s\n' 'make test-all' 'make test와 같은 전체 테스트 명령입니다.'
+	@printf '  %-28s %s\n' 'make e2e-up' 'E2E Docker Compose 서비스를 시작합니다.'
+	@printf '  %-28s %s\n' 'make e2e-wait' 'E2E 서비스 준비 상태를 확인합니다.'
+	@printf '  %-28s %s\n' 'make e2e-newman' '실행 중인 E2E 서비스에 Newman을 실행합니다.'
+	@printf '  %-28s %s\n' 'make e2e-down' 'E2E Docker Compose 서비스를 정리합니다.'
+	@printf '  %-28s %s\n' 'make clean-test' 'E2E 서비스와 Gradle 캐시 볼륨을 정리합니다.'
+	@printf '%s\n' ''
+	@printf '%s\n' '로컬 k8s 환경 설치'
+	@printf '  %-28s %s\n' 'make local-k8s-bootstrap' 'VM, Kubernetes, registry, Metrics Server, 앱 의존성을 한 번에 준비합니다.'
+	@printf '%s\n' ''
+	@printf '%s\n' 'VM 조작'
+	@printf '  %-28s %s\n' 'make local-vms-up' 'Vagrant VM 3대를 생성하거나 시작합니다.'
+	@printf '  %-28s %s\n' 'make local-vms-status' '현재 Vagrant VM 상태를 확인합니다.'
+	@printf '  %-28s %s\n' 'make local-vms-ssh' 'control-plane VM에 SSH로 접속합니다.'
+	@printf '  %-28s %s\n' 'make local-vms-stop' 'VM을 종료합니다. 디스크는 유지합니다.'
+	@printf '  %-28s %s\n' 'make local-vms-destroy' 'VM과 디스크를 삭제합니다.'
+	@printf '  %-28s %s\n' 'make local-vms-reset' 'VM을 삭제한 뒤 로컬 k8s 환경을 처음부터 다시 구성합니다.'
+	@printf '%s\n' ''
+	@printf '%s\n' 'k8s 조작'
+	@printf '  %-28s %s\n' 'make local-k8s-deploy' '앱을 빌드하고 로컬 Kubernetes에 배포한 뒤 상태를 확인합니다.'
+	@printf '  %-28s %s\n' 'make local-k8s-apply' 'k8s/overlays/local/all 전체 manifest를 control-plane VM에서 적용합니다.'
+	@printf '  %-28s %s\n' 'make local-k8s-deps-apply' 'k8s/overlays/local/deps PostgreSQL/Kafka manifest를 적용합니다.'
+	@printf '  %-28s %s\n' 'make local-k8s-app-apply' 'k8s/overlays/local/apps 앱 manifest를 적용합니다.'
+	@printf '  %-28s %s\n' 'make local-k8s-pods' 'VM Kubernetes 전체 namespace의 pod 상태를 확인합니다.'
+	@printf '  %-28s %s\n' 'make local-k8s-app-pods' 'medical-platform namespace의 pod 상태를 확인합니다.'
+	@printf '  %-28s %s\n' 'make local-k8s-app-services' 'medical-platform namespace의 service 상태를 확인합니다.'
+	@printf '  %-28s %s\n' 'make local-k8s-status' '파드, 서비스, PVC, 최근 event를 확인합니다.'
+	@printf '  %-28s %s\n' 'make local-k8s-node-top' 'VM Kubernetes node CPU/메모리 사용량을 확인합니다.'
+	@printf '  %-28s %s\n' 'make local-k8s-app-top' 'medical-platform pod/container CPU/메모리 사용량을 확인합니다.'
+	@printf '  %-28s %s\n' 'make local-k8s-top' 'node와 pod/container 리소스 사용량을 함께 확인합니다.'
+	@printf '%s\n' ''
+	@printf '%s\n' '주의: local-vms-destroy와 local-vms-reset은 VM 디스크를 삭제합니다.'
 
 list: help
 
@@ -69,3 +105,9 @@ e2e-down:
 
 clean-test: e2e-down
 	docker volume rm $(GRADLE_CACHE_VOLUME) || true
+
+install-tools check-tools check-kubectl check-local-dev-tools local-dev-config local-dev-up local-dev-kafka-up local-dev-ps local-dev-logs local-dev-down local-dev-reset \
+	local-bootstrap local-k8s-bootstrap registry-bootstrap registry-verify registry-pull-verify registry-ca-install registry-ca-curl-verify metrics-bootstrap metrics-verify \
+local-vms-up local-vms-status local-vms-ssh local-vms-ssh-config local-vms-stop local-vms-halt local-vms-destroy local-vms-reset local-inventory ansible-ping servers-bootstrap servers-verify cluster-bootstrap cluster-verify \
+app-images-build app-images-push local-kustomize-tag third-party-images-push local-k8s-render local-k8s-apply local-k8s-deps-prepare local-k8s-deps-apply local-k8s-app-apply local-k8s-deps-verify local-k8s-app-verify local-k8s-verify local-k8s-pods local-k8s-app-pods local-k8s-app-services local-k8s-status local-k8s-node-top local-k8s-app-top local-k8s-top local-k8s-crud-smoke local-k8s-deploy:
+	$(INFRA_MAKE) $@

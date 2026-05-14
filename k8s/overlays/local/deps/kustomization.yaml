@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: medical-platform
+resources:
+  - ../../../base/deps
+  - local-pv.yaml
+images:
+  - name: postgres
+    newName: 10.10.10.10:5000/postgres
+    newTag: "15"
+  - name: apache/kafka
+    newName: 10.10.10.10:5000/apache/kafka
+    newTag: "3.8.1"
+  - name: busybox
+    newName: 10.10.10.10:5000/busybox
+    newTag: "1.36"

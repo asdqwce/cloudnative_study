@@ -23,18 +23,6 @@
         state: present
         update_cache: true
 
-    - name: Fail when yq release architecture is unsupported
-      ansible.builtin.fail:
-        msg: "Unsupported yq release architecture: {{ ansible_facts.architecture }}"
-      when: ansible_facts.architecture not in yq_release_arch
-
-    - name: Install yq from upstream release
-      ansible.builtin.get_url:
-        url: "https://github.com/mikefarah/yq/releases/download/{{ yq_version }}/yq_linux_{{ yq_release_arch[ansible_facts.architecture] }}"
-        dest: "{{ yq_binary_path }}"
-        mode: "0755"
-        checksum: "sha256:{{ yq_release_sha256[yq_release_arch[ansible_facts.architecture]] }}"
-
     - name: Disable swap for kubelet
       ansible.builtin.command: swapoff -a
       changed_when: false
@@ -91,11 +79,49 @@
         content: "{{ containerd_default_config.stdout | regex_replace('SystemdCgroup = false', 'SystemdCgroup = true') }}"
       notify: Restart containerd
 
+    - name: Configure containerd registry config path
+      ansible.builtin.replace:
+        path: "{{ containerd_config_path }}"
+        regexp: "(?s)(\\[plugins\\.'io\\.containerd\\.cri\\.v1\\.images'\\.registry\\])\\s*config_path\\s*=.*?(\\n\\s*\\[plugins\\.'io\\.containerd\\.cri\\.v1\\.images'\\.image_decryption\\])"
+        replace: |-
+          \1
+                config_path = "{{ containerd_registry_config_path }}"
+          \2
+      notify: Restart containerd
+
+    - name: Ensure local registry trust directory exists
+      ansible.builtin.file:
+        path: "{{ containerd_registry_config_path }}/{{ local_registry_endpoint }}"
+        state: directory
+        mode: "0755"
+
+    - name: Trust the local registry CA path from containerd
+      ansible.builtin.copy:
+        dest: "{{ containerd_registry_config_path }}/{{ local_registry_endpoint }}/hosts.toml"
+        mode: "0644"
+        content: |
+          server = "https://{{ local_registry_endpoint }}"
+
+          [host."https://{{ local_registry_endpoint }}"]
+            capabilities = ["pull", "resolve", "push"]
+            ca = "{{ containerd_registry_config_path }}/{{ local_registry_endpoint }}/ca.crt"
+      notify: Restart containerd
+
     - name: Ensure containerd is enabled
       ansible.builtin.service:
         name: containerd
         enabled: true
         state: started
+
+    - name: Configure crictl to use containerd
+      ansible.builtin.copy:
+        dest: "{{ crictl_config_path }}"
+        mode: "0644"
+        content: |
+          runtime-endpoint: {{ kubernetes_cri_socket }}
+          image-endpoint: {{ kubernetes_cri_socket }}
+          timeout: 10
+          debug: false
 
     - name: Ensure apt keyring directory exists
       ansible.builtin.file:
@@ -122,9 +148,10 @@
         content: |
           deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/{{ kubernetes_apt_release }}/deb/ /
 
-    - name: Install kubelet, kubeadm, and kubectl
+    - name: Install kubelet, kubeadm, kubectl, and CRI tools
       ansible.builtin.apt:
         name:
+          - cri-tools
           - kubelet
           - kubeadm
           - kubectl
@@ -136,6 +163,7 @@
         name: "{{ item }}"
         selection: hold
       loop:
+        - cri-tools
         - kubelet
         - kubeadm
         - kubectl
@@ -173,4 +201,4 @@
         dest: "{{ bootstrap_marker_path }}"
         mode: "0644"
         content: |
-          dev-env-bootstrap server initialization completed
+          cloudnative cluster server initialization completed
