@@ -19,7 +19,7 @@
 
 | 그룹 | 도구 |
 |---|---|
-| 기본 유틸 | `bash-completion`, `curl`, `wget`, `git`, `jq`, `yq`, `vim`, `tmux`, `rsync`, `tar`, `unzip` |
+| 기본 유틸 | `bash-completion`, `curl`, `wget`, `git`, `jq`, `vim`, `tmux`, `rsync`, `tar`, `unzip` |
 | 운영 확인 | `btop`, `htop`, `ncdu`, `lsof`, `tree` |
 | 네트워크 디버깅 | `iproute2`, `net-tools`, `dnsutils`, `iputils-ping`, `traceroute`, `netcat-openbsd`, `tcpdump` |
 | Kubernetes 편의 | `kubectl completion bash`, `kubeadm completion bash`, `k` alias |
@@ -45,8 +45,6 @@ make servers-verify
 ```
 
 검증 playbook은 marker 파일, 주요 명령어, `containerd` 실행 상태, swap 비활성화 여부를 확인한다.
-
-`yq`는 Ubuntu ARM64 apt 저장소에 없을 수 있어 `mikefarah/yq`의 Linux `amd64`/`arm64` release binary로 설치한다.
 
 클러스터 구성 후에는 다음 명령으로 node와 system pod 상태를 확인한다.
 

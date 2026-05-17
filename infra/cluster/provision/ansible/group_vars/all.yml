@@ -3,20 +3,44 @@ kubernetes_admin_conf_path: /etc/kubernetes/admin.conf
 kubernetes_cri_socket: unix:///run/containerd/containerd.sock
 kubernetes_pod_network_cidr: "{{ lookup('env', 'KUBERNETES_POD_NETWORK_CIDR') | default('192.168.0.0/16', true) }}"
 kubernetes_node_ready_timeout: "{{ lookup('env', 'KUBERNETES_NODE_READY_TIMEOUT') | default('300s', true) }}"
+kubeadm_image_pull_timeout: "{{ lookup('env', 'KUBEADM_IMAGE_PULL_TIMEOUT') | default('600s', true) }}"
+kubeadm_init_timeout: "{{ lookup('env', 'KUBEADM_INIT_TIMEOUT') | default('600s', true) }}"
+calico_node_ready_timeout: "{{ lookup('env', 'CALICO_NODE_READY_TIMEOUT') | default('600s', true) }}"
 containerd_config_path: /etc/containerd/config.toml
-bootstrap_marker_path: /etc/dev-env-bootstrap-ready
+containerd_registry_config_path: /etc/containerd/certs.d
+crictl_config_path: /etc/crictl.yaml
+bootstrap_marker_path: /etc/cloudnative-cluster-ready
 calico_version: "{{ lookup('env', 'CALICO_VERSION') | default('v3.31.4', true) }}"
 calico_manifest_url: "https://raw.githubusercontent.com/projectcalico/calico/{{ calico_version }}/manifests/calico.yaml"
-yq_version: v4.53.2
-yq_binary_path: /usr/local/bin/yq
-yq_release_arch:
-  amd64: amd64
+calico_local_manifest_path: "/tmp/calico-{{ calico_version }}-local-registry.yaml"
+calico_image_pull_timeout: "{{ lookup('env', 'CALICO_IMAGE_PULL_TIMEOUT') | default('300s', true) }}"
+calico_images:
+  - "quay.io/calico/cni:{{ calico_version }}"
+  - "quay.io/calico/node:{{ calico_version }}"
+  - "quay.io/calico/kube-controllers:{{ calico_version }}"
+calico_local_images: "{{ calico_images | map('regex_replace', '^', local_registry_endpoint ~ '/') | list }}"
+local_registry_host: "{{ lookup('env', 'LOCAL_REGISTRY_HOST') | default('10.10.10.10', true) }}"
+local_registry_port: "{{ lookup('env', 'LOCAL_REGISTRY_PORT') | default('5000', true) }}"
+local_registry_endpoint: "{{ local_registry_host }}:{{ local_registry_port }}"
+local_registry_storage_path: "{{ lookup('env', 'LOCAL_REGISTRY_STORAGE_PATH') | default('/var/lib/docker-registry', true) }}"
+local_registry_tls_dir: "{{ lookup('env', 'LOCAL_REGISTRY_TLS_DIR') | default('/etc/docker/registry/tls', true) }}"
+local_registry_host_tls_dir: "{{ lookup('env', 'LOCAL_REGISTRY_HOST_TLS_DIR') | default(lookup('env', 'HOME') ~ '/.cache/cloudnative-study/infra-cluster/local-registry', true) }}"
+local_registry_host_ca_cert_path: "{{ local_registry_host_tls_dir }}/ca.crt"
+local_registry_host_ca_key_path: "{{ local_registry_host_tls_dir }}/ca.key"
+local_registry_ca_cert_path: "{{ local_registry_tls_dir }}/ca.crt"
+local_registry_ca_key_path: "{{ local_registry_tls_dir }}/ca.key"
+local_registry_server_cert_path: "{{ local_registry_tls_dir }}/server.crt"
+local_registry_server_key_path: "{{ local_registry_tls_dir }}/server.key"
+local_registry_csr_path: "{{ local_registry_tls_dir }}/server.csr"
+local_registry_openssl_config_path: "{{ local_registry_tls_dir }}/server-openssl.cnf"
+registry_pull_test_image: "{{ lookup('env', 'REGISTRY_PULL_TEST_IMAGE') | default('', true) }}"
+metrics_server_version: "{{ lookup('env', 'METRICS_SERVER_VERSION') | default('v0.8.1', true) }}"
+metrics_server_manifest_url: "{{ lookup('env', 'METRICS_SERVER_MANIFEST_URL') | default('https://github.com/kubernetes-sigs/metrics-server/releases/download/' ~ metrics_server_version ~ '/components.yaml', true) }}"
+metrics_server_wait_timeout: "{{ lookup('env', 'METRICS_SERVER_WAIT_TIMEOUT') | default('300s', true) }}"
+helm_version: "{{ lookup('env', 'HELM_VERSION') | default('v3.16.4', true) }}"
+helm_release_arch:
   x86_64: amd64
-  arm64: arm64
   aarch64: arm64
-yq_release_sha256:
-  amd64: d56bf5c6819e8e696340c312bd70f849dc1678a7cda9c2ad63eebd906371d56b
-  arm64: 03061b2a50c7a498de2bbb92d7cb078ce433011f085a4994117c2726be4106ea
 
 server_base_packages:
   - apt-transport-https

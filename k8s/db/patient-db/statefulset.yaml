@@ -32,6 +32,8 @@ spec:
     - metadata:
         name: patient-db-storage
       spec:
+        volumeName: patient-db-pv
+        storageClassName: ""
         accessModes: ["ReadWriteOnce"]
         resources:
           requests:

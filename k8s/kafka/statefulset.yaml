@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: kafka
-          image: apache/kafka:latest
+          image: apache/kafka:3.8.1
           securityContext:
             runAsUser: 0
           ports:
@@ -28,9 +28,9 @@ spec:
             - name: KAFKA_LISTENERS
               value: "PLAINTEXT://:9092,CONTROLLER://:9093"
             - name: KAFKA_ADVERTISED_LISTENERS
-              value: "PLAINTEXT://kafka:9092"
+              value: "PLAINTEXT://kafka.medical-messaging.svc.cluster.local:9092"
             - name: KAFKA_CONTROLLER_QUORUM_VOTERS
-              value: "1@kafka:9093"
+              value: "1@kafka.medical-messaging.svc.cluster.local:9093"
             - name: KAFKA_CONTROLLER_LISTENER_NAMES
               value: "CONTROLLER"
             - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
@@ -42,6 +42,8 @@ spec:
     - metadata:
         name: kafka-storage
       spec:
+        volumeName: kafka-pv
+        storageClassName: ""
         accessModes: ["ReadWriteOnce"]
         resources:
           requests:

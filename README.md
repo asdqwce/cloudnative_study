@@ -1,84 +1,136 @@
-# ArgoCD 설치 및 설정 가이드
+# MediKong Cloud Native Study
 
-## 개요
-ArgoCD를 설치하고 GitHub 레포와 연동하여 k8s 디렉토리 변경사항을 자동으로 클러스터에 배포합니다.
+FastAPI 기반 의료 MSA를 로컬 Kubernetes에서 검증하고, 이후 AWS 배포로 확장하기 위한 실습 프로젝트입니다.
 
----
+현재 로컬 표준 실행 방식은 Docker Compose가 아니라 `VMware/Vagrant VM 3대 + Ansible + kubeadm Kubernetes + Kong Gateway`입니다.
 
-## 사전 준비
-- K8s 클러스터 구성 완료
-- kubectl 설치 및 설정 완료
+## 현재 검증 상태
 
----
+서비스별 namespace 분리 버전 기준으로 다음 흐름이 통과했습니다.
 
-## 자동 설치 (권장)
-
-### 1. 스크립트 다운로드 및 실행
 ```bash
-curl -O https://raw.githubusercontent.com/asdqwce/cloudnative_study/main/argo/setup-argocd.sh
-chmod +x setup-argocd.sh
-./setup-argocd.sh
+make wsl-local-k8s-bootstrap
+make IMAGE_TAG=dev-001 wsl-local-k8s-deploy
+make wsl-local-k8s-crud-smoke
 ```
 
-스크립트가 자동으로 수행하는 작업:
-- ArgoCD 설치
-- ArgoCD 파드 준비 대기
-- application.yaml 적용
-- 초기 비밀번호 출력
+성공 로그:
 
----
+```text
+ok: patient CRUD smoke passed with patientId=1
+```
 
-## 수동 설치
+## 로컬 구조
 
-### 1. ArgoCD 설치
+```text
+Windows host or macOS
+├─ Docker / Docker Desktop
+│  └─ 서비스 이미지 build/push
+├─ VMware + Vagrant
+│  ├─ control-plane-1  10.10.10.10
+│  ├─ worker-1         10.10.10.11
+│  └─ worker-2         10.10.10.12
+└─ Kubernetes
+   ├─ local registry   10.10.10.10:5000
+   ├─ MetalLB          10.10.10.240-10.10.10.250
+   ├─ Kong Gateway     http://10.10.10.240
+   ├─ medical-auth
+   ├─ medical-messaging
+   ├─ medical-patient
+   ├─ medical-appointment
+   ├─ medical-prescription
+   ├─ medical-notification
+   └─ medical-dashboard
+```
+
+## 주요 구성
+
+| 영역 | 내용 |
+| --- | --- |
+| Services | `auth`, `patient`, `appointment`, `prescription`, `notification`, `dashboard` |
+| Gateway | Kong Ingress Controller |
+| Auth | KongConsumer, JWT Secret, KongClusterPlugin |
+| LoadBalancer | MetalLB |
+| Databases | PostgreSQL StatefulSet, service별 DB 분리 |
+| Messaging | Kafka StatefulSet |
+| Registry | control-plane VM의 HTTPS local registry |
+| Infra | Vagrant, VMware, Ansible, kubeadm |
+| Deploy | Kustomize overlay 직접 apply |
+
+## Windows + WSL 실행
+
+PowerShell에서 VM을 생성합니다.
+
+```powershell
+cd D:\develop\cloudnative_study\infra\cluster\providers\local-vagrant
+vagrant up --provider=vmware_desktop
+vagrant status
+```
+
+WSL에서 Kubernetes와 앱을 배포합니다.
+
 ```bash
-kubectl create namespace argocd
-kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+cd /mnt/d/develop/cloudnative_study/infra/cluster
+cp .env.example .env  # 이미 있으면 생략
+
+make wsl-local-k8s-bootstrap
+make IMAGE_TAG=dev-001 wsl-local-k8s-deploy
+make wsl-local-k8s-crud-smoke
 ```
 
-### 2. 파드 상태 확인
+처음부터 다시 만들려면 PowerShell에서 VM을 삭제한 뒤 다시 시작합니다.
+
+```powershell
+cd D:\develop\cloudnative_study\infra\cluster\providers\local-vagrant
+vagrant destroy -f
+vagrant up --provider=vmware_desktop
+```
+
+## macOS 실행
+
 ```bash
-kubectl get pods -n argocd
+cd infra/cluster
+cp .env.example .env  # 이미 있으면 생략
+make local-reset IMAGE_TAG=dev-001
 ```
 
-### 3. Application 설정 적용
+이미 VM과 클러스터가 준비되어 있으면 앱만 다시 배포합니다.
+
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/asdqwce/cloudnative_study/main/argo/application.yaml -n argocd
+make IMAGE_TAG=dev-001 local-k8s-deploy
+make local-k8s-crud-smoke
 ```
 
----
+## 상태 확인
 
-## ArgoCD UI 접속
-
-### 포트포워딩
 ```bash
-kubectl port-forward service/argocd-server 8090:443 -n argocd --address=0.0.0.0
+cd infra/cluster
+make wsl-local-k8s-status
+make wsl-local-k8s-top
+make wsl-local-k8s-crud-smoke
 ```
 
-### 접속
-브라우저에서 `https://서버IP:8090` 접속
+직접 확인하려면 control-plane VM에서 다음을 봅니다.
 
-### 초기 비밀번호 확인
 ```bash
-kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.password}" | base64 -d && echo
-```
-- Username: `admin`
-- Password: 위 명령어 출력값
-
----
-
-## 동작 방식
-
-```
-GitHub k8s/ 디렉토리 변경
-        ↓
-ArgoCD 자동 감지
-        ↓
-K8s 클러스터 자동 배포
+sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl get pods -A -o wide
+sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl get svc -A
+sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl get ingress -A
+sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl get pvc -A
+sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl get kongclusterplugins
+sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl get kongconsumers -n medical-auth
 ```
 
-main 브랜치의 `k8s/` 디렉토리 변경사항만 감지하여 자동 배포합니다.
+## 문서
 
-> **참고**: `application.yaml` 의 `path: k8s` 를 변경하면 다른 디렉토리도 감지 가능합니다.
-> - `path: .` → 전체 레포 감지
-> - `path: k8s` → k8s 디렉토리만 감지 (기본값)
+| 문서 | 목적 |
+| --- | --- |
+| [project_docs/ARCHITECTURE.md](project_docs/ARCHITECTURE.md) | 전체 서비스 구조 이해 |
+| [project_docs/SIMPLE_RUN_GUIDE.md](project_docs/SIMPLE_RUN_GUIDE.md) | 가장 짧은 실행 순서 |
+| [project_docs/DOCKER_GUIDE.md](project_docs/DOCKER_GUIDE.md) | 이미지 빌드, push, 재배포 |
+| [project_docs/SCENARIO_TEST_GUIDE.md](project_docs/SCENARIO_TEST_GUIDE.md) | 정상 업무 흐름과 장애 시나리오 검증 |
+| [infra/cluster/README.md](infra/cluster/README.md) | 로컬 VM/Kubernetes 인프라 실행 |
+| [k8s/README.md](k8s/README.md) | Kubernetes manifest 구조 |
+| [tests/README.md](tests/README.md) | 테스트 실행 |
+
+`project_docs/doc1/`은 개인 학습용 문서 폴더이며 Git 추적 대상에서 제외합니다.

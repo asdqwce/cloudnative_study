@@ -32,4 +32,4 @@ Provider는 VM을 만들고 Ansible inventory를 제공한다. Ansible playbook�
 | 서버 유틸리티 | 운영/디버깅 도구는 로컬 VM과 클라우드 VM 모두 필요 |
 | kubeadm 준비 과정 | containerd, kubelet, kubeadm, kubectl 설치 흐름은 동일 |
 
-개인 로컬 개발 환경은 이 경로와 독립적이다. 팀원은 Docker Compose만으로 의존성을 띄우고, 플랫폼 담당자는 Vagrant/Ansible/kubeadm으로 공용 DEV 클러스터 구성을 검증한다.
+현재 로컬 검증 환경은 Docker Compose가 아니라 Vagrant/Ansible/kubeadm을 기준으로 맞춘다. 클라우드 DEV로 옮길 때는 VM 생성 계층만 Terraform 등으로 교체하고, 서버 bootstrap과 Kubernetes manifest 적용 흐름은 최대한 유지한다.

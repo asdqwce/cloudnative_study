@@ -7,13 +7,13 @@
 `vagrant status`, `vagrant ssh` 같은 명령은 `Vagrantfile`이 있는 디렉터리에서 실행한다.
 
 ```bash
-cd "/Users/danghamo/Documents/New project/dev-env-bootstrap/providers/local-vagrant"
+cd "/path/to/cloudnative_study/infra/cluster/providers/local-vagrant"
 ```
 
-프로젝트 루트의 `dev-env-bootstrap` 디렉터리에서는 Makefile target을 사용할 수 있다.
+`infra/cluster` 디렉터리에서는 Makefile target을 사용할 수 있다.
 
 ```bash
-cd "/Users/danghamo/Documents/New project/dev-env-bootstrap"
+cd "/path/to/cloudnative_study/infra/cluster"
 ```
 
 ## 상태 확인
@@ -102,7 +102,7 @@ make local-vms-destroy
 VM을 삭제하고 inventory를 정리한 뒤 전체 bootstrap을 다시 실행한다.
 
 ```bash
-make local-reset
+make local-vms-reset
 ```
 
 수동으로 같은 작업을 하려면:
@@ -163,4 +163,4 @@ open -R "<vmx-file-path>"
 | VM은 있는데 현재 폴더에서 안 보임 | `vagrant global-status --prune` |
 | SSH 접속이 안 됨 | `vagrant status` 후 `vagrant ssh-config <vm-name>` 확인 |
 | Fusion UI에 VM이 안 보임 | `find .vagrant/machines -name "*.vmx"`로 직접 열기 |
-| 처음부터 다시 만들기 | `make local-reset` |
+| 처음부터 다시 만들기 | `make local-vms-reset` |

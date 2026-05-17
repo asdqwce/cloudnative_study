@@ -29,7 +29,6 @@
         - ncdu
         - tcpdump
         - tmux
-        - yq
 
     - name: Check containerd service
       ansible.builtin.systemd:

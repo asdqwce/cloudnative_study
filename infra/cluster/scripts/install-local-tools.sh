@@ -139,4 +139,4 @@ check_vmware_fusion
 install_vagrant_plugin
 add_default_box
 
-log "Tool installation step completed. Run: make check-local-dev-tools && make check-tools"
+log "Tool installation step completed. Run: make check-tools && make check-docker-registry-proxy"

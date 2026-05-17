@@ -32,6 +32,8 @@ spec:
     - metadata:
         name: appointment-db-storage
       spec:
+        volumeName: appointment-db-pv
+        storageClassName: ""
         accessModes: ["ReadWriteOnce"]
         resources:
           requests:

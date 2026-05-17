@@ -1,467 +1,968 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Medical Nexus | MSA Dashboard</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --primary: #2563eb;
-            --primary-light: #dbeafe;
-            --bg: #f8fafc;
-            --card: #ffffff;
-            --text: #1e293b;
-            --text-light: #64748b;
-            --accent: #10b981;
-            --warning: #f59e0b;
-            --danger: #ef4444;
-            --radius: 16px;
-            --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MediKong Console</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --panel-subtle: #f0f3f7;
+      --line: #dce2ea;
+      --line-strong: #b9c5d3;
+      --text: #151a22;
+      --muted: #607084;
+      --primary: #1457d9;
+      --primary-quiet: #e8efff;
+      --success: #13795b;
+      --warning: #9a6200;
+      --danger: #c43131;
+      --shadow: 0 16px 40px rgba(18, 31, 51, 0.08);
+      --radius: 8px;
+    }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Outfit', sans-serif;
-        }
+    * {
+      box-sizing: border-box;
+    }
 
-        body {
-            background: var(--bg);
-            color: var(--text);
-            display: flex;
-            min-height: 100vh;
-        }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.86), rgba(246,247,249,0.98)),
+        radial-gradient(circle at 12% 8%, rgba(20, 87, 217, 0.09), transparent 28%);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
 
-        /* Sidebar */
-        aside {
-            width: 280px;
-            background: var(--card);
-            border-right: 1px solid #e2e8f0;
-            padding: 2rem;
-            display: flex;
-            flex-direction: column;
-            gap: 2rem;
-            position: fixed;
-            height: 100vh;
-        }
+    button, input, select, textarea {
+      font: inherit;
+    }
 
-        .logo {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--primary);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
+    button {
+      border: 0;
+      cursor: pointer;
+    }
 
-        nav {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
+    .shell {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      min-height: 100vh;
+    }
 
-        .nav-item {
-            padding: 1rem;
-            border-radius: var(--radius);
-            cursor: pointer;
-            transition: all 0.2s;
-            color: var(--text-light);
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            text-decoration: none;
-        }
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 22px;
+      border-right: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.78);
+      backdrop-filter: blur(18px);
+    }
 
-        .nav-item:hover, .nav-item.active {
-            background: var(--primary-light);
-            color: var(--primary);
-        }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 28px;
+      font-weight: 800;
+      font-size: 19px;
+    }
 
-        /* Main Content */
-        main {
-            margin-left: 280px;
-            flex: 1;
-            padding: 2rem;
-            max-width: 1200px;
-        }
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: var(--radius);
+      background: var(--primary);
+      color: #fff;
+      font-weight: 900;
+    }
 
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-        }
+    .session {
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      margin-bottom: 18px;
+    }
 
-        .token-status {
-            background: var(--primary-light);
-            color: var(--primary);
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-size: 0.875rem;
-            font-weight: 600;
-        }
+    .session strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 14px;
+    }
 
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 1.5rem;
-        }
+    .session span {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
 
-        .card {
-            background: var(--card);
-            padding: 1.5rem;
-            border-radius: var(--radius);
-            box-shadow: var(--shadow);
-            border: 1px solid #f1f5f9;
-            transition: transform 0.2s;
-        }
+    .nav {
+      display: grid;
+      gap: 8px;
+    }
 
-        .card:hover {
-            transform: translateY(-4px);
-        }
+    .nav button {
+      width: 100%;
+      text-align: left;
+      padding: 10px 12px;
+      border-radius: var(--radius);
+      background: transparent;
+      color: var(--muted);
+      font-weight: 700;
+    }
 
-        h2 {
-            font-size: 1.25rem;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
+    .nav button.active {
+      background: var(--primary-quiet);
+      color: var(--primary);
+    }
 
-        /* Forms */
-        .form-group {
-            margin-bottom: 1rem;
-        }
+    .main {
+      padding: 24px;
+      min-width: 0;
+    }
 
-        label {
-            display: block;
-            font-size: 0.875rem;
-            margin-bottom: 0.25rem;
-            color: var(--text-light);
-        }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
 
-        input, select {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            font-size: 1rem;
-            outline: none;
-            transition: border-color 0.2s;
-        }
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.2;
+    }
 
-        input:focus {
-            border-color: var(--primary);
-        }
+    .subtitle {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 14px;
+    }
 
-        button {
-            width: 100%;
-            padding: 0.75rem;
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: opacity 0.2s;
-        }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
 
-        button:hover {
-            opacity: 0.9;
-        }
+    .btn {
+      min-height: 38px;
+      padding: 0 14px;
+      border-radius: var(--radius);
+      font-weight: 800;
+      background: var(--primary);
+      color: #fff;
+    }
 
-        button.outline {
-            background: transparent;
-            border: 1px solid var(--primary);
-            color: var(--primary);
-            margin-top: 0.5rem;
-        }
+    .btn.secondary {
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--line);
+    }
 
-        /* List Styling */
-        .list-container {
-            margin-top: 1rem;
-            max-height: 300px;
-            overflow-y: auto;
-        }
+    .btn.danger {
+      background: #fff1f1;
+      color: var(--danger);
+      border: 1px solid #f0c7c7;
+    }
 
-        .list-item {
-            padding: 1rem;
-            border-bottom: 1px solid #f1f5f9;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+    .login-wrap {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
 
-        .list-item:last-child {
-            border-bottom: none;
-        }
+    .login {
+      width: min(960px, 100%);
+      display: grid;
+      grid-template-columns: 1fr 420px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.88);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
 
-        .status-badge {
-            padding: 0.25rem 0.5rem;
-            border-radius: 6px;
-            font-size: 0.75rem;
-            font-weight: 700;
-            text-transform: uppercase;
-        }
+    .login-copy {
+      padding: 42px;
+      background: linear-gradient(135deg, #eef4ff, #ffffff);
+      border-right: 1px solid var(--line);
+    }
 
-        .status-requested { background: var(--warning); color: white; }
-        .status-confirmed { background: var(--accent); color: white; }
+    .login-copy h1 {
+      font-size: 30px;
+      margin-bottom: 12px;
+    }
 
-        /* Notification Toast Area */
-        #notification-area {
-            position: fixed;
-            bottom: 2rem;
-            right: 2rem;
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-            z-index: 1000;
-        }
+    .login-copy p {
+      color: var(--muted);
+      line-height: 1.65;
+      max-width: 520px;
+    }
 
-        .toast {
-            background: #1e293b;
-            color: white;
-            padding: 1rem 1.5rem;
-            border-radius: 12px;
-            box-shadow: var(--shadow);
-            animation: slideIn 0.3s ease-out;
-        }
+    .demo-grid {
+      display: grid;
+      gap: 10px;
+      margin-top: 24px;
+    }
 
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-    </style>
+    .demo-account {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.7);
+    }
+
+    .demo-account code {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .demo-account button {
+      padding: 5px 9px;
+      border-radius: var(--radius);
+      background: var(--primary-quiet);
+      color: var(--primary);
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .login-form {
+      padding: 34px;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+      margin-bottom: 14px;
+    }
+
+    .field label {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      min-height: 40px;
+      padding: 9px 11px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      color: var(--text);
+      outline: none;
+    }
+
+    textarea {
+      min-height: 82px;
+      resize: vertical;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(20, 87, 217, 0.12);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.92);
+      box-shadow: 0 10px 24px rgba(18, 31, 51, 0.04);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(249, 251, 253, 0.82);
+    }
+
+    .panel-header h2 {
+      margin: 0;
+      font-size: 15px;
+    }
+
+    .panel-body {
+      padding: 16px;
+    }
+
+    .span-4 { grid-column: span 4; }
+    .span-5 { grid-column: span 5; }
+    .span-6 { grid-column: span 6; }
+    .span-7 { grid-column: span 7; }
+    .span-8 { grid-column: span 8; }
+    .span-12 { grid-column: span 12; }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th, td {
+      padding: 11px 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      white-space: nowrap;
+    }
+
+    th {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 0 8px;
+      border-radius: 999px;
+      background: var(--panel-subtle);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .pill.success { background: #e8f6f1; color: var(--success); }
+    .pill.warning { background: #fff6e6; color: var(--warning); }
+    .pill.danger { background: #fff1f1; color: var(--danger); }
+
+    .toast {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      display: grid;
+      gap: 8px;
+      z-index: 50;
+    }
+
+    .toast-item {
+      min-width: 280px;
+      max-width: 420px;
+      padding: 12px 14px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      background: #fff;
+      box-shadow: var(--shadow);
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .empty {
+      padding: 18px;
+      color: var(--muted);
+      border: 1px dashed var(--line-strong);
+      border-radius: var(--radius);
+      background: var(--panel-subtle);
+      font-size: 13px;
+    }
+
+    .status-line {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    @media (max-width: 980px) {
+      .shell {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: static;
+        height: auto;
+      }
+
+      .login {
+        grid-template-columns: 1fr;
+      }
+
+      .login-copy {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .span-4, .span-5, .span-6, .span-7, .span-8 {
+        grid-column: span 12;
+      }
+    }
+  </style>
 </head>
 <body>
+  <div id="loginView" class="login-wrap">
+    <section class="login">
+      <div class="login-copy">
+        <div class="brand">
+          <div class="brand-mark">M</div>
+          <span>MediKong</span>
+        </div>
+        <h1>의료 운영 콘솔</h1>
+        <p>환자 접수, 진료 예약, 처방, 알림 업무를 한 곳에서 처리합니다.</p>
+        <div class="demo-grid">
+          <div class="demo-account"><span><strong>직원</strong><code>staff@medikong.local / staff1234</code></span><button type="button" onclick="fillDemo('STAFF')">입력</button></div>
+          <div class="demo-account"><span><strong>환자</strong><code>patient@medikong.local / patient1234</code></span><button type="button" onclick="fillDemo('PATIENT')">입력</button></div>
+          <div class="demo-account"><span><strong>의사</strong><code>doctor@medikong.local / doctor1234</code></span><button type="button" onclick="fillDemo('DOCTOR')">입력</button></div>
+        </div>
+      </div>
+      <form id="loginForm" class="login-form">
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" type="email" value="staff@medikong.local" autocomplete="username">
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" type="password" value="staff1234" autocomplete="current-password">
+        </div>
+        <button class="btn" type="submit">로그인</button>
+      </form>
+    </section>
+  </div>
 
-    <aside>
-        <div class="logo">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 2a2 2 0 0 0-2 2v5H4a2 2 0 0 0-2 2v2c0 1.1.9 2 2 2h5v5c0 1.1.9 2 2 2h2a2 2 0 0 0 2-2v-5h5a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2h-5V4a2 2 0 0 0-2-2h-2z"/></svg>
-            Medical Nexus
-        </div>
-        <nav>
-            <div class="nav-item active">Admin Center</div>
-            <a href="user.html" class="nav-item">Patient Portal →</a>
-        </nav>
-        <div style="margin-top: auto; font-size: 0.75rem; color: var(--text-light);">
-            Connected to API Gateway v1.0
-        </div>
+  <div id="appView" class="shell hidden">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">M</div>
+        <span>MediKong</span>
+      </div>
+      <div class="session">
+        <strong id="sessionName">-</strong>
+        <span id="sessionMeta">-</span>
+      </div>
+      <nav id="nav" class="nav"></nav>
     </aside>
 
-    <main>
-        <header>
-            <h1>MSA Operation Center</h1>
-            <div id="token-display" class="token-status">Token: Fetching...</div>
-        </header>
-
-        <div class="grid">
-            <!-- Patient Section -->
-            <div class="card">
-                <h2>환자 등록 (Patient Service)</h2>
-                <div class="form-group">
-                    <label>성함</label>
-                    <input type="text" id="p-name" placeholder="홍길동">
-                </div>
-                <div class="form-group">
-                    <label>연락처</label>
-                    <input type="text" id="p-contact" placeholder="010-1234-5678">
-                </div>
-                <button onclick="registerPatient()">환자 등록</button>
-                <div class="list-container" id="patient-list">
-                    <!-- List items will be injected here -->
-                </div>
-            </div>
-
-            <!-- Appointment Section -->
-            <div class="card">
-                <h2>진료 예약 (Appointment)</h2>
-                <div class="form-group">
-                    <label>환자 ID</label>
-                    <input type="number" id="a-patient-id" placeholder="1">
-                </div>
-                <div class="form-group">
-                    <label>예약 일시</label>
-                    <input type="datetime-local" id="a-date">
-                </div>
-                <button onclick="createAppointment()">예약 신청</button>
-                <div class="list-container" id="appointment-list">
-                    <!-- List items will be injected here -->
-                </div>
-            </div>
-
-            <!-- Prescription Section -->
-            <div class="card">
-                <h2>처방전 발행 (Prescription)</h2>
-                <div class="form-group">
-                    <label>환자 ID (Feign Call 검증용)</label>
-                    <input type="number" id="pr-patient-id" placeholder="1">
-                </div>
-                <div class="form-group">
-                    <label>약품명</label>
-                    <input type="text" id="pr-medicine" placeholder="타이레놀">
-                </div>
-                <button onclick="issuePrescription()">처방 발행 (서킷브레이커 적용)</button>
-            </div>
-
-            <!-- Notification Section -->
-            <div class="card">
-                <h2>알림 내역 (Notification Service)</h2>
-                <button class="outline" onclick="fetchNotifications()">새로고침 (Kafka Consumer 결과)</button>
-                <div class="list-container" id="notification-list">
-                    <!-- List items will be injected here -->
-                </div>
-            </div>
+    <main class="main">
+      <div class="topbar">
+        <div>
+          <h1 id="pageTitle">Console</h1>
+          <div id="pageSubtitle" class="subtitle"></div>
         </div>
+        <div class="toolbar">
+          <button class="btn secondary" type="button" onclick="refreshCurrent()">새로고침</button>
+          <button class="btn danger" type="button" onclick="logout()">로그아웃</button>
+        </div>
+      </div>
+
+      <section id="staffPage" class="grid hidden">
+        <div class="panel span-4">
+          <div class="panel-header"><h2>환자 등록</h2></div>
+          <div class="panel-body">
+            <div class="field"><label>이름</label><input id="patientName" value="Scenario Patient"></div>
+            <div class="field"><label>생년월일</label><input id="patientBirthDate" value="1990-01-01"></div>
+            <div class="field"><label>성별</label><select id="patientGender"><option>F</option><option>M</option></select></div>
+            <div class="field"><label>연락처</label><input id="patientContact" value="010-1111-2222"></div>
+            <div class="field"><label>담당 의사 ID</label><input id="patientDoctorId" type="number" value="10"></div>
+            <button class="btn" type="button" onclick="createPatient()">등록</button>
+          </div>
+        </div>
+        <div class="panel span-8">
+          <div class="panel-header"><h2>환자 목록</h2><button class="btn secondary" type="button" onclick="loadPatients()">조회</button></div>
+          <div class="panel-body table-wrap"><table id="patientsTable"></table></div>
+        </div>
+        <div class="panel span-6">
+          <div class="panel-header"><h2>예약 현황</h2><button class="btn secondary" type="button" onclick="loadAppointments()">조회</button></div>
+          <div class="panel-body table-wrap"><table id="staffAppointmentsTable"></table></div>
+        </div>
+        <div class="panel span-6">
+          <div class="panel-header"><h2>Audit Log</h2><button class="btn secondary" type="button" onclick="loadAuditLogs()">조회</button></div>
+          <div class="panel-body table-wrap"><table id="auditTable"></table></div>
+        </div>
+        <div class="panel span-6">
+          <div class="panel-header"><h2>전체 처방</h2><button class="btn secondary" type="button" onclick="loadPrescriptions()">조회</button></div>
+          <div class="panel-body table-wrap"><table id="staffPrescriptionsTable"></table></div>
+        </div>
+        <div class="panel span-6">
+          <div class="panel-header"><h2>전체 알림</h2><button class="btn secondary" type="button" onclick="loadNotifications()">조회</button></div>
+          <div class="panel-body table-wrap"><table id="staffNotificationsTable"></table></div>
+        </div>
+      </section>
+
+      <section id="patientPage" class="grid hidden">
+        <div class="panel span-12">
+          <div class="panel-header"><h2>내 환자 프로필</h2><button class="btn secondary" type="button" onclick="loadMyPatientProfile()">조회</button></div>
+          <div class="panel-body table-wrap"><table id="patientProfileTable"></table></div>
+        </div>
+        <div class="panel span-4">
+          <div class="panel-header"><h2>진료 예약</h2></div>
+          <div class="panel-body">
+            <div class="field"><label>의사 ID</label><input id="appointmentDoctorId" type="number" value="10"></div>
+            <div class="field"><label>예약 일시</label><input id="appointmentAt" type="datetime-local"></div>
+            <div class="field"><label>사유</label><textarea id="appointmentReason">headache</textarea></div>
+            <button class="btn" type="button" onclick="createAppointment()">예약 신청</button>
+          </div>
+        </div>
+        <div class="panel span-8">
+          <div class="panel-header"><h2>내 예약</h2><button class="btn secondary" type="button" onclick="loadAppointments()">조회</button></div>
+          <div class="panel-body table-wrap"><table id="patientAppointmentsTable"></table></div>
+        </div>
+        <div class="panel span-6">
+          <div class="panel-header"><h2>내 처방</h2><button class="btn secondary" type="button" onclick="loadPrescriptions()">조회</button></div>
+          <div class="panel-body table-wrap"><table id="patientPrescriptionsTable"></table></div>
+        </div>
+        <div class="panel span-6">
+          <div class="panel-header"><h2>내 알림</h2><button class="btn secondary" type="button" onclick="loadNotifications()">조회</button></div>
+          <div class="panel-body table-wrap"><table id="patientNotificationsTable"></table></div>
+        </div>
+      </section>
+
+      <section id="doctorPage" class="grid hidden">
+        <div class="panel span-12">
+          <div class="panel-header"><h2>담당 환자</h2><button class="btn secondary" type="button" onclick="loadPatients()">조회</button></div>
+          <div class="panel-body table-wrap"><table id="doctorPatientsTable"></table></div>
+        </div>
+        <div class="panel span-7">
+          <div class="panel-header"><h2>담당 예약</h2><button class="btn secondary" type="button" onclick="loadAppointments()">조회</button></div>
+          <div class="panel-body table-wrap"><table id="doctorAppointmentsTable"></table></div>
+        </div>
+        <div class="panel span-5">
+          <div class="panel-header"><h2>처방 발행</h2></div>
+          <div class="panel-body">
+            <div class="field"><label>환자 ID</label><input id="prescriptionPatientId" type="number" value="1"></div>
+            <div class="field"><label>약품명</label><input id="medicationName" value="Amoxicillin"></div>
+            <div class="field"><label>용량</label><input id="dosage" value="500mg"></div>
+            <div class="field"><label>복약 안내</label><textarea id="instructions">after meals</textarea></div>
+            <button class="btn" type="button" onclick="issuePrescription()">발행</button>
+          </div>
+        </div>
+        <div class="panel span-12">
+          <div class="panel-header"><h2>담당 처방</h2><button class="btn secondary" type="button" onclick="loadPrescriptions()">조회</button></div>
+          <div class="panel-body table-wrap"><table id="doctorPrescriptionsTable"></table></div>
+        </div>
+      </section>
     </main>
+  </div>
 
-    <div id="notification-area"></div>
+  <div id="toast" class="toast"></div>
 
-    <script>
-        const API_BASE = "http://localhost:8080";
-        let JWT_TOKEN = "";
+  <script>
+    const state = {
+      token: sessionStorage.getItem("accessToken"),
+      user: JSON.parse(sessionStorage.getItem("user") || "null"),
+      page: "home",
+      demoAccounts: {
+        STAFF: { email: "staff@medikong.local", password: "staff1234" },
+        PATIENT: { email: "patient@medikong.local", password: "patient1234" },
+        DOCTOR: { email: "doctor@medikong.local", password: "doctor1234" }
+      }
+    };
 
-        // Initial Token Fetch
-        async function fetchToken() {
-            try {
-                const res = await fetch(`${API_BASE}/auth/token`);
-                const data = await res.json();
-                JWT_TOKEN = data.token;
-                document.getElementById('token-display').innerText = "Token: Active (JWT)";
-                console.log("Token Acquired:", JWT_TOKEN);
-                loadAll();
-            } catch (e) {
-                document.getElementById('token-display').innerText = "Token: Failed to connect";
-                document.getElementById('token-display').style.background = "#fee2e2";
-                document.getElementById('token-display').style.color = "#ef4444";
-            }
+    const rolePages = {
+      STAFF: [{ id: "staff", label: "운영" }],
+      PATIENT: [{ id: "patient", label: "환자" }],
+      DOCTOR: [{ id: "doctor", label: "의사" }]
+    };
+
+    document.getElementById("loginForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      await login();
+    });
+
+    bootstrap();
+
+    async function bootstrap() {
+      await loadDemoAccounts();
+      if (!state.token) {
+        showLogin();
+        return;
+      }
+      try {
+        state.user = await api("/auth/me");
+        saveSession();
+        showApp();
+      } catch (_error) {
+        clearSession();
+        showLogin();
+      }
+    }
+
+    async function loadDemoAccounts() {
+      try {
+        const response = await fetch("/auth/demo-accounts");
+        if (!response.ok) return;
+        const accounts = await response.json();
+        state.demoAccounts = Object.fromEntries(accounts.map((account) => [
+          account.role,
+          { email: account.email, password: account.password }
+        ]));
+      } catch (_error) {
+        // Static fallback above keeps the login shortcuts usable.
+      }
+    }
+
+    function fillDemo(role) {
+      const account = state.demoAccounts[role];
+      if (!account) return;
+      document.getElementById("email").value = account.email;
+      document.getElementById("password").value = account.password;
+    }
+
+    async function login() {
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      const response = await fetch("/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
+      if (!response.ok) {
+        toast("로그인에 실패했습니다.");
+        return;
+      }
+      const body = await response.json();
+      state.token = body.accessToken;
+      state.user = body.user;
+      saveSession();
+      showApp();
+    }
+
+    async function logout() {
+      try {
+        await api("/auth/logout", { method: "POST" });
+      } catch (_error) {
+        // Client-side logout still clears the session for this MVP.
+      }
+      clearSession();
+      showLogin();
+    }
+
+    function showLogin() {
+      document.getElementById("loginView").classList.remove("hidden");
+      document.getElementById("appView").classList.add("hidden");
+    }
+
+    function showApp() {
+      document.getElementById("loginView").classList.add("hidden");
+      document.getElementById("appView").classList.remove("hidden");
+      document.getElementById("sessionName").textContent = state.user.displayName;
+      document.getElementById("sessionMeta").textContent = `${state.user.email} · ${state.user.role}`;
+      renderNav();
+      openPage(defaultPage());
+    }
+
+    function renderNav() {
+      const nav = document.getElementById("nav");
+      nav.innerHTML = "";
+      for (const item of rolePages[state.user.role] || []) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.dataset.page = item.id;
+        button.textContent = item.label;
+        button.onclick = () => openPage(item.id);
+        nav.appendChild(button);
+      }
+    }
+
+    function defaultPage() {
+      if (state.user.role === "STAFF") return "staff";
+      if (state.user.role === "PATIENT") return "patient";
+      return "doctor";
+    }
+
+    async function openPage(page) {
+      state.page = page;
+      for (const id of ["staffPage", "patientPage", "doctorPage"]) {
+        document.getElementById(id).classList.add("hidden");
+      }
+      document.querySelectorAll(".nav button").forEach((button) => {
+        button.classList.toggle("active", button.dataset.page === page);
+      });
+      document.getElementById(`${page}Page`).classList.remove("hidden");
+      document.getElementById("pageTitle").textContent = pageTitle(page);
+      document.getElementById("pageSubtitle").textContent = pageSubtitle(page);
+      await refreshCurrent();
+    }
+
+    async function refreshCurrent() {
+      if (state.page === "staff") {
+        await Promise.allSettled([loadPatients(), loadAppointments(), loadAuditLogs(), loadPrescriptions(), loadNotifications()]);
+      }
+      if (state.page === "patient") {
+        await Promise.allSettled([loadMyPatientProfile(), loadAppointments(), loadPrescriptions(), loadNotifications()]);
+      }
+      if (state.page === "doctor") {
+        await Promise.allSettled([loadPatients(), loadAppointments(), loadPrescriptions()]);
+      }
+    }
+
+    function pageTitle(page) {
+      return { staff: "운영", patient: "환자 포털", doctor: "의사 콘솔" }[page];
+    }
+
+    function pageSubtitle(page) {
+      return {
+        staff: "환자 등록 · 예약 현황 · 감사 로그",
+        patient: "예약 신청 · 처방 내역 · 알림",
+        doctor: "예약 확정 · 처방 발행"
+      }[page];
+    }
+
+    async function createPatient() {
+      const payload = {
+        name: value("patientName"),
+        birthDate: value("patientBirthDate"),
+        gender: value("patientGender"),
+        contact: value("patientContact"),
+        primaryDoctorId: Number(value("patientDoctorId")),
+        allergies: "none",
+        medicationWarnings: "none"
+      };
+      const patient = await api("/patients", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+      document.getElementById("prescriptionPatientId").value = patient.id;
+      toast(`환자 ID ${patient.id} 등록 완료`);
+      await loadPatients();
+    }
+
+    async function createAppointment() {
+      const payload = {
+        patientId: state.user.patientId,
+        doctorId: Number(value("appointmentDoctorId")),
+        appointmentAt: value("appointmentAt") || "2026-05-20T10:00:00",
+        reason: value("appointmentReason")
+      };
+      const appointment = await api("/appointments", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+      toast(`예약 ID ${appointment.id} 신청 완료`);
+      await loadAppointments();
+    }
+
+    async function confirmAppointment(id) {
+      await api(`/appointments/${id}/confirm`, { method: "POST" });
+      toast(`예약 ID ${id} 확정 완료`);
+      await loadAppointments();
+    }
+
+    async function issuePrescription() {
+      const payload = {
+        patientId: Number(value("prescriptionPatientId")),
+        doctorId: state.user.doctorId,
+        medicationName: value("medicationName"),
+        dosage: value("dosage"),
+        instructions: value("instructions")
+      };
+      const prescription = await api("/prescriptions", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+      const snapshot = prescription.patientSnapshotAvailable ? "환자 확인 완료" : "부분 저장";
+      toast(`처방 ID ${prescription.id} 발행 완료 · ${snapshot}`);
+      await loadPrescriptions();
+    }
+
+    async function loadPatients() {
+      if (!["STAFF", "DOCTOR"].includes(state.user.role)) return;
+      const patients = await api("/patients");
+      const rows = patients.map((p) => [
+        p.id,
+        p.name,
+        p.contact,
+        p.primaryDoctorId || "-",
+        p.allergies || "-",
+        p.medicationWarnings || "-"
+      ]);
+      if (state.user.role === "STAFF") renderTable("patientsTable", ["ID", "이름", "연락처", "담당의", "알레르기", "주의"], rows);
+      if (state.user.role === "DOCTOR") renderTable("doctorPatientsTable", ["ID", "이름", "연락처", "담당의", "알레르기", "주의"], rows);
+    }
+
+    async function loadMyPatientProfile() {
+      if (state.user.role !== "PATIENT") return;
+      const patient = await api(`/patients/${state.user.patientId}`);
+      renderTable("patientProfileTable", ["ID", "이름", "연락처", "담당의", "알레르기", "주의"], [[
+        patient.id,
+        patient.name,
+        patient.contact,
+        patient.primaryDoctorId || "-",
+        patient.allergies || "-",
+        patient.medicationWarnings || "-"
+      ]]);
+    }
+
+    async function loadAppointments() {
+      const appointments = await api("/appointments");
+      const rows = appointments.map((item) => [
+        item.id,
+        item.patientId,
+        item.doctorId,
+        item.appointmentAt,
+        statusPill(item.status),
+        state.user.role === "DOCTOR" && item.status === "REQUESTED"
+          ? `<button class="btn secondary" type="button" onclick="confirmAppointment(${item.id})">확정</button>`
+          : "-"
+      ]);
+      if (state.user.role === "STAFF") renderTable("staffAppointmentsTable", ["ID", "환자", "의사", "일시", "상태", "작업"], rows);
+      if (state.user.role === "PATIENT") renderTable("patientAppointmentsTable", ["ID", "환자", "의사", "일시", "상태", "작업"], rows);
+      if (state.user.role === "DOCTOR") renderTable("doctorAppointmentsTable", ["ID", "환자", "의사", "일시", "상태", "작업"], rows);
+    }
+
+    async function loadPrescriptions() {
+      const prescriptions = await api("/prescriptions");
+      const rows = prescriptions.map((item) => [
+        item.id,
+        item.patientId,
+        item.doctorId,
+        item.medicationName,
+        item.dosage,
+        item.patientSnapshotAvailable ? "OK" : "PARTIAL",
+        (item.warnings || []).join(" / ") || "-"
+      ]);
+      if (state.user.role === "STAFF") renderTable("staffPrescriptionsTable", ["ID", "환자", "의사", "약품", "용량", "확인", "경고"], rows);
+      if (state.user.role === "PATIENT") renderTable("patientPrescriptionsTable", ["ID", "환자", "의사", "약품", "용량", "확인", "경고"], rows);
+      if (state.user.role === "DOCTOR") renderTable("doctorPrescriptionsTable", ["ID", "환자", "의사", "약품", "용량", "확인", "경고"], rows);
+    }
+
+    async function loadNotifications() {
+      const notifications = await api("/notifications");
+      const rows = notifications.map((item) => [
+        item.id,
+        item.patientId,
+        item.type,
+        item.message,
+        item.status
+      ]);
+      if (state.user.role === "STAFF") renderTable("staffNotificationsTable", ["ID", "환자", "유형", "메시지", "상태"], rows);
+      if (state.user.role === "PATIENT") renderTable("patientNotificationsTable", ["ID", "환자", "유형", "메시지", "상태"], rows);
+    }
+
+    async function loadAuditLogs() {
+      if (state.user.role !== "STAFF") return;
+      const logs = await api("/auth/audit-logs");
+      renderTable("auditTable", ["ID", "Event", "결과", "사용자", "시간"], logs.map((item) => [
+        item.id,
+        item.eventType,
+        item.outcome,
+        item.userEmail || "-",
+        formatDate(item.createdAt)
+      ]));
+    }
+
+    async function api(path, options = {}) {
+      const response = await fetch(path, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${state.token}`,
+          ...(options.headers || {})
         }
+      });
+      if (response.status === 401) {
+        clearSession();
+        showLogin();
+        throw new Error("Unauthorized");
+      }
+      if (!response.ok) {
+        const body = await response.text();
+        toast(body || `요청 실패: ${response.status}`);
+        throw new Error(body);
+      }
+      if (response.status === 204) return null;
+      return response.json();
+    }
 
-        function loadAll() {
-            fetchPatients();
-            fetchAppointments();
-            fetchNotifications();
-        }
+    function renderTable(id, headers, rows) {
+      const table = document.getElementById(id);
+      if (!rows.length) {
+        table.outerHTML = `<table id="${id}"><tbody><tr><td><div class="empty">표시할 데이터가 없습니다.</div></td></tr></tbody></table>`;
+        return;
+      }
+      table.innerHTML = `
+        <thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead>
+        <tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td>${renderCell(cell)}</td>`).join("")}</tr>`).join("")}</tbody>
+      `;
+    }
 
-        // --- Patient ---
-        async function registerPatient() {
-            const name = document.getElementById('p-name').value;
-            const contact = document.getElementById('p-contact').value;
-            const res = await fetch(`${API_BASE}/patient-service/patients`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, contact, birthDate: "1990-01-01", gender: "M" })
-            });
-            if (res.ok) {
-                showToast("환자가 등록되었습니다.");
-                fetchPatients();
-            }
-        }
+    function renderCell(cell) {
+      const text = String(cell);
+      if (text.startsWith("<button") || text.startsWith("<span")) return text;
+      return escapeHtml(text);
+    }
 
-        async function fetchPatients() {
-            const res = await fetch(`${API_BASE}/patient-service/patients`);
-            const data = await res.json();
-            const list = document.getElementById('patient-list');
-            list.innerHTML = data.map(p => `
-                <div class="list-item">
-                    <span>ID: ${p.id} | <strong>${p.name}</strong></span>
-                    <span style="font-size: 0.8rem">${p.contact}</span>
-                </div>
-            `).join('');
-        }
+    function statusPill(status) {
+      const tone = status === "CONFIRMED" ? "success" : status === "CANCELLED" ? "danger" : "warning";
+      return `<span class="pill ${tone}">${status}</span>`;
+    }
 
-        // --- Appointment ---
-        async function createAppointment() {
-            const patientId = document.getElementById('a-patient-id').value;
-            const res = await fetch(`${API_BASE}/appointment-service/appointments`, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${JWT_TOKEN}`
-                },
-                body: JSON.stringify({ patientId, appointmentDate: document.getElementById('a-date').value })
-            });
-            if (res.ok) {
-                showToast("예약이 신청되었습니다.");
-                fetchAppointments();
-            } else if (res.status === 401) {
-                showToast("인증 오류 (JWT Check)");
-            }
-        }
+    function value(id) {
+      return document.getElementById(id).value;
+    }
 
-        async function confirmAppointment(id) {
-            const res = await fetch(`${API_BASE}/appointment-service/appointments/${id}/confirm`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${JWT_TOKEN}` }
-            });
-            if (res.ok) {
-                showToast("예약이 확정되었습니다! (Kafka Event 발행)");
-                fetchAppointments();
-                setTimeout(fetchNotifications, 2000); // Wait for Kafka
-            }
-        }
+    function saveSession() {
+      sessionStorage.setItem("accessToken", state.token);
+      sessionStorage.setItem("user", JSON.stringify(state.user));
+    }
 
-        async function fetchAppointments() {
-            const res = await fetch(`${API_BASE}/appointment-service/appointments`);
-            const data = await res.json();
-            const list = document.getElementById('appointment-list');
-            list.innerHTML = data.map(a => `
-                <div class="list-item">
-                    <span>ID: ${a.id} | P_ID: ${a.patientId} | <span class="status-badge status-${a.status.toLowerCase()}">${a.status}</span></span>
-                    ${a.status === 'REQUESTED' ? `<button style="width:auto; padding: 4px 8px; font-size:0.7rem;" onclick="confirmAppointment(${a.id})">Confirm</button>` : ''}
-                </div>
-            `).join('');
-        }
+    function clearSession() {
+      state.token = null;
+      state.user = null;
+      sessionStorage.removeItem("accessToken");
+      sessionStorage.removeItem("user");
+    }
 
-        // --- Prescription ---
-        async function issuePrescription() {
-            const patientId = document.getElementById('pr-patient-id').value;
-            const medicine = document.getElementById('pr-medicine').value;
-            const res = await fetch(`${API_BASE}/prescription-service/prescriptions`, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${JWT_TOKEN}`
-                },
-                body: JSON.stringify({ patientId, medicine, dosage: "1 tab, 2 times daily" })
-            });
-            if (res.ok) {
-                showToast("처방전이 발행되었습니다. (Feign Call 성공)");
-            } else {
-                showToast("처방 발행 실패 (서비스 장애 시 Fallback 동작)");
-            }
-        }
+    function toast(message) {
+      const wrap = document.getElementById("toast");
+      const item = document.createElement("div");
+      item.className = "toast-item";
+      item.textContent = message;
+      wrap.appendChild(item);
+      setTimeout(() => item.remove(), 4200);
+    }
 
-        // --- Notifications ---
-        async function fetchNotifications() {
-            const res = await fetch(`${API_BASE}/notification-service/notifications`);
-            const data = await res.json();
-            const list = document.getElementById('notification-list');
-            list.innerHTML = data.map(n => `
-                <div class="list-item">
-                    <span>P_ID: ${n.patientId}</span>
-                    <span style="font-size: 0.8rem">${n.message}</span>
-                </div>
-            `).join('');
-        }
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+      })[char]);
+    }
 
-        function showToast(msg) {
-            const area = document.getElementById('notification-area');
-            const toast = document.createElement('div');
-            toast.className = 'toast';
-            toast.innerText = msg;
-            area.appendChild(toast);
-            setTimeout(() => toast.remove(), 4000);
-        }
-
-        // Start
-        fetchToken();
-    </script>
+    function formatDate(value) {
+      return new Date(value).toLocaleString("ko-KR");
+    }
+  </script>
 </body>
 </html>

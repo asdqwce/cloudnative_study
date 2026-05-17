@@ -1,9 +1,12 @@
 name: E2E
 
 on:
-  schedule:
-    - cron: '0 18 * * *'
   workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'Kong Gateway base URL'
+        required: true
+        default: 'http://10.10.10.240'
 
 permissions:
   contents: read
@@ -16,25 +19,41 @@ jobs:
   postman-newman:
     name: Postman E2E
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Show Docker versions
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Generate demo JWTs
+        id: tokens
         run: |
-          docker version
-          docker compose version
+          python k8s/kong/scripts/generate-demo-jwts.py >> "$GITHUB_OUTPUT"
+
+      - name: Install Newman
+        run: npm install -g newman
+
+      - name: Wait for Kong route
+        env:
+          E2E_BASE_URL: ${{ inputs.base_url }}
+        run: sh tests/e2e/scripts/wait-for-services.sh
 
       - name: Run Postman collection with Newman
-        run: make test-e2e
-
-      - name: Collect Docker Compose logs
-        if: failure()
         run: |
           mkdir -p tests/e2e/newman/reports
-          docker compose -p medical-platform-test -f docker-compose.yml logs --no-color > tests/e2e/newman/reports/docker-compose.log || true
+          newman run tests/e2e/postman/medical-platform.postman_collection.json \
+            -e tests/e2e/newman/docker.postman_environment.json \
+            --env-var baseUrl="${{ inputs.base_url }}" \
+            --env-var staffToken="${{ steps.tokens.outputs.STAFF_TOKEN }}" \
+            --env-var patientToken="${{ steps.tokens.outputs.PATIENT_TOKEN }}" \
+            --env-var doctorToken="${{ steps.tokens.outputs.DOCTOR_TOKEN }}" \
+            --reporters cli,junit \
+            --reporter-junit-export tests/e2e/newman/reports/e2e.xml
 
       - name: Upload E2E reports
         if: always()
@@ -44,7 +63,3 @@ jobs:
           path: |
             tests/e2e/newman/reports/
           if-no-files-found: ignore
-
-      - name: Clean up E2E services
-        if: always()
-        run: docker compose -p medical-platform-test -f docker-compose.yml down --remove-orphans

@@ -32,6 +32,8 @@ spec:
     - metadata:
         name: prescription-db-storage
       spec:
+        volumeName: prescription-db-pv
+        storageClassName: ""
         accessModes: ["ReadWriteOnce"]
         resources:
           requests:

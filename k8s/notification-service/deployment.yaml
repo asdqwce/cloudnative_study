@@ -18,7 +18,25 @@ spec:
           ports:
             - containerPort: 8084
           env:
-            - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
-              value: http://eureka-server:8761/eureka/
-            - name: SPRING_DATASOURCE_URL
-              value: jdbc:h2:mem:notification_db
+            - name: DATABASE_URL
+              value: postgresql+psycopg://user:password@notification-db:5432/notification_db
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: kafka.medical-messaging.svc.cluster.local:9092
+            - name: KAFKA_GROUP_ID
+              value: notification-service
+            - name: APPOINTMENT_CONFIRMED_TOPIC
+              value: appointment-confirmed
+            - name: PRESCRIPTION_ISSUED_TOPIC
+              value: prescription-issued
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8084
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8084
+            initialDelaySeconds: 15
+            periodSeconds: 20
