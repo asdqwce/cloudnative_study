@@ -1,13 +1,39 @@
 .git
+.env
+.env.*
+!.env.example
+!**/.env.example
 .gradle
+.terraform
+.vagrant
 .idea
 .vscode
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+*.pem
+id_rsa*
+kubeconfig*
+*secret*
+*credential*
+*token*
 
 **/build
+**/.terraform
+**/.vagrant
+**/__pycache__
+**/.pytest_cache
 **/bin
 **/out
 **/target
+**/*.py[cod]
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+**/*.retry
 
+**/node_modules
 dashboard/node_modules
 dashboard/dist
 

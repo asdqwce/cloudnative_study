@@ -479,6 +479,25 @@ tests/e2e/newman/reports/
 # Local VM state and generated infrastructure files
 .vagrant/
 **/.vagrant/
+.terraform/
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+crash.log
+crash.*.log
+*.retry
+
+# Local credentials and kubeconfig files
+.env.*
+!.env.example
+!**/.env.example
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+kubeconfig*
+*.kubeconfig
 
 # Personal study notes
 project_docs/doc1/
