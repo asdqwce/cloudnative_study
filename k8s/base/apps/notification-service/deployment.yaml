@@ -18,15 +18,25 @@ spec:
           ports:
             - containerPort: 8084
           env:
-            - name: EUREKA_CLIENT_ENABLED
-              value: "false"
-            - name: JAVA_TOOL_OPTIONS
-              value: "-XX:+UseSerialGC -Xms48m -Xmx96m -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=48m -Xss256k -Djava.security.egd=file:/dev/./urandom"
-            - name: SPRING_DATASOURCE_URL
-              value: jdbc:h2:mem:notification_db
-          resources:
-            requests:
-              cpu: 50m
-              memory: 128Mi
-            limits:
-              memory: 256Mi
+            - name: DATABASE_URL
+              value: postgresql+psycopg://user:password@notification-db:5432/notification_db
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: kafka.medical-messaging.svc.cluster.local:9092
+            - name: KAFKA_GROUP_ID
+              value: notification-service
+            - name: APPOINTMENT_CONFIRMED_TOPIC
+              value: appointment-confirmed
+            - name: PRESCRIPTION_ISSUED_TOPIC
+              value: prescription-issued
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8084
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8084
+            initialDelaySeconds: 15
+            periodSeconds: 20

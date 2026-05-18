@@ -23,6 +23,9 @@ local.properties
 # PyDev specific (Python IDE for Eclipse)
 *.pydevproject
 
+__pycache__/
+*.py[cod]
+
 # CDT-specific (C/C++ Development Tooling)
 .cproject
 
@@ -469,3 +472,17 @@ gradle-app.setting
 tests/e2e/newman/reports/
 
 # End of https://www.toptal.com/developers/gitignore/api/java,node,gradle,intellij,visualstudiocode,eclipse,macos,windows,linux
+
+# Local VM state and generated infrastructure files
+.vagrant/
+**/.vagrant/
+
+# Personal study notes
+project_docs/doc1/
+
+# Python virtual environment
+.venv/
+
+# Pytest cache
+.pytest_cache/
+**/.pytest_cache/

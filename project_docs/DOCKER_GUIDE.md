@@ -1,55 +1,65 @@
-# 도커 컨테이너화 가이드 (Dockerization Guide)
+# Image Build And Redeploy Guide
 
-이 가이드는 의료 MSA 플랫폼을 컨테이너화하고 실행하는 방법을 설명합니다.
+Docker는 로컬에서 서비스를 직접 실행하기 위한 목적이 아니라, Kubernetes가 사용할 이미지를 만들고 local registry로 push하기 위해 사용합니다.
 
-## 1. 사전 준비 사항
+## Local Registry
 
-- **Docker Desktop**: 설치 및 실행 중이어야 합니다.
-- **Java 17 (JDK)**: 빌드를 위해 설치되어 있어야 합니다.
-- **Gradle**: 프로젝트에 포함된 래퍼를 사용합니다.
+로컬 registry:
 
-## 2. Jar 파일 빌드
-
-도커 이미지를 만들기 전에, 각 Spring Boot 서비스의 실행 가능한 Jar 파일을 생성해야 합니다.
-
-루트 디렉토리에서 다음 명령어를 실행하세요:
-
-```bash
-./gradlew clean build -x test
+```text
+10.10.10.10:5000
 ```
 
-성공하면 각 하위 프로젝트의 `build/libs/` 폴더에 `*.jar` 파일이 생성됩니다.
+이미지 예시:
 
-## 3. Docker Compose로 실행
-
-Jar 파일 빌드가 완료되면, 단 하나의 명령어로 전체 클러스터를 실행할 수 있습니다.
-
-```bash
-docker-compose up --build
+```text
+10.10.10.10:5000/patient-service:dev-001
+10.10.10.10:5000/appointment-service:dev-001
+10.10.10.10:5000/prescription-service:dev-001
+10.10.10.10:5000/notification-service:dev-001
+10.10.10.10:5000/dashboard:dev-001
 ```
 
-### 이 명령어가 수행하는 작업:
-- **이미지 빌드**: 모든 서비스(Gateway, Patient, Eureka 등)의 이미지를 빌드합니다.
-- **데이터베이스 실행**: 환자, 예약, 처방 서비스를 위한 PostgreSQL 컨테이너를 실행합니다.
-- **네트워크 설정**: 서비스들이 서로 통신할 수 있도록 내부 네트워크를 구축합니다.
+## 앱 이미지 빌드와 push
 
-## 4. 서비스 접속 정보
+```bash
+cd infra/cluster
+make IMAGE_TAG=dev-001 app-images-push
+```
 
-| 서비스 | 호스트 포트 | 내부 포트 | 설명 |
-| :--- | :--- | :--- | :--- |
-| **대시보드 UI** | 80 | 80 | 메인 화면 (브라우저 접속) |
-| **API 게이트웨이** | 8080 | 8080 | API 요청 진입점 |
-| **유레카 서버** | 8761 | 8761 | 서비스 상태 모니터링 대시보드 |
+전체 재배포:
 
-## 5. 주요 설정 (환경 변수 오버라이드)
+```bash
+make IMAGE_TAG=dev-001 wsl-local-k8s-deploy
+```
 
-`docker-compose.yml` 파일은 `application.yml`의 기본 설정을 환경 변수로 덮어씁니다:
+이 명령은 다음을 수행합니다.
 
-- `EUREKA_CLIENT_SERVICEURL_DEFAULTZONE`: 유레카 서버 주소를 `http://eureka-server:8761/eureka/`로 설정합니다.
-- `SPRING_DATASOURCE_URL`: 각 서비스가 H2 대신 도커 내 PostgreSQL 컨테이너에 연결하도록 설정합니다.
+```text
+Docker image build
+-> local registry push
+-> Kustomize image tag update
+-> registry pull verify
+-> Kubernetes app apply
+-> rollout verify
+-> status/top 출력
+```
 
-## 6. 문제 해결 (Troubleshooting)
+## 코드 수정 후 반복 배포
 
-- **로그 확인**: `docker-compose logs -f [서비스명]`
-- **특정 서비스만 재시작**: `docker-compose restart [서비스명]`
-- **전체 중지 및 데이터 초기화**: `docker-compose down -v`
+```bash
+cd /mnt/d/develop/cloudnative_study/infra/cluster
+make IMAGE_TAG=dev-002 wsl-local-k8s-deploy
+make wsl-local-k8s-crud-smoke
+```
+
+## 문제 해결
+
+| 증상 | 확인 |
+| --- | --- |
+| `x509: certificate signed by unknown authority` | `make registry-ca-install` 후 Docker Desktop 재시작 |
+| `proxyconnect tcp ... 3128` | Docker Desktop proxy 예외에 `10.10.10.10,10.10.10.10:5000,10.10.10.0/24` 추가 |
+| `ImagePullBackOff` | `make registry-pull-verify`, image tag 확인 |
+| Kong `404` | `kubectl get ingress -A`, `kubectl get svc -A`, `make wsl-kong-verify` 확인 |
+| Kong `401` | JWT가 없거나 유효하지 않음 |
+| Kong `403` | JWT role/claim은 유효하지만 서비스 인가에서 거부 |

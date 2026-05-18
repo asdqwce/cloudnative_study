@@ -1,52 +1,128 @@
-# 프로젝트 아키텍처 개요 (Architecture Overview)
+# MediKong Architecture
 
-이 프로젝트는 의료 관리 플랫폼을 위한 마이크로서비스 아키텍처(MSA)입니다. Spring Cloud를 사용하여 서비스 발견, 라우팅 및 회복성을 관리합니다.
+MediKong은 의료 업무를 예제로 한 FastAPI 기반 MSA입니다. 외부 요청은 Kong Gateway로만 들어오고, 내부 서비스는 Kubernetes Service DNS로 통신합니다.
 
-## 시스템 구조도
+## 서비스 경계
 
-```mermaid
-graph TD
-    Client[대시보드 UI / 환자 포털] -->|HTTP| Gateway[API 게이트웨이 :8080]
-    
-    subgraph 서비스 계층
-        Gateway --> Patient[환자 서비스 :8081]
-        Gateway --> Appt[예약 서비스 :8082]
-        Gateway --> Presc[처방 서비스 :8083]
-        Gateway --> Notif[알림 서비스 :8084]
-    end
-    
-    subgraph 인프라 계층
-        Discovery[유레카 서버 :8761]
-        Discovery <-->|등록/조회| Patient
-        Discovery <-->|등록/조회| Appt
-        Discovery <-->|등록/조회| Presc
-        Discovery <-->|등록/조회| Notif
-        Discovery <-->|등록/조회| Gateway
-        
-        DB_P[(환자 DB)] --- Patient
-        DB_A[(예약 DB)] --- Appt
-        DB_PR[(처방 DB)] --- Presc
-    end
-    
-    Appt -->|Feign Call| Patient
-    Presc -->|Feign Call| Patient
-    Appt -->|이벤트 전파/비동기| Notif
+| 서비스 | Namespace | 책임 | 데이터 |
+| --- | --- | --- | --- |
+| `auth-service` | `medical-auth` | 계정 로그인, JWT 발급, logout, auth audit log | `auth-db` |
+| `patient-service` | `medical-patient` | 환자 프로필, 의료 요약 | `patient-db` |
+| `appointment-service` | `medical-appointment` | 예약 요청, 확정, 취소 | `appointment-db` |
+| `prescription-service` | `medical-prescription` | 처방 발행, 처방 조회 | `prescription-db` |
+| `notification-service` | `medical-notification` | Kafka 이벤트 기반 알림 저장 | `notification-db` |
+| `dashboard` | `medical-dashboard` | 정적 화면 | 없음 |
+| `kafka` | `medical-messaging` | 서비스 간 이벤트 전달 | `kafka-pv` |
+| Kong auth resources | `medical-auth` | JWT consumer와 credential 관리 | Kubernetes Secret |
+
+## 요청 흐름
+
+```text
+Client
+  -> Kong Gateway LoadBalancer
+  -> 서비스별 Ingress
+  -> ClusterIP Service
+  -> FastAPI Pod
+  -> PostgreSQL 또는 Kafka
 ```
 
-## 핵심 구성 요소
+로컬에서는 Kong Gateway가 MetalLB를 통해 `http://10.10.10.240`으로 노출됩니다.
 
-1.  **대시보드 (Frontend)**: Nginx로 서빙되는 정적 HTML/JS입니다. API 게이트웨이를 통해 백엔드와 통신합니다.
-2.  **API 게이트웨이 (API Gateway)**: 모든 요청의 진입점입니다. 라우팅 및 (선택적으로) JWT 인증을 처리합니다.
-3.  **유레카 서버 (Eureka Server)**: 서비스 레지스트리입니다. 서비스들이 서로의 IP 주소를 하드코딩하지 않고도 찾을 수 있게 해줍니다.
-4.  **환자 서비스 (Patient Service)**: 환자 기록(CRUD)을 관리합니다.
-5.  **예약 서비스 (Appointment Service)**: 진료 예약을 관리하며, 환자 서비스(Feign)를 통해 환자 유효성을 확인합니다.
-6.  **처방 서비스 (Prescription Service)**: 약 처방 발행을 담당합니다. 서킷 브레이커를 사용하여 환자 데이터 확인 시 장애 전파를 방지합니다.
-7.  **알림 서비스 (Notification Service)**: 예약 확정 등의 이벤트 발생 시 알림을 전송합니다.
+로그인은 `/auth/login`으로 들어와 auth-service가 JWT를 발급합니다. 이후 업무 API 요청은 `Authorization: Bearer <token>`으로 Kong을 통과합니다. `/auth/logout`은 auth-service에 감사 로그를 남기고 브라우저 세션을 종료하는 MVP 방식입니다.
 
-## 데이터 흐름 (처방전 연동 수정 사항)
+## Namespace 분리
 
--   **프론트엔드**: `GET /prescription-service/prescriptions?patientId=1` 요청을 보냅니다.
--   **게이트웨이**: 해당 요청을 실행 중인 `prescription-service` 인스턴스로 전달합니다.
--   **처방 서비스**:
-    *   리포지토리가 `patientId`로 필터링된 기록을 가져옵니다.
-    *   프론트엔드로 목록을 반환하여 화면에 표시합니다.
+서비스별 namespace를 사용합니다.
+
+```text
+medical-auth
+medical-messaging
+medical-patient
+medical-appointment
+medical-prescription
+medical-notification
+medical-dashboard
+```
+
+Kong Ingress Controller는 watch namespace 제한을 두지 않고 전체 namespace를 감시합니다. 그래서 각 서비스 namespace의 Ingress와 `medical-auth`의 KongConsumer/Secret을 함께 읽을 수 있습니다.
+
+## API Gateway
+
+Kong은 다음 역할을 담당합니다.
+
+| 기능 | 구현 |
+| --- | --- |
+| 라우팅 | 서비스별 Ingress |
+| JWT 인증 | `medikong-jwt` KongClusterPlugin |
+| 사용자 claim 전달 | `medikong-identity-headers` KongClusterPlugin |
+| 요청 제한 | `medikong-rate-limiting` KongClusterPlugin |
+| Request ID | `medikong-correlation-id` KongClusterPlugin |
+| Gateway metrics | `medikong-prometheus` KongClusterPlugin |
+
+서비스별 경로:
+
+```text
+/patients       -> medical-patient/patient-service
+/appointments  -> medical-appointment/appointment-service
+/prescriptions -> medical-prescription/prescription-service
+/notifications -> medical-notification/notification-service
+/auth          -> medical-auth/auth-service
+/              -> medical-dashboard/dashboard
+```
+
+## 서비스 간 통신
+
+같은 namespace 안의 DB는 짧은 DNS 이름을 사용합니다.
+
+```text
+patient-service -> patient-db:5432
+auth-service -> auth-db:5432
+appointment-service -> appointment-db:5432
+prescription-service -> prescription-db:5432
+notification-service -> notification-db:5432
+```
+
+다른 namespace로 가는 호출은 FQDN을 사용합니다.
+
+```text
+prescription-service -> http://patient-service.medical-patient.svc.cluster.local:8081
+appointment-service -> kafka.medical-messaging.svc.cluster.local:9092
+prescription-service -> kafka.medical-messaging.svc.cluster.local:9092
+notification-service -> kafka.medical-messaging.svc.cluster.local:9092
+```
+
+## 데이터와 이벤트
+
+각 서비스는 자기 DB만 직접 접근합니다. 다른 서비스의 DB를 직접 읽지 않습니다.
+
+```text
+appointment-service --appointment-confirmed--> Kafka
+prescription-service --prescription-issued--> Kafka
+Kafka --> notification-service
+```
+
+`prescription-service`는 `patient-service` 조회 실패에 대비해 circuit breaker와 fallback을 사용합니다.
+
+## 로컬과 AWS 차이
+
+로컬은 학습과 검증용입니다.
+
+```text
+Vagrant VM
+kubeadm
+local registry
+MetalLB
+hostPath PV
+PostgreSQL/Kafka StatefulSet
+```
+
+AWS 배포 시에는 인프라 계층을 교체합니다.
+
+```text
+EKS
+ECR
+AWS Load Balancer
+Route 53
+EBS CSI 또는 RDS
+Secrets Manager 또는 External Secrets
+```

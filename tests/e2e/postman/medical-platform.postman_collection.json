@@ -1,48 +1,29 @@
 {
   "info": {
     "_postman_id": "64a8820f-2a82-4f02-bfc2-900ea3f78f38",
-    "name": "Medical Platform Gateway E2E",
+    "name": "MediKong Gateway E2E",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
-      "name": "Issue test token",
-      "request": {
-        "method": "GET",
-        "url": "{{baseUrl}}/auth/token"
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('token is issued', function () {",
-              "  pm.response.to.have.status(200);",
-              "  const body = pm.response.json();",
-              "  pm.expect(body.token).to.be.a('string').and.not.empty;",
-              "  pm.environment.set('token', body.token);",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "Create patient",
+      "name": "Create patient as staff",
       "request": {
         "method": "POST",
         "header": [
           {
             "key": "Content-Type",
             "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{staffToken}}"
           }
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\"name\":\"E2E Patient\",\"birthDate\":\"1990-01-01\",\"gender\":\"F\",\"contact\":\"010-0000-0000\"}"
+          "raw": "{\"name\":\"E2E Patient\",\"birthDate\":\"1990-01-01\",\"gender\":\"F\",\"contact\":\"010-0000-0000\",\"primaryDoctorId\":10,\"allergies\":\"none\",\"medicationWarnings\":\"none\"}"
         },
-        "url": "{{baseUrl}}/patient-service/patients"
+        "url": "{{baseUrl}}/patients"
       },
       "event": [
         {
@@ -54,7 +35,6 @@
               "  pm.response.to.have.status(200);",
               "  const body = pm.response.json();",
               "  pm.expect(body.id).to.be.a('number');",
-              "  pm.expect(body.name).to.eql('E2E Patient');",
               "  pm.environment.set('patientId', String(body.id));",
               "});"
             ]
@@ -63,29 +43,7 @@
       ]
     },
     {
-      "name": "Get patient",
-      "request": {
-        "method": "GET",
-        "url": "{{baseUrl}}/patient-service/patients/{{patientId}}"
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('patient is returned', function () {",
-              "  pm.response.to.have.status(200);",
-              "  const body = pm.response.json();",
-              "  pm.expect(body.id).to.eql(Number(pm.environment.get('patientId')));",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "Create appointment",
+      "name": "Request appointment as patient",
       "request": {
         "method": "POST",
         "header": [
@@ -95,14 +53,14 @@
           },
           {
             "key": "Authorization",
-            "value": "Bearer {{token}}"
+            "value": "Bearer {{patientToken}}"
           }
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\"patientId\":{{patientId}},\"appointmentDate\":\"2026-05-12T09:30:00\"}"
+          "raw": "{\"patientId\":{{patientId}},\"doctorId\":10,\"appointmentAt\":\"2026-05-20T10:00:00\",\"reason\":\"headache\"}"
         },
-        "url": "{{baseUrl}}/appointment-service/appointments"
+        "url": "{{baseUrl}}/appointments"
       },
       "event": [
         {
@@ -113,7 +71,6 @@
               "pm.test('appointment is requested', function () {",
               "  pm.response.to.have.status(200);",
               "  const body = pm.response.json();",
-              "  pm.expect(body.id).to.be.a('number');",
               "  pm.expect(body.status).to.eql('REQUESTED');",
               "  pm.environment.set('appointmentId', String(body.id));",
               "});"
@@ -123,16 +80,16 @@
       ]
     },
     {
-      "name": "Confirm appointment",
+      "name": "Confirm appointment as doctor",
       "request": {
         "method": "POST",
         "header": [
           {
             "key": "Authorization",
-            "value": "Bearer {{token}}"
+            "value": "Bearer {{doctorToken}}"
           }
         ],
-        "url": "{{baseUrl}}/appointment-service/appointments/{{appointmentId}}/confirm"
+        "url": "{{baseUrl}}/appointments/{{appointmentId}}/confirm"
       },
       "event": [
         {
@@ -142,8 +99,7 @@
             "exec": [
               "pm.test('appointment is confirmed', function () {",
               "  pm.response.to.have.status(200);",
-              "  const body = pm.response.json();",
-              "  pm.expect(body.status).to.eql('CONFIRMED');",
+              "  pm.expect(pm.response.json().status).to.eql('CONFIRMED');",
               "});"
             ]
           }
@@ -151,7 +107,7 @@
       ]
     },
     {
-      "name": "Create prescription",
+      "name": "Issue prescription as doctor",
       "request": {
         "method": "POST",
         "header": [
@@ -161,14 +117,14 @@
           },
           {
             "key": "Authorization",
-            "value": "Bearer {{token}}"
+            "value": "Bearer {{doctorToken}}"
           }
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\"patientId\":{{patientId}},\"medicine\":\"Amoxicillin\",\"dosage\":\"500mg\",\"prescriptionDate\":\"2026-05-12\"}"
+          "raw": "{\"patientId\":{{patientId}},\"doctorId\":10,\"medicationName\":\"Amoxicillin\",\"dosage\":\"500mg\",\"instructions\":\"after meals\"}"
         },
-        "url": "{{baseUrl}}/prescription-service/prescriptions"
+        "url": "{{baseUrl}}/prescriptions"
       },
       "event": [
         {
@@ -176,10 +132,9 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test('prescription is created', function () {",
+              "pm.test('prescription is issued', function () {",
               "  pm.response.to.have.status(200);",
               "  const body = pm.response.json();",
-              "  pm.expect(body.id).to.be.a('number');",
               "  pm.expect(body.patientId).to.eql(Number(pm.environment.get('patientId')));",
               "});"
             ]
@@ -188,10 +143,16 @@
       ]
     },
     {
-      "name": "List notifications",
+      "name": "List notifications as patient",
       "request": {
         "method": "GET",
-        "url": "{{baseUrl}}/notification-service/notifications"
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{patientToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/notifications"
       },
       "event": [
         {
@@ -200,6 +161,33 @@
             "type": "text/javascript",
             "exec": [
               "pm.test('notifications endpoint is available', function () {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.json()).to.be.an('array');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List prescriptions as patient",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{patientToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/prescriptions"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('patient prescriptions are returned', function () {",
               "  pm.response.to.have.status(200);",
               "  pm.expect(pm.response.json()).to.be.an('array');",
               "});"

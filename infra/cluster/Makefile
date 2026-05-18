@@ -74,6 +74,7 @@ ifneq ($(origin ANSIBLE_INVENTORY),command line)
 override ANSIBLE_INVENTORY := $(DEFAULT_ANSIBLE_INVENTORY)
 endif
 endif
+WSL_ANSIBLE_INVENTORY ?= provision/ansible/inventory.ini
 ANSIBLE_FLAGS ?=
 HELM_FLAGS ?=
 
@@ -104,10 +105,25 @@ LOCAL_REGISTRY ?= $(LOCAL_REGISTRY_HOST):$(LOCAL_REGISTRY_PORT)
 LOCAL_REGISTRY_STORAGE_PATH ?= /var/lib/docker-registry
 LOCAL_REGISTRY_CA_LOCAL_PATH ?= $(HOME)/.docker/certs.d/$(LOCAL_REGISTRY)/ca.crt
 LOCAL_VM_SSH_PRIVATE_KEY ?=
-APP_NAMESPACE ?= medical-platform
+AUTH_NAMESPACE ?= medical-auth
+MESSAGING_NAMESPACE ?= medical-messaging
+PATIENT_NAMESPACE ?= medical-patient
+APPOINTMENT_NAMESPACE ?= medical-appointment
+PRESCRIPTION_NAMESPACE ?= medical-prescription
+NOTIFICATION_NAMESPACE ?= medical-notification
+DASHBOARD_NAMESPACE ?= medical-dashboard
+APP_NAMESPACE ?= $(PATIENT_NAMESPACE)
+APP_STATUS_NAMESPACES ?= $(AUTH_NAMESPACE) $(MESSAGING_NAMESPACE) $(PATIENT_NAMESPACE) $(APPOINTMENT_NAMESPACE) $(PRESCRIPTION_NAMESPACE) $(NOTIFICATION_NAMESPACE) $(DASHBOARD_NAMESPACE)
 METRICS_SERVER_VERSION ?= v0.8.1
 METRICS_SERVER_WAIT_TIMEOUT ?= 300s
-HELM_VERSION ?= v3.15.4
+METALLB_VERSION ?= v0.15.3
+METALLB_NAMESPACE ?= metallb-system
+METALLB_IP_POOL_NAME ?= medikong-pool
+METALLB_L2_ADVERTISEMENT_NAME ?= medikong-l2
+METALLB_IP_RANGE ?= 10.10.10.240-10.10.10.250
+METALLB_EXTERNAL_IP ?= 10.10.10.240
+METALLB_WAIT_TIMEOUT ?= 300s
+HELM_VERSION ?= v3.16.4
 OBSERVABILITY_NAMESPACE ?= observability
 OBSERVABILITY_DIR ?= stacks/observability
 OBSERVABILITY_REMOTE_ARCHIVE ?= /tmp/cloudnative-study-observability.tgz
@@ -130,16 +146,16 @@ LOCAL_K8S_ALL_DIR ?= $(REPO_ROOT)/k8s/overlays/local/all
 LOCAL_K8S_APPS_DIR ?= $(REPO_ROOT)/k8s/overlays/local/apps
 LOCAL_K8S_DEPS_DIR ?= $(REPO_ROOT)/k8s/overlays/local/deps
 LOCAL_KUSTOMIZATION ?= $(LOCAL_K8S_APPS_DIR)/kustomization.yaml
+LOCAL_KUSTOMIZATION_ALL ?= $(LOCAL_K8S_ALL_DIR)/kustomization.yaml
 LOCAL_K8S_REMOTE_ARCHIVE ?= /tmp/cloudnative-study-k8s.tgz
 LOCAL_K8S_REMOTE_DIR ?= /tmp/cloudnative-study-k8s
 LOCAL_K8S_WAIT_TIMEOUT ?= 300s
-LOCAL_API_GATEWAY_URL ?= http://$(LOCAL_REGISTRY_HOST):30080
-APP_SERVICES ?= api-gateway patient-service appointment-service prescription-service notification-service
+LOCAL_API_GATEWAY_URL ?= http://$(METALLB_EXTERNAL_IP)
+APP_SERVICES ?= auth-service patient-service appointment-service prescription-service notification-service
 DASHBOARD_SERVICE ?= dashboard
-APP_DEPLOYMENTS ?= deployment/api-gateway deployment/patient-service deployment/appointment-service deployment/prescription-service deployment/notification-service deployment/dashboard
-APP_POD_SELECTOR ?= app in (api-gateway,patient-service,appointment-service,prescription-service,notification-service,dashboard)
-DEPENDENCY_STATEFULSETS ?= statefulset/patient-db statefulset/appointment-db statefulset/prescription-db statefulset/kafka
-REGISTRY_PULL_TEST_IMAGE ?= $(LOCAL_REGISTRY)/api-gateway:$(IMAGE_TAG)
+APP_ROLLOUT_TARGETS ?= $(AUTH_NAMESPACE):deployment/auth-service $(PATIENT_NAMESPACE):deployment/patient-service $(APPOINTMENT_NAMESPACE):deployment/appointment-service $(PRESCRIPTION_NAMESPACE):deployment/prescription-service $(NOTIFICATION_NAMESPACE):deployment/notification-service $(DASHBOARD_NAMESPACE):deployment/dashboard
+DEPENDENCY_ROLLOUT_TARGETS ?= $(AUTH_NAMESPACE):statefulset/auth-db $(PATIENT_NAMESPACE):statefulset/patient-db $(APPOINTMENT_NAMESPACE):statefulset/appointment-db $(PRESCRIPTION_NAMESPACE):statefulset/prescription-db $(NOTIFICATION_NAMESPACE):statefulset/notification-db $(MESSAGING_NAMESPACE):statefulset/kafka
+REGISTRY_PULL_TEST_IMAGE ?= $(LOCAL_REGISTRY)/patient-service:$(IMAGE_TAG)
 LOCAL_K8S_DEP_IMAGES ?= postgres:15 apache/kafka:3.8.1 busybox:1.36
 OBSERVABILITY_IMAGES ?= docker.io/grafana/grafana:13.0.1 \
 	docker.io/library/busybox:1.37.0 \
@@ -209,8 +225,25 @@ export LOCAL_REGISTRY_STORAGE_PATH
 export REGISTRY_PULL_TEST_IMAGE
 export LOCAL_VM_SSH_PRIVATE_KEY
 export APP_NAMESPACE
+export AUTH_NAMESPACE
+export MESSAGING_NAMESPACE
+export PATIENT_NAMESPACE
+export APPOINTMENT_NAMESPACE
+export PRESCRIPTION_NAMESPACE
+export NOTIFICATION_NAMESPACE
+export DASHBOARD_NAMESPACE
+export APP_STATUS_NAMESPACES
+export APP_ROLLOUT_TARGETS
+export DEPENDENCY_ROLLOUT_TARGETS
 export METRICS_SERVER_VERSION
 export METRICS_SERVER_WAIT_TIMEOUT
+export METALLB_VERSION
+export METALLB_NAMESPACE
+export METALLB_IP_POOL_NAME
+export METALLB_L2_ADVERTISEMENT_NAME
+export METALLB_IP_RANGE
+export METALLB_EXTERNAL_IP
+export METALLB_WAIT_TIMEOUT
 export HELM_VERSION
 export LOCAL_DEV_POSTGRES_PORT
 export LOCAL_DEV_POSTGRES_DB
@@ -220,11 +253,12 @@ export LOCAL_DEV_REDIS_PORT
 export LOCAL_DEV_KAFKA_PORT
 export LOCAL_DEV_KAFKA_ADVERTISED_HOST
 
-.PHONY: help install-tools check-tools check-kubectl check-helm local-vms-up local-vms-status local-vms-ssh local-vms-ssh-config local-vms-stop local-vms-halt local-vms-destroy local-vms-reset local-inventory ansible-ping servers-bootstrap servers-verify cluster-bootstrap cluster-verify helm-bootstrap observability-storage-bootstrap local-servers-bootstrap local-cluster-bootstrap local-bootstrap \
+.PHONY: help install-tools check-tools check-kubectl check-helm check-docker-registry-proxy local-vms-up local-vms-status local-vms-ssh local-vms-ssh-config local-vms-stop local-vms-halt local-vms-destroy local-vms-reset local-inventory ansible-ping servers-bootstrap servers-verify cluster-bootstrap cluster-verify metallb-bootstrap metallb-verify helm-bootstrap kong-bootstrap kong-verify observability-storage-bootstrap local-servers-bootstrap local-cluster-bootstrap local-bootstrap \
 	registry-bootstrap registry-verify registry-pull-verify registry-ca-install registry-ca-install-mac registry-ca-install-linux registry-ca-install-wsl registry-ca-trust-macos registry-ca-curl-verify \
 	metrics-bootstrap metrics-verify observability-images-push observability-template observability-install observability-status grafana observability-grafana-port-forward \
 	check-local-dev-tools local-dev-config local-dev-up local-dev-kafka-up local-dev-down local-dev-reset local-dev-ps local-dev-logs \
-	local-kustomize-tag app-images-build app-images-push third-party-images-push local-k8s-bootstrap local-k8s-render local-k8s-apply local-k8s-deps-prepare local-k8s-deps-apply local-k8s-app-apply local-k8s-app-stop local-k8s-app-pods-delete local-k8s-deps-verify local-k8s-app-verify local-k8s-verify local-k8s-pods local-k8s-app-pods local-k8s-app-services local-k8s-status local-k8s-node-top local-k8s-app-top local-k8s-top local-k8s-crud-smoke local-k8s-deploy clean
+	local-kustomize-tag app-images-build app-images-push third-party-images-push local-k8s-bootstrap local-k8s-render local-k8s-apply local-k8s-deps-prepare local-k8s-deps-apply local-k8s-app-apply local-k8s-app-stop local-k8s-app-pods-delete local-k8s-deps-verify local-k8s-app-verify local-k8s-verify local-k8s-pods local-k8s-app-pods local-k8s-app-services local-k8s-status local-k8s-node-top local-k8s-app-top local-k8s-top local-k8s-crud-smoke local-k8s-deploy \
+	wsl-local-ssh-keys-sync wsl-local-inventory wsl-bootstrap-after-vagrant wsl-local-k8s-bootstrap wsl-metallb-bootstrap wsl-metallb-verify wsl-upload-k8s wsl-kong-bootstrap wsl-kong-verify wsl-local-k8s-apply wsl-local-k8s-deps-apply wsl-local-k8s-app-apply wsl-local-k8s-deps-verify wsl-local-k8s-app-verify wsl-local-k8s-verify wsl-local-k8s-pods wsl-local-k8s-app-pods wsl-local-k8s-app-services wsl-local-k8s-status wsl-local-k8s-node-top wsl-local-k8s-app-top wsl-local-k8s-top wsl-local-k8s-crud-smoke wsl-local-k8s-deploy clean
 
 help:
 	@printf "%s\n" "사용법: make <target>"
@@ -284,11 +318,11 @@ help:
 	@printf "%s\n" "  make local-k8s-app-verify   앱 Deployment rollout 상태를 확인합니다."
 	@printf "%s\n" "  make local-k8s-verify       앱 Deployment rollout 상태를 확인합니다."
 	@printf "%s\n" "  make local-k8s-pods         VM Kubernetes 전체 namespace의 pod 상태를 확인합니다."
-	@printf "%s\n" "  make local-k8s-app-pods     medical-platform namespace의 pod 상태를 확인합니다."
-	@printf "%s\n" "  make local-k8s-app-services medical-platform namespace의 service 상태를 확인합니다."
+	@printf "%s\n" "  make local-k8s-app-pods     전체 namespace의 pod 상태를 확인합니다."
+	@printf "%s\n" "  make local-k8s-app-services 전체 namespace의 service 상태를 확인합니다."
 	@printf "%s\n" "  make local-k8s-status       pod, service, PVC, 최근 event를 확인합니다."
 	@printf "%s\n" "  make local-k8s-node-top     VM Kubernetes node CPU/메모리 사용량을 확인합니다."
-	@printf "%s\n" "  make local-k8s-app-top      medical-platform pod/container CPU/메모리 사용량을 확인합니다."
+	@printf "%s\n" "  make local-k8s-app-top      전체 namespace pod/container CPU/메모리 사용량을 확인합니다."
 	@printf "%s\n" "  make local-k8s-top          node와 pod/container 리소스 사용량을 확인합니다."
 	@printf "%s\n" "  make local-k8s-deploy       앱 image build/push부터 앱 apply, rollout/status/top 확인까지 실행합니다."
 	@printf "%s\n" ""
@@ -342,6 +376,15 @@ check-local-dev-tools:
 	@docker compose version >/dev/null
 	@printf "%s\n" "ok: docker compose"
 
+check-docker-registry-proxy: check-local-dev-tools
+	@info="$$(docker info 2>/dev/null)"; \
+	proxy="$$(printf "%s\n" "$$info" | awk -F': ' '/^[[:space:]]*HTTPS? Proxy:/ && $$2 != "" {print $$0}')"; \
+	no_proxy="$$(printf "%s\n" "$$info" | awk -F': ' '/^[[:space:]]*No Proxy:/ {print $$2}')"; \
+	if [ -n "$$proxy" ] && ! printf ",%s," "$$no_proxy" | grep -Eq ",($(LOCAL_REGISTRY_HOST)|$(LOCAL_REGISTRY)|10\.10\.10\.0/24),"; then \
+		printf "%s\n" "Docker Desktop proxy is configured, but No Proxy does not include $(LOCAL_REGISTRY_HOST)."; \
+		printf "%s\n" "Add $(LOCAL_REGISTRY_HOST),$(LOCAL_REGISTRY),10.10.10.0/24 to Docker Desktop No Proxy."; \
+	fi
+
 local-dev-config:
 	docker compose -p $(LOCAL_DEV_PROJECT) -f $(LOCAL_DEV_COMPOSE_FILE) config
 
@@ -394,6 +437,16 @@ local-inventory:
 ansible-ping:
 	ansible $(ANSIBLE_FLAGS) -i $(ANSIBLE_INVENTORY) all -m ping
 
+ansible-ping-wait:
+	@for attempt in $$(seq 1 30); do \
+		if ansible $(ANSIBLE_FLAGS) -i $(ANSIBLE_INVENTORY) all -m ping; then \
+			exit 0; \
+		fi; \
+		printf "waiting for VM SSH reachability... attempt %s/30\n" "$$attempt"; \
+		sleep 5; \
+	done; \
+	exit 1
+
 servers-bootstrap:
 	ansible-playbook $(ANSIBLE_FLAGS) -i $(ANSIBLE_INVENTORY) provision/ansible/playbooks/bootstrap-servers.yml
 
@@ -412,8 +465,27 @@ metrics-bootstrap:
 metrics-verify:
 	ansible-playbook $(ANSIBLE_FLAGS) -i $(ANSIBLE_INVENTORY) provision/ansible/playbooks/verify-metrics-server.yml
 
+metallb-bootstrap:
+	(cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo env KUBECONFIG=/etc/kubernetes/admin.conf METALLB_VERSION="$(METALLB_VERSION)" METALLB_NAMESPACE="$(METALLB_NAMESPACE)" METALLB_IP_POOL_NAME="$(METALLB_IP_POOL_NAME)" METALLB_L2_ADVERTISEMENT_NAME="$(METALLB_L2_ADVERTISEMENT_NAME)" METALLB_IP_RANGE="$(METALLB_IP_RANGE)" METALLB_WAIT_TIMEOUT="$(METALLB_WAIT_TIMEOUT)" bash -s') < scripts/bootstrap-metallb.sh
+
+metallb-verify:
+	(cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo env KUBECONFIG=/etc/kubernetes/admin.conf METALLB_NAMESPACE="$(METALLB_NAMESPACE)" METALLB_IP_POOL_NAME="$(METALLB_IP_POOL_NAME)" METALLB_L2_ADVERTISEMENT_NAME="$(METALLB_L2_ADVERTISEMENT_NAME)" METALLB_WAIT_TIMEOUT="$(METALLB_WAIT_TIMEOUT)" bash -s') < scripts/verify-metallb.sh
+
 helm-bootstrap:
 	ansible-playbook $(ANSIBLE_FLAGS) -i $(ANSIBLE_INVENTORY) provision/ansible/playbooks/bootstrap-helm.yml
+
+kong-bootstrap: helm-bootstrap
+	@archive="$$(mktemp)"; \
+	trap 'rm -f "$$archive"' EXIT; \
+	tar_args=(); \
+	if tar --help 2>&1 | grep -q -- '--disable-copyfile'; then tar_args+=(--disable-copyfile); fi; \
+	if tar --help 2>&1 | grep -q -- '--no-xattrs'; then tar_args+=(--no-xattrs); fi; \
+	COPYFILE_DISABLE=1 tar "$${tar_args[@]}" -C "$(REPO_ROOT)" -czf "$$archive" k8s; \
+	(cd providers/$(LOCAL_PROVIDER) && vagrant upload "$$archive" "$(LOCAL_K8S_REMOTE_ARCHIVE)" control-plane-1); \
+	(cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo rm -rf "$(LOCAL_K8S_REMOTE_DIR)" && sudo mkdir -p "$(LOCAL_K8S_REMOTE_DIR)" && sudo tar -xzf "$(LOCAL_K8S_REMOTE_ARCHIVE)" -C "$(LOCAL_K8S_REMOTE_DIR)" && sudo env KUBECONFIG=/etc/kubernetes/admin.conf helm repo add kong https://charts.konghq.com || true && sudo env KUBECONFIG=/etc/kubernetes/admin.conf helm repo update && sudo env KUBECONFIG=/etc/kubernetes/admin.conf kubectl create namespace kong --dry-run=client -o yaml | sudo env KUBECONFIG=/etc/kubernetes/admin.conf kubectl apply -f - && sudo env KUBECONFIG=/etc/kubernetes/admin.conf helm upgrade --install kong kong/ingress --namespace kong --values "$(LOCAL_K8S_REMOTE_DIR)/k8s/kong/values.yaml"')
+
+kong-verify:
+	cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo env KUBECONFIG=/etc/kubernetes/admin.conf kubectl -n kong rollout status deployment/kong-controller --timeout=$(LOCAL_K8S_WAIT_TIMEOUT); sudo env KUBECONFIG=/etc/kubernetes/admin.conf kubectl -n kong rollout status deployment/kong-gateway --timeout=$(LOCAL_K8S_WAIT_TIMEOUT); sudo env KUBECONFIG=/etc/kubernetes/admin.conf kubectl -n kong get pods -o wide; sudo env KUBECONFIG=/etc/kubernetes/admin.conf kubectl -n kong get svc'
 
 observability-storage-bootstrap:
 	ansible-playbook $(ANSIBLE_FLAGS) -i $(ANSIBLE_INVENTORY) provision/ansible/playbooks/bootstrap-observability-storage.yml
@@ -481,18 +553,18 @@ registry-ca-trust-macos:
 registry-ca-curl-verify:
 	curl --cacert "$(LOCAL_REGISTRY_CA_LOCAL_PATH)" "https://$(LOCAL_REGISTRY)/v2/"
 
-app-images-build: check-local-dev-tools
+app-images-build: check-docker-registry-proxy
 	@for service in $(APP_SERVICES); do \
 		printf "building %s/%s:%s\n" "$(LOCAL_REGISTRY)" "$$service" "$(IMAGE_TAG)"; \
-		docker build -t $(LOCAL_REGISTRY)/$$service:$(IMAGE_TAG) -f $(REPO_ROOT)/$$service/Dockerfile $(REPO_ROOT); \
+		NO_PROXY="$(DOCKER_NO_PROXY)" no_proxy="$(DOCKER_NO_PROXY)" docker build -t $(LOCAL_REGISTRY)/$$service:$(IMAGE_TAG) $(REPO_ROOT)/services/$$service; \
 	done
-	docker build -t $(LOCAL_REGISTRY)/$(DASHBOARD_SERVICE):$(IMAGE_TAG) $(REPO_ROOT)/$(DASHBOARD_SERVICE)
+	NO_PROXY="$(DOCKER_NO_PROXY)" no_proxy="$(DOCKER_NO_PROXY)" docker build -t $(LOCAL_REGISTRY)/$(DASHBOARD_SERVICE):$(IMAGE_TAG) $(REPO_ROOT)/$(DASHBOARD_SERVICE)
 
 app-images-push: app-images-build
 	@set -e; \
 	for service in $(APP_SERVICES) $(DASHBOARD_SERVICE); do \
 		printf "pushing %s/%s:%s\n" "$(LOCAL_REGISTRY)" "$$service" "$(IMAGE_TAG)"; \
-		if ! docker push $(LOCAL_REGISTRY)/$$service:$(IMAGE_TAG); then \
+		if ! NO_PROXY="$(DOCKER_NO_PROXY)" no_proxy="$(DOCKER_NO_PROXY)" docker push $(LOCAL_REGISTRY)/$$service:$(IMAGE_TAG); then \
 			printf "%s\n" "docker push failed. Run make registry-ca-install, restart Docker Desktop, then retry."; \
 			exit 1; \
 		fi; \
@@ -500,6 +572,7 @@ app-images-push: app-images-build
 
 local-kustomize-tag:
 	./scripts/update-local-image-tags.sh "$(IMAGE_TAG)" "$(LOCAL_KUSTOMIZATION)" "$(LOCAL_REGISTRY)"
+	./scripts/update-local-image-tags.sh "$(IMAGE_TAG)" "$(LOCAL_KUSTOMIZATION_ALL)" "$(LOCAL_REGISTRY)"
 
 third-party-images-push: check-local-dev-tools
 	@set -e; \
@@ -528,6 +601,8 @@ local-cluster-bootstrap:
 	$(MAKE) cluster-verify
 	$(MAKE) metrics-bootstrap
 	$(MAKE) metrics-verify
+	$(MAKE) metallb-bootstrap
+	$(MAKE) metallb-verify
 
 local-bootstrap:
 	$(MAKE) local-servers-bootstrap
@@ -538,6 +613,8 @@ local-k8s-bootstrap:
 	$(MAKE) local-bootstrap
 	$(MAKE) local-k8s-deps-apply
 	$(MAKE) local-k8s-deps-verify
+	$(MAKE) kong-bootstrap
+	$(MAKE) kong-verify
 	@if [ "$(CLUSTER_TOPOLOGY)" = "role-separated" ] || [ "$(CLUSTER_TOPOLOGY)" = "balanced" ]; then \
 		$(MAKE) observability-install; \
 	else \
@@ -571,7 +648,7 @@ local-k8s-deps-apply: check-kubectl
 	if tar --help 2>&1 | grep -q -- '--no-xattrs'; then tar_args+=(--no-xattrs); fi; \
 	COPYFILE_DISABLE=1 tar "$${tar_args[@]}" -C "$(REPO_ROOT)" -czf "$$archive" k8s; \
 	(cd providers/$(LOCAL_PROVIDER) && vagrant upload "$$archive" "$(LOCAL_K8S_REMOTE_ARCHIVE)" control-plane-1); \
-	(cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo rm -rf "$(LOCAL_K8S_REMOTE_DIR)" && sudo mkdir -p "$(LOCAL_K8S_REMOTE_DIR)" && sudo tar -xzf "$(LOCAL_K8S_REMOTE_ARCHIVE)" -C "$(LOCAL_K8S_REMOTE_DIR)" && sudo env KUBECONFIG=/etc/kubernetes/admin.conf kubectl create namespace "$(APP_NAMESPACE)" --dry-run=client -o yaml | sudo env KUBECONFIG=/etc/kubernetes/admin.conf kubectl apply -f - && sudo env KUBECONFIG=/etc/kubernetes/admin.conf kubectl apply -k "$(LOCAL_K8S_REMOTE_DIR)/k8s/overlays/local/deps"')
+	(cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo rm -rf "$(LOCAL_K8S_REMOTE_DIR)" && sudo mkdir -p "$(LOCAL_K8S_REMOTE_DIR)" && sudo tar -xzf "$(LOCAL_K8S_REMOTE_ARCHIVE)" -C "$(LOCAL_K8S_REMOTE_DIR)" && sudo env KUBECONFIG=/etc/kubernetes/admin.conf kubectl apply -k "$(LOCAL_K8S_REMOTE_DIR)/k8s/overlays/local/deps"')
 
 local-k8s-app-apply: check-kubectl
 	@archive="$$(mktemp)"; \
@@ -581,18 +658,18 @@ local-k8s-app-apply: check-kubectl
 	if tar --help 2>&1 | grep -q -- '--no-xattrs'; then tar_args+=(--no-xattrs); fi; \
 	COPYFILE_DISABLE=1 tar "$${tar_args[@]}" -C "$(REPO_ROOT)" -czf "$$archive" k8s; \
 	(cd providers/$(LOCAL_PROVIDER) && vagrant upload "$$archive" "$(LOCAL_K8S_REMOTE_ARCHIVE)" control-plane-1); \
-	(cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo rm -rf "$(LOCAL_K8S_REMOTE_DIR)" && sudo mkdir -p "$(LOCAL_K8S_REMOTE_DIR)" && sudo tar -xzf "$(LOCAL_K8S_REMOTE_ARCHIVE)" -C "$(LOCAL_K8S_REMOTE_DIR)" && sudo env KUBECONFIG=/etc/kubernetes/admin.conf kubectl create namespace "$(APP_NAMESPACE)" --dry-run=client -o yaml | sudo env KUBECONFIG=/etc/kubernetes/admin.conf kubectl apply -f - && sudo env KUBECONFIG=/etc/kubernetes/admin.conf kubectl apply -k "$(LOCAL_K8S_REMOTE_DIR)/k8s/overlays/local/apps"')
+	(cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo rm -rf "$(LOCAL_K8S_REMOTE_DIR)" && sudo mkdir -p "$(LOCAL_K8S_REMOTE_DIR)" && sudo tar -xzf "$(LOCAL_K8S_REMOTE_ARCHIVE)" -C "$(LOCAL_K8S_REMOTE_DIR)" && sudo env KUBECONFIG=/etc/kubernetes/admin.conf kubectl apply -k "$(LOCAL_K8S_REMOTE_DIR)/k8s/overlays/local/apps"')
 
 local-k8s-deps-verify:
-	(cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo env KUBECONFIG=/etc/kubernetes/admin.conf APP_NAMESPACE="$(APP_NAMESPACE)" LOCAL_K8S_WAIT_TIMEOUT="$(LOCAL_K8S_WAIT_TIMEOUT)" DEPENDENCY_STATEFULSETS="$(DEPENDENCY_STATEFULSETS)" bash -s') < scripts/verify-local-k8s-deps.sh
+	(cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo env KUBECONFIG=/etc/kubernetes/admin.conf LOCAL_K8S_WAIT_TIMEOUT="$(LOCAL_K8S_WAIT_TIMEOUT)" DEPENDENCY_ROLLOUT_TARGETS="$(DEPENDENCY_ROLLOUT_TARGETS)" bash -s') < scripts/verify-local-k8s-deps.sh
 
 local-k8s-app-verify:
-	cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo env KUBECONFIG=/etc/kubernetes/admin.conf kubectl -n $(APP_NAMESPACE) rollout status $(APP_DEPLOYMENTS) --timeout=$(LOCAL_K8S_WAIT_TIMEOUT)'
+	(cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo env KUBECONFIG=/etc/kubernetes/admin.conf LOCAL_K8S_WAIT_TIMEOUT="$(LOCAL_K8S_WAIT_TIMEOUT)" APP_ROLLOUT_TARGETS="$(APP_ROLLOUT_TARGETS)" bash -s') < scripts/verify-local-k8s-apps.sh
 
 local-k8s-verify: local-k8s-app-verify
 
 local-k8s-app-stop:
-	(cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo env KUBECONFIG=/etc/kubernetes/admin.conf APP_NAMESPACE="$(APP_NAMESPACE)" APP_DEPLOYMENTS="$(APP_DEPLOYMENTS)" APP_POD_SELECTOR="$(APP_POD_SELECTOR)" LOCAL_K8S_WAIT_TIMEOUT="$(LOCAL_K8S_WAIT_TIMEOUT)" bash -s') < scripts/stop-local-k8s-apps.sh
+	(cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo env KUBECONFIG=/etc/kubernetes/admin.conf APP_ROLLOUT_TARGETS="$(APP_ROLLOUT_TARGETS)" LOCAL_K8S_WAIT_TIMEOUT="$(LOCAL_K8S_WAIT_TIMEOUT)" bash -s') < scripts/stop-local-k8s-apps.sh
 
 local-k8s-app-pods-delete: local-k8s-app-stop
 
@@ -600,19 +677,19 @@ local-k8s-pods:
 	cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo env KUBECONFIG=/etc/kubernetes/admin.conf kubectl get pods -A -o wide'
 
 local-k8s-app-pods:
-	cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo env KUBECONFIG=/etc/kubernetes/admin.conf kubectl get pods -n $(APP_NAMESPACE) -o wide'
+	cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo env KUBECONFIG=/etc/kubernetes/admin.conf kubectl get pods -A -o wide'
 
 local-k8s-app-services:
-	cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo env KUBECONFIG=/etc/kubernetes/admin.conf kubectl get svc -n $(APP_NAMESPACE)'
+	cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo env KUBECONFIG=/etc/kubernetes/admin.conf kubectl get svc -A'
 
 local-k8s-status:
-	cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo env KUBECONFIG=/etc/kubernetes/admin.conf bash -lc '"'"'kubectl get pods -n $(APP_NAMESPACE) -o wide; kubectl get svc -n $(APP_NAMESPACE); kubectl get pvc -n $(APP_NAMESPACE); kubectl get events -n $(APP_NAMESPACE) --sort-by=.lastTimestamp | tail -n 40'"'"''
+	(cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo env KUBECONFIG=/etc/kubernetes/admin.conf APP_STATUS_NAMESPACES="$(APP_STATUS_NAMESPACES)" bash -s') < scripts/show-local-k8s-status.sh
 
 local-k8s-node-top:
 	cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo env KUBECONFIG=/etc/kubernetes/admin.conf kubectl top nodes'
 
 local-k8s-app-top:
-	cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo env KUBECONFIG=/etc/kubernetes/admin.conf kubectl top pods -n $(APP_NAMESPACE) --containers'
+	cd providers/$(LOCAL_PROVIDER) && vagrant ssh control-plane-1 -c 'sudo env KUBECONFIG=/etc/kubernetes/admin.conf kubectl top pods -A --containers'
 
 local-k8s-top: local-k8s-node-top local-k8s-app-top
 
@@ -628,5 +705,117 @@ local-k8s-deploy:
 	$(MAKE) local-k8s-status
 	$(MAKE) local-k8s-top
 
+wsl-local-ssh-keys-sync:
+	bash scripts/sync-wsl-vagrant-keys.sh "providers/$(LOCAL_PROVIDER)" "$(HOME)/.ssh/cloudnative-vagrant"
+
+wsl-local-inventory:
+	bash scripts/generate-wsl-ansible-inventory.sh "$(WSL_ANSIBLE_INVENTORY)" "$(HOME)/.ssh/cloudnative-vagrant"
+
+wsl-bootstrap-after-vagrant:
+	$(MAKE) wsl-local-ssh-keys-sync
+	$(MAKE) wsl-local-inventory
+	$(MAKE) ANSIBLE_INVENTORY="$(WSL_ANSIBLE_INVENTORY)" ansible-ping-wait
+	$(MAKE) ANSIBLE_INVENTORY="$(WSL_ANSIBLE_INVENTORY)" servers-bootstrap
+	$(MAKE) ANSIBLE_INVENTORY="$(WSL_ANSIBLE_INVENTORY)" servers-verify
+	$(MAKE) ANSIBLE_INVENTORY="$(WSL_ANSIBLE_INVENTORY)" local-k8s-deps-prepare
+	$(MAKE) ANSIBLE_INVENTORY="$(WSL_ANSIBLE_INVENTORY)" cluster-bootstrap
+	$(MAKE) ANSIBLE_INVENTORY="$(WSL_ANSIBLE_INVENTORY)" cluster-verify
+	$(MAKE) ANSIBLE_INVENTORY="$(WSL_ANSIBLE_INVENTORY)" metrics-bootstrap
+	$(MAKE) ANSIBLE_INVENTORY="$(WSL_ANSIBLE_INVENTORY)" metrics-verify
+	$(MAKE) wsl-metallb-bootstrap
+	$(MAKE) wsl-metallb-verify
+
+wsl-local-k8s-bootstrap:
+	$(MAKE) wsl-bootstrap-after-vagrant
+	$(MAKE) wsl-local-k8s-deps-apply
+	$(MAKE) wsl-local-k8s-deps-verify
+	$(MAKE) wsl-kong-bootstrap
+	$(MAKE) wsl-kong-verify
+
+wsl-metallb-bootstrap:
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m copy -a "src=scripts/bootstrap-metallb.sh dest=/tmp/cloudnative-bootstrap-metallb.sh mode=0755"
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m shell -a 'KUBECONFIG=/etc/kubernetes/admin.conf METALLB_VERSION="$(METALLB_VERSION)" METALLB_NAMESPACE="$(METALLB_NAMESPACE)" METALLB_IP_POOL_NAME="$(METALLB_IP_POOL_NAME)" METALLB_L2_ADVERTISEMENT_NAME="$(METALLB_L2_ADVERTISEMENT_NAME)" METALLB_IP_RANGE="$(METALLB_IP_RANGE)" METALLB_WAIT_TIMEOUT="$(METALLB_WAIT_TIMEOUT)" /tmp/cloudnative-bootstrap-metallb.sh'
+
+wsl-metallb-verify:
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m copy -a "src=scripts/verify-metallb.sh dest=/tmp/cloudnative-verify-metallb.sh mode=0755"
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m shell -a 'KUBECONFIG=/etc/kubernetes/admin.conf METALLB_NAMESPACE="$(METALLB_NAMESPACE)" METALLB_IP_POOL_NAME="$(METALLB_IP_POOL_NAME)" METALLB_L2_ADVERTISEMENT_NAME="$(METALLB_L2_ADVERTISEMENT_NAME)" METALLB_WAIT_TIMEOUT="$(METALLB_WAIT_TIMEOUT)" /tmp/cloudnative-verify-metallb.sh'
+
+wsl-upload-k8s:
+	@archive="$$(mktemp)"; \
+	trap 'rm -f "$$archive"' EXIT; \
+	tar_args=(); \
+	if tar --help 2>&1 | grep -q -- '--disable-copyfile'; then tar_args+=(--disable-copyfile); fi; \
+	if tar --help 2>&1 | grep -q -- '--no-xattrs'; then tar_args+=(--no-xattrs); fi; \
+	COPYFILE_DISABLE=1 tar "$${tar_args[@]}" -C "$(REPO_ROOT)" -czf "$$archive" k8s; \
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m copy -a "src=$$archive dest=$(LOCAL_K8S_REMOTE_ARCHIVE) mode=0644"; \
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m shell -a 'rm -rf "$(LOCAL_K8S_REMOTE_DIR)" && mkdir -p "$(LOCAL_K8S_REMOTE_DIR)" && tar -xzf "$(LOCAL_K8S_REMOTE_ARCHIVE)" -C "$(LOCAL_K8S_REMOTE_DIR)"'
+
+wsl-local-k8s-apply: wsl-upload-k8s
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m shell -a 'KUBECONFIG=/etc/kubernetes/admin.conf kubectl apply -k "$(LOCAL_K8S_REMOTE_DIR)/k8s/overlays/local/all"'
+
+wsl-local-k8s-deps-apply: wsl-upload-k8s
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m shell -a 'KUBECONFIG=/etc/kubernetes/admin.conf kubectl apply -k "$(LOCAL_K8S_REMOTE_DIR)/k8s/overlays/local/deps"'
+
+wsl-local-k8s-app-apply: wsl-upload-k8s
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m shell -a 'KUBECONFIG=/etc/kubernetes/admin.conf kubectl apply -k "$(LOCAL_K8S_REMOTE_DIR)/k8s/overlays/local/apps"'
+
+wsl-local-k8s-deps-verify:
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m copy -a "src=scripts/verify-local-k8s-deps.sh dest=/tmp/cloudnative-verify-local-k8s-deps.sh mode=0755"
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m shell -a 'KUBECONFIG=/etc/kubernetes/admin.conf LOCAL_K8S_WAIT_TIMEOUT="$(LOCAL_K8S_WAIT_TIMEOUT)" DEPENDENCY_ROLLOUT_TARGETS="$(DEPENDENCY_ROLLOUT_TARGETS)" /tmp/cloudnative-verify-local-k8s-deps.sh'
+
+wsl-local-k8s-app-verify:
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m copy -a "src=scripts/verify-local-k8s-apps.sh dest=/tmp/cloudnative-verify-local-k8s-apps.sh mode=0755"
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m shell -a 'KUBECONFIG=/etc/kubernetes/admin.conf LOCAL_K8S_WAIT_TIMEOUT="$(LOCAL_K8S_WAIT_TIMEOUT)" APP_ROLLOUT_TARGETS="$(APP_ROLLOUT_TARGETS)" /tmp/cloudnative-verify-local-k8s-apps.sh'
+
+wsl-local-k8s-verify: wsl-local-k8s-app-verify
+
+wsl-local-k8s-pods:
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m shell -a 'KUBECONFIG=/etc/kubernetes/admin.conf kubectl get pods -A -o wide'
+
+wsl-local-k8s-app-pods:
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m shell -a 'KUBECONFIG=/etc/kubernetes/admin.conf kubectl get pods -A -o wide'
+
+wsl-local-k8s-app-services:
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m shell -a 'KUBECONFIG=/etc/kubernetes/admin.conf kubectl get svc -A'
+
+wsl-local-k8s-status:
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m copy -a "src=scripts/show-local-k8s-status.sh dest=/tmp/cloudnative-show-local-k8s-status.sh mode=0755"
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m shell -a 'KUBECONFIG=/etc/kubernetes/admin.conf APP_STATUS_NAMESPACES="$(APP_STATUS_NAMESPACES)" /tmp/cloudnative-show-local-k8s-status.sh'
+
+wsl-local-k8s-node-top:
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m shell -a 'KUBECONFIG=/etc/kubernetes/admin.conf kubectl top nodes'
+
+wsl-local-k8s-app-top:
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m shell -a 'KUBECONFIG=/etc/kubernetes/admin.conf kubectl top pods -A --containers'
+
+wsl-local-k8s-top: wsl-local-k8s-node-top wsl-local-k8s-app-top
+
+wsl-kong-bootstrap:
+	$(MAKE) ANSIBLE_INVENTORY="$(WSL_ANSIBLE_INVENTORY)" helm-bootstrap
+	$(MAKE) wsl-upload-k8s
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m shell -a 'KUBECONFIG=/etc/kubernetes/admin.conf helm repo add kong https://charts.konghq.com || true'
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m shell -a 'KUBECONFIG=/etc/kubernetes/admin.conf helm repo update'
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m shell -a 'KUBECONFIG=/etc/kubernetes/admin.conf kubectl create namespace kong --dry-run=client -o yaml | KUBECONFIG=/etc/kubernetes/admin.conf kubectl apply -f -'
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m shell -a 'KUBECONFIG=/etc/kubernetes/admin.conf helm upgrade --install kong kong/ingress --namespace kong --values "$(LOCAL_K8S_REMOTE_DIR)/k8s/kong/values.yaml"'
+
+wsl-kong-verify:
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m shell -a 'KUBECONFIG=/etc/kubernetes/admin.conf kubectl -n kong rollout status deployment/kong-controller --timeout="$(LOCAL_K8S_WAIT_TIMEOUT)"'
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m shell -a 'KUBECONFIG=/etc/kubernetes/admin.conf kubectl -n kong rollout status deployment/kong-gateway --timeout="$(LOCAL_K8S_WAIT_TIMEOUT)"'
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m shell -a 'KUBECONFIG=/etc/kubernetes/admin.conf kubectl -n kong get pods -o wide'
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m shell -a 'KUBECONFIG=/etc/kubernetes/admin.conf kubectl -n kong get svc'
+
+wsl-local-k8s-crud-smoke:
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m copy -a "src=scripts/local-k8s-crud-smoke.sh dest=/tmp/cloudnative-local-k8s-crud-smoke.sh mode=0755"
+	ansible $(ANSIBLE_FLAGS) -i $(WSL_ANSIBLE_INVENTORY) kube_control_plane -b -m shell -a 'KUBECONFIG=/etc/kubernetes/admin.conf LOCAL_API_GATEWAY_URL="$(LOCAL_API_GATEWAY_URL)" /tmp/cloudnative-local-k8s-crud-smoke.sh'
+
+wsl-local-k8s-deploy:
+	$(MAKE) IMAGE_TAG="$(IMAGE_TAG)" app-images-push
+	$(MAKE) IMAGE_TAG="$(IMAGE_TAG)" local-kustomize-tag
+	$(MAKE) IMAGE_TAG="$(IMAGE_TAG)" ANSIBLE_INVENTORY="$(WSL_ANSIBLE_INVENTORY)" registry-pull-verify
+	$(MAKE) wsl-local-k8s-app-apply
+	$(MAKE) wsl-local-k8s-app-verify
+	$(MAKE) wsl-local-k8s-status
+	$(MAKE) wsl-local-k8s-top
+
 clean:
-	rm -f $(ANSIBLE_INVENTORY)
+	rm -f $(ANSIBLE_INVENTORY) $(WSL_ANSIBLE_INVENTORY)
