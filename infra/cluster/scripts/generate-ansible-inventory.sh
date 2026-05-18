@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-inventory_path="${1:-provision/ansible/inventory.ini}"
 provider_dir="${2:-providers/local-vagrant}"
 cluster_dir="$PWD"
 
@@ -15,6 +14,7 @@ if [[ -f .env ]]; then
 fi
 
 cluster_topology="${CLUSTER_TOPOLOGY:-compact}"
+inventory_path="${1:-provision/ansible/inventories/local-vagrant/${cluster_topology}.ini}"
 vagrant_provider="${LOCAL_VAGRANT_PROVIDER:-vmware_desktop}"
 topology_file="topologies/${cluster_topology}/nodes.yml"
 

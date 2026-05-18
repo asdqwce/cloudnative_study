@@ -3,7 +3,8 @@ set -euo pipefail
 
 registry="${LOCAL_REGISTRY:-10.10.10.10:5000}"
 registry_host="${LOCAL_REGISTRY_HOST:-10.10.10.10}"
-inventory_path="${ANSIBLE_INVENTORY:-provision/ansible/inventory.ini}"
+cluster_topology="${CLUSTER_TOPOLOGY:-compact}"
+inventory_path="${ANSIBLE_INVENTORY:-provision/ansible/inventories/local-vagrant/${cluster_topology}.ini}"
 cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/cloudnative-study/infra-cluster"
 cache_ca="${cache_dir}/${registry}-ca.crt"
 

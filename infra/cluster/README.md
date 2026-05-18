@@ -51,7 +51,13 @@ infra/cluster/
 │     └─ README.md
 ├─ provision/
 │  └─ ansible/
-│     ├─ inventory.ini
+│     ├─ inventories/
+│     │  ├─ local-vagrant/
+│     │  │  ├─ compact.ini
+│     │  │  ├─ balanced.ini
+│     │  │  └─ role-separated.ini
+│     │  └─ aws/
+│     │     └─ dev.ini
 │     ├─ group_vars/
 │     │  └─ all.yml
 │     └─ playbooks/
@@ -178,7 +184,9 @@ Apple Silicon Mac은 VMware Fusion에서 사용할 수 있는 ARM64 Ubuntu Vagra
 
 이 프로젝트는 비밀번호를 Git에 커밋하지 않습니다.
 
-`provision/ansible/inventory.ini`에는 SSH private key의 경로만 들어갑니다. `make local-inventory`가 Vagrant SSH 설정을 읽어 로컬 환경에 맞게 생성합니다. 실제 private key 파일은 Vagrant가 로컬에 생성하며 `.gitignore`로 제외됩니다.
+Inventory는 provider별로 분리합니다. VMware/Vagrant 로컬 클러스터는 `provision/ansible/inventories/local-vagrant/<topology>.ini`를 사용하고, AWS DEV 클러스터는 `provision/ansible/inventories/aws/dev.ini`를 사용합니다.
+
+로컬 Vagrant inventory에는 SSH private key의 경로만 들어갑니다. `make local-inventory`가 선택된 topology의 Vagrant SSH 설정을 읽어 `provision/ansible/inventories/local-vagrant/<topology>.ini`를 다시 생성합니다. 실제 private key 파일은 Vagrant가 로컬에 생성하며 `.gitignore`로 제외됩니다.
 
 ```text
 providers/local-vagrant/.vagrant/
@@ -187,7 +195,8 @@ providers/local-vagrant/.vagrant/
 따라서 Git에는 다음을 올립니다.
 
 ```text
-provision/ansible/inventory.ini
+provision/ansible/inventories/local-vagrant/*.ini
+provision/ansible/inventories/aws/*.ini
 ```
 
 Git에 올리지 않습니다.

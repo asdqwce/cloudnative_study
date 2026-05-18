@@ -6,10 +6,10 @@
 
 ```text
 로컬:
-Vagrant + VMware Fusion -> inventory.local.ini -> Ansible
+Vagrant + VMware Fusion -> provision/ansible/inventories/local-vagrant/<topology>.ini -> Ansible
 
 클라우드:
-Terraform + VM -> inventory.cloud.ini -> Ansible
+Terraform + VM -> provision/ansible/inventories/aws/<env>.ini -> Ansible
 ```
 
 Provider는 VM을 만들고 Ansible inventory를 제공한다. Ansible playbook은 provider와 무관하게 같은 서버 초기 설정을 수행한다.

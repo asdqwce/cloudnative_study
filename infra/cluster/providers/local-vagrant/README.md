@@ -190,7 +190,7 @@ chmod 600 ~/.ssh/cloudnative-vagrant/worker-2
 
 `balanced` topology에서는 생성된 VM 이름에 맞춰 `platform-1`, `app-1`, `data-1` key도 같은 방식으로 복사합니다. `role-separated` topology에서는 `platform-1`, `app-a-1`, `app-b-1`, `postgres-1`, `kafka-1` key도 복사합니다. 일반적으로는 `make local-inventory`가 Vagrant SSH 설정을 읽어 inventory를 다시 생성하므로, 수동 복사는 WSL private key 권한 문제가 있을 때만 필요합니다.
 
-그 다음 `infra/cluster/provision/ansible/inventory.ini`의 `ansible_ssh_private_key_file` 값을 WSL 홈 경로로 맞춥니다.
+그 다음 선택한 topology의 inventory 파일에서 `ansible_ssh_private_key_file` 값을 WSL 홈 경로로 맞춥니다. 예를 들어 `balanced` topology라면 `infra/cluster/provision/ansible/inventories/local-vagrant/balanced.ini`를 수정합니다.
 
 ```ini
 ansible_ssh_private_key_file=~/.ssh/cloudnative-vagrant/control-plane-1
@@ -204,7 +204,7 @@ WSL 또는 macOS Terminal에서 실행합니다.
 
 ```bash
 cd /mnt/d/develop/cloudnative_study/infra/cluster
-ansible -i provision/ansible/inventory.ini all -m ping
+ansible -i provision/ansible/inventories/local-vagrant/compact.ini all -m ping
 ```
 
 성공 예시:
