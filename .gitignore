@@ -25,6 +25,9 @@ local.properties
 
 __pycache__/
 *.py[cod]
+*.db
+*.sqlite
+*.sqlite3
 
 # CDT-specific (C/C++ Development Tooling)
 .cproject
