@@ -8,12 +8,16 @@ VENV_BOOTSTRAP_PYTHON ?= python3.13
 VENV_PYTHON := $(CURDIR)/$(VENV_DIR)/bin/python
 TEST_RUNNER_IMAGE ?= medical-platform-python-test-runner:local
 PYTEST_ARGS ?= -q -s -p no:cacheprovider
+DOCKER_COMPOSE ?= docker compose
+E2E_COMPOSE_FILE ?= tests/e2e/docker-compose.yml
+E2E_COMPOSE_PROJECT ?= medical-platform-e2e
+E2E_NETWORK ?= $(E2E_COMPOSE_PROJECT)_default
 CURL_IMAGE ?= curlimages/curl:8.7.1
 NEWMAN_IMAGE ?= postman/newman:6-alpine
-E2E_BASE_URL ?= http://10.10.10.240
-STAFF_TOKEN ?=
-PATIENT_TOKEN ?=
-DOCTOR_TOKEN ?=
+E2E_PATIENT_SERVICE_URL ?= http://patient-service:8081
+E2E_APPOINTMENT_SERVICE_URL ?= http://appointment-service:8082
+E2E_PRESCRIPTION_SERVICE_URL ?= http://prescription-service:8083
+E2E_NOTIFICATION_SERVICE_URL ?= http://notification-service:8084
 
 INFRA_CLUSTER_DIR ?= infra/cluster
 INFRA_MAKE := $(MAKE) -C $(INFRA_CLUSTER_DIR)
@@ -35,7 +39,7 @@ INFRA_TARGETS := \
 	app-images-build app-images-push local-kustomize-tag third-party-images-push local-k8s-render local-k8s-apply local-k8s-deps-prepare local-k8s-deps-apply local-k8s-app-apply local-k8s-app-stop local-k8s-app-pods-delete local-k8s-deps-verify local-k8s-app-verify local-k8s-verify local-k8s-pods local-k8s-app-pods local-k8s-app-services local-k8s-status local-k8s-node-top local-k8s-app-top local-k8s-top local-k8s-crud-smoke local-k8s-deploy \
 	wsl-local-ssh-keys-sync wsl-local-inventory wsl-bootstrap-after-vagrant wsl-local-k8s-bootstrap wsl-metallb-bootstrap wsl-metallb-verify wsl-upload-k8s wsl-kong-bootstrap wsl-kong-verify wsl-local-k8s-apply wsl-local-k8s-deps-apply wsl-local-k8s-app-apply wsl-local-k8s-deps-verify wsl-local-k8s-app-verify wsl-local-k8s-verify wsl-local-k8s-pods wsl-local-k8s-app-pods wsl-local-k8s-app-services wsl-local-k8s-status wsl-local-k8s-node-top wsl-local-k8s-app-top wsl-local-k8s-top wsl-local-k8s-crud-smoke wsl-local-k8s-deploy
 
-.PHONY: help list install activate test-runner-build test-unit test test-all test-e2e e2e-wait e2e-newman $(INFRA_TARGETS)
+.PHONY: help list install activate test-runner-build test-unit test test-all test-e2e e2e-up e2e-wait e2e-newman e2e-down $(INFRA_TARGETS)
 
 help:
 	@printf '%s\n' 'Medical Platform commands'
@@ -49,10 +53,12 @@ help:
 	@printf '%s\n' '테스트'
 	@printf '  %-28s %s\n' 'make test-unit' 'Docker Python 러너에서 FastAPI 서비스 pytest를 실행합니다.'
 	@printf '  %-28s %s\n' 'make test' 'make test-unit과 같은 기본 테스트입니다.'
-	@printf '  %-28s %s\n' 'make test-all' '단위 테스트와 Kong E2E 테스트를 실행합니다.'
-	@printf '  %-28s %s\n' 'make test-e2e' 'Docker Newman 컨테이너로 Kong Gateway E2E 테스트를 실행합니다.'
-	@printf '  %-28s %s\n' 'make e2e-wait' 'Docker curl 컨테이너로 Kong route 준비 상태를 확인합니다.'
-	@printf '  %-28s %s\n' 'make e2e-newman' 'Docker Newman 컨테이너로 실행 중인 Kong Gateway에 collection을 실행합니다.'
+	@printf '  %-28s %s\n' 'make test-all' '단위 테스트와 Docker Compose E2E 테스트를 실행합니다.'
+	@printf '  %-28s %s\n' 'make test-e2e' 'Docker Compose에서 PostgreSQL/Kafka 기반 E2E 시나리오를 실행합니다.'
+	@printf '  %-28s %s\n' 'make e2e-up' 'E2E Docker Compose stack을 시작합니다.'
+	@printf '  %-28s %s\n' 'make e2e-wait' 'Docker curl 컨테이너로 E2E 서비스 준비 상태를 확인합니다.'
+	@printf '  %-28s %s\n' 'make e2e-newman' 'Docker Newman 컨테이너로 E2E collection을 실행합니다.'
+	@printf '  %-28s %s\n' 'make e2e-down' 'E2E Docker Compose stack을 정리합니다.'
 	@printf '%s\n' ''
 	@printf '%s\n' '로컬 k8s 환경 설치'
 	@printf '  %-28s %s\n' 'make local-k8s-bootstrap' 'VM, Kubernetes, registry, Metrics Server, 앱 의존성을 준비합니다.'
@@ -127,21 +133,41 @@ test: test-unit
 
 test-all: test-unit test-e2e
 
-test-e2e: e2e-wait e2e-newman
+test-e2e:
+	@set -e; \
+	trap '$(DOCKER_COMPOSE) -p $(E2E_COMPOSE_PROJECT) -f $(E2E_COMPOSE_FILE) down -v --remove-orphans' EXIT INT TERM; \
+	$(MAKE) e2e-up; \
+	$(MAKE) e2e-wait; \
+	$(MAKE) e2e-newman
+
+e2e-up:
+	$(DOCKER_COMPOSE) -p $(E2E_COMPOSE_PROJECT) -f $(E2E_COMPOSE_FILE) up -d --build
 
 e2e-wait:
-	docker run --rm -v "$(CURDIR)/tests/e2e/scripts":/scripts:ro -e E2E_BASE_URL="$(E2E_BASE_URL)" -e E2E_WAIT_TIMEOUT_SECONDS -e E2E_WAIT_SLEEP_SECONDS $(CURL_IMAGE) sh /scripts/wait-for-services.sh
+	docker run --rm --network $(E2E_NETWORK) \
+		-v "$(CURDIR)/tests/e2e/scripts":/scripts:ro \
+		-e E2E_PATIENT_SERVICE_URL="$(E2E_PATIENT_SERVICE_URL)" \
+		-e E2E_APPOINTMENT_SERVICE_URL="$(E2E_APPOINTMENT_SERVICE_URL)" \
+		-e E2E_PRESCRIPTION_SERVICE_URL="$(E2E_PRESCRIPTION_SERVICE_URL)" \
+		-e E2E_NOTIFICATION_SERVICE_URL="$(E2E_NOTIFICATION_SERVICE_URL)" \
+		-e E2E_WAIT_TIMEOUT_SECONDS \
+		-e E2E_WAIT_SLEEP_SECONDS \
+		$(CURL_IMAGE) sh /scripts/wait-for-services.sh
 
 e2e-newman:
 	mkdir -p tests/e2e/newman/reports
-	docker run --rm -v "$(CURDIR)/tests/e2e":/etc/newman -w /etc/newman $(NEWMAN_IMAGE) run postman/medical-platform.postman_collection.json \
+	docker run --rm --network $(E2E_NETWORK) -v "$(CURDIR)/tests/e2e":/etc/newman -w /etc/newman $(NEWMAN_IMAGE) run postman/medical-platform.postman_collection.json \
 		-e newman/docker.postman_environment.json \
-		--env-var baseUrl="$(E2E_BASE_URL)" \
-		--env-var staffToken="$(STAFF_TOKEN)" \
-		--env-var patientToken="$(PATIENT_TOKEN)" \
-		--env-var doctorToken="$(DOCTOR_TOKEN)" \
+		--env-var patientServiceUrl="$(E2E_PATIENT_SERVICE_URL)" \
+		--env-var appointmentServiceUrl="$(E2E_APPOINTMENT_SERVICE_URL)" \
+		--env-var prescriptionServiceUrl="$(E2E_PRESCRIPTION_SERVICE_URL)" \
+		--env-var notificationServiceUrl="$(E2E_NOTIFICATION_SERVICE_URL)" \
 		--reporters cli,junit \
+		--delay-request 1000 \
 		--reporter-junit-export newman/reports/e2e.xml
+
+e2e-down:
+	$(DOCKER_COMPOSE) -p $(E2E_COMPOSE_PROJECT) -f $(E2E_COMPOSE_FILE) down -v --remove-orphans
 
 $(INFRA_TARGETS):
 	$(INFRA_MAKE) $@

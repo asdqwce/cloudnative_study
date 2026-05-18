@@ -1,6 +1,6 @@
 # 테스트 실행 가이드
 
-이 프로젝트의 테스트 진입점은 루트 `Makefile`이다. 개발자 로컬에는 Docker와 Make를 준비하고, Python pytest, curl, Newman 실행은 컨테이너 안에서 수행한다.
+이 프로젝트의 테스트 진입점은 루트 `Makefile`이다. 개발자 로컬에는 Docker, Docker Compose, Make를 준비하고, Python pytest, curl, Newman 실행은 컨테이너 안에서 수행한다.
 
 업무 흐름을 사람이 직접 검증하거나 장애를 주입해 확인하는 절차는 [project_docs/SCENARIO_TEST_GUIDE.md](../project_docs/SCENARIO_TEST_GUIDE.md)에 정리한다.
 
@@ -9,8 +9,8 @@
 | 구분 | 도구 | 대상 |
 | --- | --- | --- |
 | 단위 테스트 | Docker Python pytest 러너 | `auth-service`, `patient-service`, `appointment-service`, `prescription-service`, `notification-service` |
-| E2E 테스트 | Docker curl/Newman 컨테이너 | Kong Gateway를 통한 환자 생성, 예약, 처방, 알림 흐름 |
-| 후순위 통합 테스트 | `testcontainers-python` | PostgreSQL, Kafka 실제 컨테이너 기반 테스트 |
+| E2E 테스트 | Docker Compose, PostgreSQL, Kafka, Docker curl/Newman 컨테이너 | 서비스 DNS 직접 호출로 환자 생성, 예약 확정, 이벤트 발행/소비, 알림 저장, 처방 발행 흐름 |
+| Gateway E2E | 별도 future scope | Kong/JWT/Ingress 라우팅과 MetalLB 노출 검증 |
 
 ## 폴더 구조
 
@@ -19,8 +19,11 @@ tests/
   docker/
     Dockerfile
   e2e/
+    docker-compose.yml
     postman/
       medical-platform.postman_collection.json
+    postgres-init/
+      01-create-databases.sql
     newman/
       docker.postman_environment.json
     scripts/
@@ -46,42 +49,62 @@ make test-unit
 
 ## E2E 테스트 흐름
 
-Newman 컬렉션은 Kong Gateway 기준으로 다음 흐름을 검증한다.
+Newman 컬렉션은 Docker Compose 네트워크 DNS로 각 서비스를 직접 호출해 다음 흐름을 검증한다. Kong/JWT/Ingress는 기본 `make test-e2e` 범위가 아니며, 서비스가 기대하는 `X-User-*` 헤더를 요청에 직접 넣는다.
 
-1. `STAFF` 토큰으로 `POST /patients`를 호출해 환자를 생성한다.
-2. `PATIENT` 토큰으로 `POST /appointments`를 호출해 예약을 요청한다.
-3. `DOCTOR` 토큰으로 `POST /appointments/{appointmentId}/confirm`을 호출해 예약을 확정한다.
+1. `STAFF` 사용자 헤더로 `patient-service`의 `POST /patients`를 호출해 환자를 생성한다.
+2. `PATIENT` 사용자 헤더로 `appointment-service`의 `POST /appointments`를 호출해 예약을 요청한다.
+3. `DOCTOR` 사용자 헤더로 `POST /appointments/{appointmentId}/confirm`을 호출해 예약을 확정한다.
 4. 예약 확정 이벤트가 `appointment-confirmed` 토픽으로 발행되고 `notification-service`가 알림을 저장한다.
-5. `DOCTOR` 토큰으로 `POST /prescriptions`를 호출해 처방을 발행한다.
+5. `DOCTOR` 사용자 헤더로 `prescription-service`의 `POST /prescriptions`를 호출해 처방을 발행한다.
 6. 처방 발행 이벤트가 `prescription-issued` 토픽으로 발행되고 `notification-service`가 알림을 저장한다.
-7. `PATIENT` 토큰으로 `GET /notifications`, `GET /prescriptions`를 호출해 본인 데이터만 조회되는지 확인한다.
+7. `PATIENT` 사용자 헤더로 `GET /notifications`, `GET /prescriptions`를 호출해 본인 데이터가 조회되는지 확인한다.
 
 ## 로컬 E2E 실행
 
-Kubernetes, MetalLB, Kong이 먼저 올라와 있어야 한다. 기본 base URL은 MetalLB가 Kong에 할당하는 `http://10.10.10.240`이다.
+`make test-e2e`는 Docker Compose로 PostgreSQL, Kafka, FastAPI 서비스를 띄운 뒤 같은 Compose 네트워크에서 Newman을 실행한다. 서비스 URL은 Compose DNS 이름을 사용한다.
 
 ```bash
-eval "$(python3 k8s/kong/scripts/generate-demo-jwts.py)"
-make test-e2e E2E_BASE_URL=http://10.10.10.240 STAFF_TOKEN="$STAFF_TOKEN" PATIENT_TOKEN="$PATIENT_TOKEN" DOCTOR_TOKEN="$DOCTOR_TOKEN"
+make test-e2e
 ```
 
-`tests/e2e/scripts/wait-for-services.sh`는 Docker curl 컨테이너 안에서 실행된다. Newman 컬렉션도 Docker Newman 컨테이너 안에서 실행되므로 로컬에 curl이나 newman을 따로 설치하지 않는다. 업무 API는 JWT가 없으면 `401`이 나올 수 있고, 이 응답도 라우팅 확인에는 정상으로 본다.
+기본 URL은 다음과 같다.
+
+| 서비스 | 기본 URL |
+| --- | --- |
+| `patient-service` | `http://patient-service:8081` |
+| `appointment-service` | `http://appointment-service:8082` |
+| `prescription-service` | `http://prescription-service:8083` |
+| `notification-service` | `http://notification-service:8084` |
+
+`tests/e2e/scripts/wait-for-services.sh`는 Docker curl 컨테이너 안에서 실행된다. Newman 컬렉션도 Docker Newman 컨테이너 안에서 실행되므로 로컬에 curl이나 newman을 따로 설치하지 않는다.
+
+수동으로 stack을 살펴보려면 다음 명령을 사용한다.
+
+```bash
+make e2e-up
+make e2e-wait
+make e2e-newman
+make e2e-down
+```
 
 ## CI
 
-`.github/workflows/ci.yml`은 Python 3.12 matrix로 네 개 서비스를 각각 테스트한다.
+`.github/workflows/ci.yml`은 `make test-unit`을 실행해 Docker Python 테스트 러너에서 서비스 pytest를 실행한다.
 
-`.github/workflows/e2e.yml`은 수동 실행 workflow다. 실행 시 Kong base URL을 입력하고, workflow 내부에서 demo JWT를 생성해 Newman에 전달한다.
+`.github/workflows/e2e.yml`은 수동 실행 workflow다. GitHub runner 안에서 `make test-e2e`를 실행해 Docker Compose 기반 PostgreSQL/Kafka E2E stack과 Newman을 함께 실행한다.
+
+Kong/JWT/Ingress 검증은 기본 E2E와 분리한다. 이후 필요해지면 `make test-gateway-e2e` 같은 별도 타깃에서 MetalLB IP 또는 Ingress 주소, JWT 생성, Gateway 라우팅 검증을 다룬다.
 
 ## 실패 시 점검 포인트
 
 | 증상 | 점검 |
 | --- | --- |
 | Docker build 실패 | Docker Desktop/Engine 실행 상태 확인 |
+| `docker compose` 실패 | Docker Compose plugin 설치 여부 확인 |
 | pytest import 실패 | `make test-unit`로 Docker 테스트 러너를 통해 실행했는지 확인 |
 | DB 연결 실패 | `DATABASE_URL` 값과 PostgreSQL 실행 상태 확인 |
-| Kafka 이벤트 검증 실패 | `kafka.medical-messaging.svc.cluster.local:9092`, topic 생성 job, consumer group 로그 확인 |
-| Newman 401 | 토큰 생성 스크립트와 Authorization 헤더 확인 |
-| Newman 403 | 토큰 role, `patientId`, `doctorId` claim과 요청 데이터 확인 |
-| Newman 404 | Kong Ingress path와 서비스 API path 확인 |
-| Newman readiness timeout | Kong proxy 주소와 `kubectl get ingress -A` 결과 확인 |
+| Kafka 이벤트 검증 실패 | Compose `kafka:29092`, topic auto-create, `notification-service` consumer 로그 확인 |
+| Newman 401 | `X-User-Id`, `X-User-Role` 헤더 누락 여부 확인 |
+| Newman 403 | `X-Patient-Id`, `X-Doctor-Id`와 요청 데이터의 권한 관계 확인 |
+| Newman 404 | 서비스 URL과 API path 확인 |
+| Newman readiness timeout | `docker compose -p medical-platform-e2e -f tests/e2e/docker-compose.yml ps`와 각 서비스 로그 확인 |

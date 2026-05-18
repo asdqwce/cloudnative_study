@@ -17,31 +17,12 @@ concurrency:
 
 jobs:
   pytest:
-    name: pytest (${{ matrix.service }})
+    name: Docker pytest
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        service:
-          - patient-service
-          - appointment-service
-          - prescription-service
-          - notification-service
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r services/${{ matrix.service }}/requirements.txt
-
-      - name: Run pytest
-        working-directory: services/${{ matrix.service }}
-        run: PYTHONPATH=. python -m pytest -q -s
+      - name: Run unit tests in Docker
+        run: make test-unit

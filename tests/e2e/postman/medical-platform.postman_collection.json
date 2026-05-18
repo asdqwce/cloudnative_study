@@ -1,7 +1,7 @@
 {
   "info": {
     "_postman_id": "64a8820f-2a82-4f02-bfc2-900ea3f78f38",
-    "name": "MediKong Gateway E2E",
+    "name": "Medical Platform Docker E2E",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -15,15 +15,19 @@
             "value": "application/json"
           },
           {
-            "key": "Authorization",
-            "value": "Bearer {{staffToken}}"
+            "key": "X-User-Id",
+            "value": "staff-1"
+          },
+          {
+            "key": "X-User-Role",
+            "value": "STAFF"
           }
         ],
         "body": {
           "mode": "raw",
           "raw": "{\"name\":\"E2E Patient\",\"birthDate\":\"1990-01-01\",\"gender\":\"F\",\"contact\":\"010-0000-0000\",\"primaryDoctorId\":10,\"allergies\":\"none\",\"medicationWarnings\":\"none\"}"
         },
-        "url": "{{baseUrl}}/patients"
+        "url": "{{patientServiceUrl}}/patients"
       },
       "event": [
         {
@@ -52,15 +56,23 @@
             "value": "application/json"
           },
           {
-            "key": "Authorization",
-            "value": "Bearer {{patientToken}}"
+            "key": "X-User-Id",
+            "value": "patient-{{patientId}}"
+          },
+          {
+            "key": "X-User-Role",
+            "value": "PATIENT"
+          },
+          {
+            "key": "X-Patient-Id",
+            "value": "{{patientId}}"
           }
         ],
         "body": {
           "mode": "raw",
           "raw": "{\"patientId\":{{patientId}},\"doctorId\":10,\"appointmentAt\":\"2026-05-20T10:00:00\",\"reason\":\"headache\"}"
         },
-        "url": "{{baseUrl}}/appointments"
+        "url": "{{appointmentServiceUrl}}/appointments"
       },
       "event": [
         {
@@ -85,11 +97,19 @@
         "method": "POST",
         "header": [
           {
-            "key": "Authorization",
-            "value": "Bearer {{doctorToken}}"
+            "key": "X-User-Id",
+            "value": "doctor-10"
+          },
+          {
+            "key": "X-User-Role",
+            "value": "DOCTOR"
+          },
+          {
+            "key": "X-Doctor-Id",
+            "value": "10"
           }
         ],
-        "url": "{{baseUrl}}/appointments/{{appointmentId}}/confirm"
+        "url": "{{appointmentServiceUrl}}/appointments/{{appointmentId}}/confirm"
       },
       "event": [
         {
@@ -107,6 +127,57 @@
       ]
     },
     {
+      "name": "Wait for appointment notification",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-User-Id",
+            "value": "patient-{{patientId}}"
+          },
+          {
+            "key": "X-User-Role",
+            "value": "PATIENT"
+          },
+          {
+            "key": "X-Patient-Id",
+            "value": "{{patientId}}"
+          }
+        ],
+        "url": "{{notificationServiceUrl}}/notifications"
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const attempts = Number(pm.environment.get('appointmentNotificationAttempts') || '0');",
+              "pm.environment.set('appointmentNotificationAttempts', String(attempts + 1));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('appointment-confirmed notification is stored', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  const notification = body.find((item) => item.type === 'appointment-confirmed' && item.sourceId === Number(pm.environment.get('appointmentId')));",
+              "  if (!notification && Number(pm.environment.get('appointmentNotificationAttempts')) < 12) {",
+              "    postman.setNextRequest('Wait for appointment notification');",
+              "    return;",
+              "  }",
+              "  pm.expect(notification, 'appointment-confirmed notification').to.exist;",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "Issue prescription as doctor",
       "request": {
         "method": "POST",
@@ -116,15 +187,23 @@
             "value": "application/json"
           },
           {
-            "key": "Authorization",
-            "value": "Bearer {{doctorToken}}"
+            "key": "X-User-Id",
+            "value": "doctor-10"
+          },
+          {
+            "key": "X-User-Role",
+            "value": "DOCTOR"
+          },
+          {
+            "key": "X-Doctor-Id",
+            "value": "10"
           }
         ],
         "body": {
           "mode": "raw",
           "raw": "{\"patientId\":{{patientId}},\"doctorId\":10,\"medicationName\":\"Amoxicillin\",\"dosage\":\"500mg\",\"instructions\":\"after meals\"}"
         },
-        "url": "{{baseUrl}}/prescriptions"
+        "url": "{{prescriptionServiceUrl}}/prescriptions"
       },
       "event": [
         {
@@ -136,6 +215,8 @@
               "  pm.response.to.have.status(200);",
               "  const body = pm.response.json();",
               "  pm.expect(body.patientId).to.eql(Number(pm.environment.get('patientId')));",
+              "  pm.expect(body.patientSnapshotAvailable).to.eql(true);",
+              "  pm.environment.set('prescriptionId', String(body.id));",
               "});"
             ]
           }
@@ -143,26 +224,50 @@
       ]
     },
     {
-      "name": "List notifications as patient",
+      "name": "Wait for prescription notification",
       "request": {
         "method": "GET",
         "header": [
           {
-            "key": "Authorization",
-            "value": "Bearer {{patientToken}}"
+            "key": "X-User-Id",
+            "value": "patient-{{patientId}}"
+          },
+          {
+            "key": "X-User-Role",
+            "value": "PATIENT"
+          },
+          {
+            "key": "X-Patient-Id",
+            "value": "{{patientId}}"
           }
         ],
-        "url": "{{baseUrl}}/notifications"
+        "url": "{{notificationServiceUrl}}/notifications"
       },
       "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const attempts = Number(pm.environment.get('prescriptionNotificationAttempts') || '0');",
+              "pm.environment.set('prescriptionNotificationAttempts', String(attempts + 1));"
+            ]
+          }
+        },
         {
           "listen": "test",
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test('notifications endpoint is available', function () {",
+              "pm.test('prescription-issued notification is stored', function () {",
               "  pm.response.to.have.status(200);",
-              "  pm.expect(pm.response.json()).to.be.an('array');",
+              "  const body = pm.response.json();",
+              "  const notification = body.find((item) => item.type === 'prescription-issued' && item.sourceId === Number(pm.environment.get('prescriptionId')));",
+              "  if (!notification && Number(pm.environment.get('prescriptionNotificationAttempts')) < 12) {",
+              "    postman.setNextRequest('Wait for prescription notification');",
+              "    return;",
+              "  }",
+              "  pm.expect(notification, 'prescription-issued notification').to.exist;",
               "});"
             ]
           }
@@ -175,11 +280,19 @@
         "method": "GET",
         "header": [
           {
-            "key": "Authorization",
-            "value": "Bearer {{patientToken}}"
+            "key": "X-User-Id",
+            "value": "patient-{{patientId}}"
+          },
+          {
+            "key": "X-User-Role",
+            "value": "PATIENT"
+          },
+          {
+            "key": "X-Patient-Id",
+            "value": "{{patientId}}"
           }
         ],
-        "url": "{{baseUrl}}/prescriptions"
+        "url": "{{prescriptionServiceUrl}}/prescriptions"
       },
       "event": [
         {
@@ -189,7 +302,9 @@
             "exec": [
               "pm.test('patient prescriptions are returned', function () {",
               "  pm.response.to.have.status(200);",
-              "  pm.expect(pm.response.json()).to.be.an('array');",
+              "  const body = pm.response.json();",
+              "  pm.expect(body).to.be.an('array');",
+              "  pm.expect(body.some((item) => item.id === Number(pm.environment.get('prescriptionId')))).to.eql(true);",
               "});"
             ]
           }
