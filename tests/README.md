@@ -1,6 +1,6 @@
 # 테스트 실행 가이드
 
-이 프로젝트의 테스트 기준은 FastAPI 서비스 단위 테스트와 Kong을 통과하는 Newman E2E 테스트다. 이전 런타임과 테스트 러너 기반 경로는 제거했다.
+이 프로젝트의 테스트 진입점은 루트 `Makefile`이다. 개발자 로컬에는 Docker와 Make를 준비하고, Python pytest, curl, Newman 실행은 컨테이너 안에서 수행한다.
 
 업무 흐름을 사람이 직접 검증하거나 장애를 주입해 확인하는 절차는 [project_docs/SCENARIO_TEST_GUIDE.md](../project_docs/SCENARIO_TEST_GUIDE.md)에 정리한다.
 
@@ -8,14 +8,16 @@
 
 | 구분 | 도구 | 대상 |
 | --- | --- | --- |
-| 단위 테스트 | `pytest` | `patient-service`, `appointment-service`, `prescription-service`, `notification-service` |
-| E2E 테스트 | `newman` | Kong Gateway를 통한 환자 생성, 예약, 처방, 알림 흐름 |
+| 단위 테스트 | Docker Python pytest 러너 | `auth-service`, `patient-service`, `appointment-service`, `prescription-service`, `notification-service` |
+| E2E 테스트 | Docker curl/Newman 컨테이너 | Kong Gateway를 통한 환자 생성, 예약, 처방, 알림 흐름 |
 | 후순위 통합 테스트 | `testcontainers-python` | PostgreSQL, Kafka 실제 컨테이너 기반 테스트 |
 
 ## 폴더 구조
 
 ```text
 tests/
+  docker/
+    Dockerfile
   e2e/
     postman/
       medical-platform.postman_collection.json
@@ -36,17 +38,10 @@ services/notification-service/tests/
 
 ## 로컬 단위 테스트
 
-루트에서 전체 서비스 테스트를 실행한다.
+루트에서 전체 서비스 테스트를 실행한다. `make test-unit`은 `tests/docker/Dockerfile`로 Python 테스트 러너 이미지를 빌드한 뒤, 현재 소스 트리를 컨테이너에 마운트해 서비스별 pytest를 실행한다.
 
 ```bash
 make test-unit
-```
-
-특정 서비스만 확인할 때는 해당 서비스 디렉터리에서 실행한다.
-
-```bash
-cd services/patient-service
-PYTHONPATH=. python -m pytest -q -s
 ```
 
 ## E2E 테스트 흐름
@@ -70,7 +65,7 @@ eval "$(python3 k8s/kong/scripts/generate-demo-jwts.py)"
 make test-e2e E2E_BASE_URL=http://10.10.10.240 STAFF_TOKEN="$STAFF_TOKEN" PATIENT_TOKEN="$PATIENT_TOKEN" DOCTOR_TOKEN="$DOCTOR_TOKEN"
 ```
 
-`tests/e2e/scripts/wait-for-services.sh`는 Newman 실행 전에 Kong 라우트가 살아 있는지 확인한다. 업무 API는 JWT가 없으면 `401`이 나올 수 있고, 이 응답도 라우팅 확인에는 정상으로 본다.
+`tests/e2e/scripts/wait-for-services.sh`는 Docker curl 컨테이너 안에서 실행된다. Newman 컬렉션도 Docker Newman 컨테이너 안에서 실행되므로 로컬에 curl이나 newman을 따로 설치하지 않는다. 업무 API는 JWT가 없으면 `401`이 나올 수 있고, 이 응답도 라우팅 확인에는 정상으로 본다.
 
 ## CI
 
@@ -82,7 +77,8 @@ make test-e2e E2E_BASE_URL=http://10.10.10.240 STAFF_TOKEN="$STAFF_TOKEN" PATIEN
 
 | 증상 | 점검 |
 | --- | --- |
-| pytest import 실패 | `PYTHONPATH=.`로 실행했는지 확인 |
+| Docker build 실패 | Docker Desktop/Engine 실행 상태 확인 |
+| pytest import 실패 | `make test-unit`로 Docker 테스트 러너를 통해 실행했는지 확인 |
 | DB 연결 실패 | `DATABASE_URL` 값과 PostgreSQL 실행 상태 확인 |
 | Kafka 이벤트 검증 실패 | `kafka.medical-messaging.svc.cluster.local:9092`, topic 생성 job, consumer group 로그 확인 |
 | Newman 401 | 토큰 생성 스크립트와 Authorization 헤더 확인 |
