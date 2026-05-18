@@ -3,6 +3,8 @@
   hosts: k8s_cluster
   become: true
   gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
 
   tasks:
     - name: Check registry API from each node
@@ -19,6 +21,8 @@
   hosts: control_plane
   become: true
   gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
 
   tasks:
     - name: Query registry catalog

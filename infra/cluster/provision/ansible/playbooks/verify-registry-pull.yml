@@ -3,6 +3,8 @@
   hosts: k8s_cluster
   become: true
   gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
 
   tasks:
     - name: Fail when pull test image is not provided

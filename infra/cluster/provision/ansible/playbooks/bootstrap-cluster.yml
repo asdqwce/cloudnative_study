@@ -3,6 +3,8 @@
   hosts: k8s_cluster
   become: true
   gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
 
   tasks:
     - name: Configure kubelet to use the inventory node IP
@@ -47,6 +49,8 @@
   hosts: control_plane
   become: true
   gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
 
   tasks:
     - name: Check whether the control plane is already initialized
@@ -146,6 +150,8 @@
   hosts: workers
   become: true
   gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
 
   tasks:
     - name: Check whether worker already joined a cluster
@@ -161,6 +167,8 @@
   hosts: control_plane
   become: true
   gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
 
   tasks:
     - name: Wait until all expected nodes are registered
