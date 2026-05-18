@@ -1,2 +1,21 @@
 aws_access_key = "여기에_ACCESS_KEY_입력"
 aws_secret_key = "여기에_SECRET_KEY_입력"
+
+aws_region = "ap-northeast-2"
+
+github_repository_owner = "asdqwce"
+github_repository_name  = "cloudnative_study"
+
+# Argo CD Application targetRevision and the release branch used for deployment should stay aligned.
+github_actions_branch_pattern = "release/*"
+github_actions_role_name      = "github-actions-cloudnative-release"
+
+# Decision point: add future Kong/Python services here after their manifests and Dockerfiles land on main.
+ecr_service_repositories = [
+  "api-gateway",
+  "patient-service",
+  "appointment-service",
+  "prescription-service",
+  "notification-service",
+  "dashboard",
+]

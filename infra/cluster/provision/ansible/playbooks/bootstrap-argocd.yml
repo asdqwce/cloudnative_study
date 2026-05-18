@@ -1,0 +1,137 @@
+---
+- name: Bootstrap Argo CD on the control plane
+  hosts: control_plane
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Verify kubectl can reach the cluster
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ kubernetes_admin_conf_path }}"
+          - cluster-info
+      register: kubectl_cluster_info
+      changed_when: false
+
+    - name: Check Argo CD namespace
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ kubernetes_admin_conf_path }}"
+          - get
+          - namespace
+          - "{{ argocd_namespace }}"
+      register: argocd_namespace_check
+      changed_when: false
+      failed_when: false
+
+    - name: Create Argo CD namespace
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ kubernetes_admin_conf_path }}"
+          - create
+          - namespace
+          - "{{ argocd_namespace }}"
+      when: argocd_namespace_check.rc != 0
+
+    - name: Add Argo Helm repository
+      ansible.builtin.command:
+        argv:
+          - helm
+          - repo
+          - add
+          - "{{ argocd_chart_repo_name }}"
+          - "{{ argocd_chart_repo_url }}"
+      register: argocd_repo_add
+      changed_when: "'has been added' in argocd_repo_add.stdout"
+      failed_when:
+        - argocd_repo_add.rc != 0
+        - "'already exists' not in argocd_repo_add.stderr"
+
+    - name: Update Helm repositories
+      ansible.builtin.command:
+        argv:
+          - helm
+          - repo
+          - update
+      register: helm_repo_update
+      changed_when: "'Update Complete' in helm_repo_update.stdout"
+
+    - name: Install or upgrade Argo CD with latest configured chart
+      ansible.builtin.command:
+        argv:
+          - helm
+          - upgrade
+          - --install
+          - "{{ argocd_release_name }}"
+          - "{{ argocd_chart_ref }}"
+          - --namespace
+          - "{{ argocd_namespace }}"
+          - --create-namespace
+          - --kubeconfig
+          - "{{ kubernetes_admin_conf_path }}"
+      register: argocd_helm_install
+      changed_when: >
+        'has been installed' in argocd_helm_install.stdout or
+        'has been upgraded' in argocd_helm_install.stdout
+      when: argocd_chart_version | length == 0
+
+    - name: Install or upgrade Argo CD with pinned chart version
+      ansible.builtin.command:
+        argv:
+          - helm
+          - upgrade
+          - --install
+          - "{{ argocd_release_name }}"
+          - "{{ argocd_chart_ref }}"
+          - --namespace
+          - "{{ argocd_namespace }}"
+          - --create-namespace
+          - --kubeconfig
+          - "{{ kubernetes_admin_conf_path }}"
+          - --version
+          - "{{ argocd_chart_version }}"
+      register: argocd_helm_install_pinned
+      changed_when: >
+        'has been installed' in argocd_helm_install_pinned.stdout or
+        'has been upgraded' in argocd_helm_install_pinned.stdout
+      when: argocd_chart_version | length > 0
+
+    - name: Wait for Argo CD deployments
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ kubernetes_admin_conf_path }}"
+          - -n
+          - "{{ argocd_namespace }}"
+          - rollout
+          - status
+          - deployment
+          - "--timeout={{ argocd_rollout_timeout }}"
+      changed_when: false
+
+    - name: Copy Argo CD Application manifest
+      ansible.builtin.copy:
+        src: ../../../../../argo/application.yaml
+        dest: "{{ argocd_application_remote_path }}"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Apply Argo CD Application manifest
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ kubernetes_admin_conf_path }}"
+          - apply
+          - -f
+          - "{{ argocd_application_remote_path }}"
+      register: argocd_application_apply
+      changed_when: "'configured' in argocd_application_apply.stdout or 'created' in argocd_application_apply.stdout"

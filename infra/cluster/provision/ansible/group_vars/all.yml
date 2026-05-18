@@ -40,6 +40,14 @@ metrics_server_wait_timeout: "{{ lookup('env', 'METRICS_SERVER_WAIT_TIMEOUT') | 
 helm_version: "{{ lookup('env', 'HELM_VERSION') | default('v3.15.4', true) }}"
 helm_install_script_url: "{{ lookup('env', 'HELM_INSTALL_SCRIPT_URL') | default('https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3', true) }}"
 helm_install_script_path: /tmp/get-helm-3
+argocd_namespace: "{{ lookup('env', 'ARGOCD_NAMESPACE') | default('argocd', true) }}"
+argocd_release_name: "{{ lookup('env', 'ARGOCD_RELEASE_NAME') | default('argocd', true) }}"
+argocd_chart_repo_name: argo
+argocd_chart_repo_url: https://argoproj.github.io/argo-helm
+argocd_chart_ref: argo/argo-cd
+argocd_chart_version: "{{ lookup('env', 'ARGOCD_CHART_VERSION') | default('', true) }}"
+argocd_rollout_timeout: "{{ lookup('env', 'ARGOCD_ROLLOUT_TIMEOUT') | default('600s', true) }}"
+argocd_application_remote_path: /tmp/medical-platform-argocd-application.yaml
 
 server_base_packages:
   - apt-transport-https

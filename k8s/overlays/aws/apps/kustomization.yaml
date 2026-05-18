@@ -4,18 +4,26 @@ namespace: medical-platform
 resources:
   - ../../../base/apps
 images:
+  # Placeholder account/repository values are replaced by the release workflow.
+  # Decision point: add Kong/Python service images here after their manifests land on main.
   - name: zexpand/api-gateway
-    newTag: latest
+    newName: 000000000000.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study/api-gateway
+    newTag: release-placeholder
   - name: zexpand/patient-service
-    newTag: latest
+    newName: 000000000000.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study/patient-service
+    newTag: release-placeholder
   - name: zexpand/appointment-service
-    newTag: latest
+    newName: 000000000000.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study/appointment-service
+    newTag: release-placeholder
   - name: zexpand/prescription-service
-    newTag: latest
+    newName: 000000000000.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study/prescription-service
+    newTag: release-placeholder
   - name: zexpand/notification-service
-    newTag: latest
+    newName: 000000000000.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study/notification-service
+    newTag: release-placeholder
   - name: zexpand/dashboard
-    newTag: latest
+    newName: 000000000000.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study/dashboard
+    newTag: release-placeholder
 patches:
   - target:
       version: v1
