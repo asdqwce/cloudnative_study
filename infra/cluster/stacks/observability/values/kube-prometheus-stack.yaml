@@ -21,6 +21,15 @@ grafana:
       registry: 10.10.10.10:5000/quay.io
       repository: kiwigrid/k8s-sidecar
       tag: 2.7.3
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: observability
+      provider:
+        allowUiUpdates: false
+        disableDelete: false
+        foldersFromFilesStructure: true
   persistence:
     enabled: true
     type: pvc

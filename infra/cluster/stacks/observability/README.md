@@ -11,7 +11,7 @@
 | Grafana Alloy | `grafana/alloy` | Kubernetes pod 로그 수집 agent |
 | Tempo | `grafana/tempo` | trace 저장소 기반 |
 
-Kong Ingress, 애플리케이션별 `/metrics`, 서비스별 scrape 설정, Grafana dashboard 고도화, alert rule 설계는 이번 stack의 범위가 아닙니다. OpenTelemetry Collector는 trace instrumentation 방향이 정해진 뒤 추가할 결정점으로 둡니다.
+Kong Ingress, Kafka consumer lag exporter, alert rule 설계는 이번 stack의 범위가 아닙니다. OpenTelemetry Collector는 trace instrumentation 방향이 정해진 뒤 추가할 결정점으로 둡니다.
 
 ## Namespace
 
@@ -47,6 +47,12 @@ workload.medical-platform.io/tier=platform
 ```
 
 기본 values는 Prometheus, Grafana, Loki, Tempo, kube-state-metrics 같은 주요 observability component가 platform tier에 배치되도록 `nodeSelector`를 준비합니다. Alloy는 pod 로그 수집 agent라 DaemonSet으로 각 노드에서 실행됩니다. `compact` topology에서 이 stack을 실험하려면 values의 `nodeSelector`를 비우거나, 별도로 선택한 worker에 같은 label을 붙여야 합니다. 기본 `compact` 3VM 경험은 label 강제 적용 없이 유지합니다.
+
+## Dashboards as Code
+
+Grafana dashboard는 UI에서 수동 생성하지 않고 `dashboards/*.json` 파일로 관리합니다. `install.sh`는 이 JSON 파일들을 `cloudnative-grafana-dashboards` ConfigMap으로 적용하고, Grafana sidecar는 `grafana_dashboard=1` label이 붙은 ConfigMap을 읽어 dashboard를 자동 반영합니다.
+
+기본 클러스터 보조 대시보드는 `dashboards/local-kubernetes-overview.json`입니다. 로컬 Kubernetes 실험에 필요한 node 메모리, pod 메모리/CPU, 재시작, Deployment availability, PVC 사용량을 한 화면에서 봅니다. UI에서 임시로 바꾼 내용은 재설치 시 파일 기준으로 되돌아갈 수 있으므로, 유지할 변경은 JSON 파일에 반영합니다.
 
 ## 리소스 기준
 

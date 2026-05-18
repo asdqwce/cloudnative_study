@@ -42,8 +42,26 @@ helm_upgrade() {
   done
 }
 
+apply_grafana_dashboards() {
+  if [ ! -d dashboards ] || ! find dashboards -type f -name '*.json' | grep -q .; then
+    return 0
+  fi
+
+  kubectl -n "${OBSERVABILITY_NAMESPACE}" create configmap cloudnative-grafana-dashboards \
+    --from-file=dashboards \
+    --dry-run=client \
+    -o yaml \
+    | kubectl label --local -f - \
+      grafana_dashboard=1 \
+      app.kubernetes.io/name=grafana-dashboard \
+      app.kubernetes.io/part-of=medical-platform \
+      -o yaml \
+    | kubectl apply -f -
+}
+
 kubectl apply -f manifests/namespace.yaml
 kubectl apply -f manifests/local-pv.yaml
+apply_grafana_dashboards
 
 helm_upgrade "${KUBE_PROMETHEUS_STACK_RELEASE}" "${KUBE_PROMETHEUS_STACK_CHART}" "${KUBE_PROMETHEUS_STACK_REPO}" values/kube-prometheus-stack.yaml
 helm_upgrade "${LOKI_RELEASE}" "${LOKI_CHART}" "${LOKI_REPO}" values/loki.yaml
