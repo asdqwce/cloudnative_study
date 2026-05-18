@@ -1,0 +1,36 @@
+name: Security
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-security:
+    name: Source security gates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan repository secrets
+        uses: gitleaks/gitleaks-action@v2
+
+      - name: Verify Docker build contexts
+        run: ./scripts/verify-dockerignore.sh
+
+      - name: Lint Dockerfiles
+        run: ./scripts/verify-dockerfiles.sh

@@ -1,8 +1,17 @@
 .git
+.env
+.env.*
 .gradle
 .vagrant
 .idea
 .vscode
+*.tfvars
+*.pem
+id_rsa*
+kubeconfig*
+*secret*
+*credential*
+*token*
 
 **/build
 **/.vagrant

@@ -1,0 +1,178 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - 'release/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-northeast-2
+  ECR_REPOSITORY_PREFIX: cloudnative-study
+  IMAGE_TAG: ${{ github.ref_name }}-${{ github.sha }}
+  KUSTOMIZE_DIR: k8s/overlays/aws/apps
+  MANIFEST_BRANCH: ${{ github.ref_name }}
+
+jobs:
+  source-security:
+    name: Source security gates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan repository secrets
+        uses: gitleaks/gitleaks-action@v2
+
+      - name: Verify Docker build contexts
+        run: ./scripts/verify-dockerignore.sh
+
+      - name: Lint Dockerfiles
+        run: ./scripts/verify-dockerfiles.sh
+
+  build-images:
+    name: Build and push ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs: source-security
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Decision point: replace or extend this matrix when Kong/Python services land on main.
+          - service: api-gateway
+            context: .
+            dockerfile: ./api-gateway/Dockerfile
+            image: zexpand/api-gateway
+          - service: patient-service
+            context: .
+            dockerfile: ./patient-service/Dockerfile
+            image: zexpand/patient-service
+          - service: appointment-service
+            context: .
+            dockerfile: ./appointment-service/Dockerfile
+            image: zexpand/appointment-service
+          - service: prescription-service
+            context: .
+            dockerfile: ./prescription-service/Dockerfile
+            image: zexpand/prescription-service
+          - service: notification-service
+            context: .
+            dockerfile: ./notification-service/Dockerfile
+            image: zexpand/notification-service
+          - service: dashboard
+            context: ./dashboard
+            dockerfile: ./dashboard/Dockerfile
+            image: zexpand/dashboard
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Normalize image tag
+        run: |
+          IMAGE_TAG="${IMAGE_TAG//\//-}"
+          echo "IMAGE_TAG=${IMAGE_TAG:0:80}" >> "$GITHUB_ENV"
+          echo "LOCAL_IMAGE=${ECR_REPOSITORY_PREFIX}/${{ matrix.service }}:${IMAGE_TAG:0:80}" >> "$GITHUB_ENV"
+
+      - name: Verify Docker build context
+        run: ./scripts/verify-dockerignore.sh "${{ matrix.context }}"
+
+      - name: Build image
+        run: docker build -f "${{ matrix.dockerfile }}" -t "$LOCAL_IMAGE" "${{ matrix.context }}"
+
+      - name: Scan image before push
+        uses: aquasecurity/trivy-action@0.29.0
+        with:
+          image-ref: ${{ env.LOCAL_IMAGE }}
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: table
+          exit-code: '1'
+
+      - name: Scan image history before push
+        run: ./scripts/scan-docker-history.sh "$LOCAL_IMAGE"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_RELEASE_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Push image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY_PREFIX}/${{ matrix.service }}:${IMAGE_TAG}"
+          docker tag "$LOCAL_IMAGE" "$IMAGE_URI"
+          docker push "$IMAGE_URI"
+
+  update-manifests:
+    name: Update Git manifests
+    runs-on: ubuntu-latest
+    needs: build-images
+
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.MANIFEST_BRANCH }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_RELEASE_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Install kustomize
+        uses: imranismail/setup-kustomize@v2
+
+      - name: Normalize image tag
+        run: |
+          IMAGE_TAG="${IMAGE_TAG//\//-}"
+          echo "IMAGE_TAG=${IMAGE_TAG:0:80}" >> "$GITHUB_ENV"
+
+      - name: Update kustomize image tags
+        env:
+          ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          cd "$KUSTOMIZE_DIR"
+          kustomize edit set image zexpand/api-gateway="${ECR_REGISTRY}/${ECR_REPOSITORY_PREFIX}/api-gateway:${IMAGE_TAG}"
+          kustomize edit set image zexpand/patient-service="${ECR_REGISTRY}/${ECR_REPOSITORY_PREFIX}/patient-service:${IMAGE_TAG}"
+          kustomize edit set image zexpand/appointment-service="${ECR_REGISTRY}/${ECR_REPOSITORY_PREFIX}/appointment-service:${IMAGE_TAG}"
+          kustomize edit set image zexpand/prescription-service="${ECR_REGISTRY}/${ECR_REPOSITORY_PREFIX}/prescription-service:${IMAGE_TAG}"
+          kustomize edit set image zexpand/notification-service="${ECR_REGISTRY}/${ECR_REPOSITORY_PREFIX}/notification-service:${IMAGE_TAG}"
+          kustomize edit set image zexpand/dashboard="${ECR_REGISTRY}/${ECR_REPOSITORY_PREFIX}/dashboard:${IMAGE_TAG}"
+
+      - name: Commit and push manifest update
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add "$KUSTOMIZE_DIR/kustomization.yaml"
+
+          if git diff --cached --quiet; then
+            echo "No manifest image tag changes to commit."
+            exit 0
+          fi
+
+          git commit -m "deploy: update release images"
+          git push origin "HEAD:${MANIFEST_BRANCH}"
