@@ -8,7 +8,8 @@ aws_secret_key = "여기에_SECRET_KEY_입력"
 
 aws_region = "ap-northeast-2"
 
-k8s_public_key_path = "~/.ssh/k8s-key.pub"
+# Default team key path. Each developer should place the shared public key here.
+# k8s_public_key_path = "~/.ssh/k8s-key.pub"
 # k8s_public_key = "ssh-ed25519 ..."
 
 github_repository_owner = "asdqwce"
@@ -18,6 +19,10 @@ github_repository_name  = "cloudnative_study"
 github_actions_release_branches = ["release/dev", "release/prod"]
 github_actions_tag_pattern      = "v*"
 github_actions_role_name        = "github-actions-cloudnative-release"
+
+# Terraform appends the current workspace to this base prefix.
+# Example workspace dang-dev -> cloudnative-study-dang-dev/patient-service
+# ecr_repository_prefix = "cloudnative-study"
 
 # Decision point: add future Kong/Python services here after their manifests and Dockerfiles land on main.
 ecr_service_repositories = [

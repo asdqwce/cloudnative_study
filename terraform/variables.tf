@@ -25,19 +25,19 @@ variable "aws_secret_key" {
 }
 
 variable "k8s_public_key_path" {
-  description = "Path to the SSH public key registered as the EC2 key pair. When empty, k8s_public_key is used."
+  description = "Path to the shared SSH public key registered as the EC2 key pair. Defaults to ~/.ssh/k8s-key.pub for macOS, Linux, WSL, and Git Bash."
   type        = string
-  default     = ""
+  default     = "~/.ssh/k8s-key.pub"
 }
 
 variable "k8s_public_key" {
-  description = "Inline SSH public key registered as the EC2 key pair when k8s_public_key_path is empty."
+  description = "Inline SSH public key registered as the EC2 key pair when k8s_public_key_path is set to empty."
   type        = string
   default     = ""
 }
 
 variable "ecr_repository_prefix" {
-  description = "Prefix for service ECR repositories. The default creates repositories such as cloudnative-study/patient-service."
+  description = "Base prefix for service ECR repositories. Terraform appends the current workspace, for example cloudnative-study-dang-dev/patient-service."
   type        = string
   default     = "cloudnative-study"
 }
@@ -106,10 +106,4 @@ variable "github_oidc_thumbprints" {
   description = "TLS thumbprints for the GitHub Actions OIDC provider."
   type        = list(string)
   default     = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
-}
-
-variable "public_key_path" {
-  description = "SSH 공개키 경로 (각자 본인 경로로 설정)"
-  type        = string
-  default     = "~/.ssh/k8s-key.pub"
 }

@@ -19,6 +19,8 @@ E2E_APPOINTMENT_SERVICE_URL ?= http://appointment-service:8082
 E2E_PRESCRIPTION_SERVICE_URL ?= http://prescription-service:8083
 E2E_NOTIFICATION_SERVICE_URL ?= http://notification-service:8084
 SECURITY_IMAGE_TARGETS ?=
+TERRAFORM ?= $(CURDIR)/.tools/terraform
+TERRAFORM_DIR ?= terraform
 
 INFRA_CLUSTER_DIR ?= infra/cluster
 INFRA_MAKE := $(MAKE) -C $(INFRA_CLUSTER_DIR)
@@ -40,8 +42,9 @@ INFRA_TARGETS := \
 	app-images-build app-images-push local-kustomize-tag third-party-images-push local-k8s-render local-k8s-apply local-k8s-deps-prepare local-k8s-deps-apply local-k8s-app-apply local-k8s-app-stop local-k8s-app-pods-delete local-k8s-deps-verify local-k8s-app-verify local-k8s-verify local-k8s-pods local-k8s-app-pods local-k8s-app-services local-k8s-status local-k8s-node-top local-k8s-app-top local-k8s-top local-k8s-crud-smoke local-k8s-deploy \
 	wsl-local-ssh-keys-sync wsl-local-inventory wsl-bootstrap-after-vagrant wsl-local-k8s-bootstrap wsl-metallb-bootstrap wsl-metallb-verify wsl-upload-k8s wsl-kong-bootstrap wsl-kong-verify wsl-local-k8s-apply wsl-local-k8s-deps-apply wsl-local-k8s-app-apply wsl-local-k8s-deps-verify wsl-local-k8s-app-verify wsl-local-k8s-verify wsl-local-k8s-pods wsl-local-k8s-app-pods wsl-local-k8s-app-services wsl-local-k8s-status wsl-local-k8s-node-top wsl-local-k8s-app-top wsl-local-k8s-top wsl-local-k8s-crud-smoke wsl-local-k8s-deploy
 
-.PHONY: help list install activate test-runner-build test-unit test test-all test-e2e e2e-up e2e-wait e2e-newman e2e-down \
+.PHONY: help list install activate terraform test-runner-build test-unit test test-all test-e2e e2e-up e2e-wait e2e-newman e2e-down \
 	security security-install security-bootstrap security-pre-push security-image-scan security-hooks-install \
+	init validate plan apply destroy output show fmt version providers workspace state import taint untaint refresh console graph force-unlock \
 	$(INFRA_TARGETS)
 
 help:
@@ -50,8 +53,9 @@ help:
 	@printf '%s\n' '기본'
 	@printf '  %-28s %s\n' 'make help' '사용 가능한 명령 목록을 출력합니다.'
 	@printf '  %-28s %s\n' 'make list' '사용 가능한 명령 목록을 출력합니다.'
-	@printf '  %-28s %s\n' 'make install' '프로젝트 전용 Python venv와 로컬 pre-push 보안 게이트를 준비합니다.'
+	@printf '  %-28s %s\n' 'make install' 'Python venv, Terraform, 로컬 pre-push 보안 게이트를 준비합니다.'
 	@printf '  %-28s %s\n' 'make activate' '프로젝트 venv가 활성화된 새 셸을 엽니다.'
+	@printf '  %-28s %s\n' 'make terraform init' 'repo-local Terraform으로 terraform/ 디렉터리에서 명령을 실행합니다.'
 	@printf '%s\n' ''
 	@printf '%s\n' '테스트'
 	@printf '  %-28s %s\n' 'make test-unit' 'Docker Python 러너에서 FastAPI 서비스 pytest를 실행합니다.'
@@ -128,6 +132,28 @@ activate:
 	fi
 	@printf '%s\n' 'Opening a venv shell from $(VENV_DIR). Type exit to leave.'
 	@. "$(VENV_DIR)/bin/activate"; "$${SHELL:-/bin/sh}" -i
+
+TERRAFORM_KNOWN_ARGS := init validate plan apply destroy output show fmt version providers workspace state import taint untaint refresh console graph force-unlock
+TERRAFORM_ARGS = $(filter-out terraform,$(MAKECMDGOALS))
+
+ifneq ($(filter terraform,$(MAKECMDGOALS)),)
+$(foreach arg,$(filter-out $(TERRAFORM_KNOWN_ARGS),$(TERRAFORM_ARGS)),$(eval $(arg):;@:))
+endif
+
+terraform:
+	@if [ ! -x "$(TERRAFORM)" ]; then \
+		printf '%s\n' 'Terraform not found. Run make install first.' >&2; \
+		exit 1; \
+	fi
+	@if [ -z "$(TERRAFORM_ARGS)" ]; then \
+		printf '%s\n' 'Usage: make terraform <command>'; \
+		printf '%s\n' 'Example: make terraform init'; \
+		exit 1; \
+	fi
+	$(TERRAFORM) -chdir=$(TERRAFORM_DIR) $(TERRAFORM_ARGS) $(TF_ARGS)
+
+init validate plan apply destroy output show fmt version providers workspace state import taint untaint refresh console graph force-unlock:
+	@:
 
 test-runner-build:
 	docker build -f tests/docker/Dockerfile -t $(TEST_RUNNER_IMAGE) .

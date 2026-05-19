@@ -136,6 +136,10 @@ output "workspace" {
   value = terraform.workspace
 }
 
+output "ecr_repository_prefix" {
+  value = local.ecr_workspace_repository_prefix
+}
+
 # 서비스별 ECR repository URL 출력
 output "ecr_repository_urls" {
   value = {

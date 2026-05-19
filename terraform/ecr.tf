@@ -1,8 +1,10 @@
 locals {
+  ecr_workspace_repository_prefix = "${var.ecr_repository_prefix}-${terraform.workspace}"
+
   # 서비스 이름을 ECR repository 이름으로 변환
   ecr_repository_names = {
     for service in var.ecr_service_repositories :
-    service => "${var.ecr_repository_prefix}/${service}"
+    service => "${local.ecr_workspace_repository_prefix}/${service}"
   }
 }
 
@@ -19,8 +21,9 @@ resource "aws_ecr_repository" "service" {
   }
 
   tags = {
-    Name    = each.value
-    Service = each.key
+    Name      = each.value
+    Service   = each.key
+    Workspace = terraform.workspace
   }
 }
 
