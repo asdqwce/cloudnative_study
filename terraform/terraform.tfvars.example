@@ -15,13 +15,13 @@ aws_region = "ap-northeast-2"
 github_repository_owner = "asdqwce"
 github_repository_name  = "cloudnative_study"
 
-# Release branches and Git tags that may assume the OIDC role.
-github_actions_release_branches = ["release/dev", "release/prod"]
+# Release branch and Git tags that may assume the OIDC role.
+github_actions_release_branches = ["release"]
 github_actions_tag_pattern      = "v*"
 github_actions_role_name        = "github-actions-cloudnative-release"
 
 # Terraform appends the current workspace to this base prefix.
-# Example workspace dang-dev -> cloudnative-study-dang-dev/patient-service
+# Example workspace lab -> cloudnative-study-lab/patient-service
 # ecr_repository_prefix = "cloudnative-study"
 
 # Decision point: add future Kong/Python services here after their manifests and Dockerfiles land on main.

@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ResourceQuota
 metadata:
-  name: medical-platform-prod-quota
+  name: medical-platform-quota
 spec:
   hard:
     count/deployments.apps: "12"
@@ -12,7 +12,7 @@ spec:
 apiVersion: v1
 kind: LimitRange
 metadata:
-  name: medical-platform-prod-limits
+  name: medical-platform-limits
 spec:
   limits:
     - type: Container

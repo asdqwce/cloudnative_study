@@ -1,17 +1,20 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: medical-platform-prod
+  name: medical-platform
   namespace: argocd
 spec:
   project: medical-platform
   source:
     repoURL: https://github.com/asdqwce/cloudnative_study.git
-    targetRevision: release/prod
-    path: k8s/overlays/aws/prod
+    targetRevision: release
+    path: k8s/overlays/aws
   destination:
     server: https://kubernetes.default.svc
-    namespace: medical-platform-prod
+    namespace: medical-platform
   syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
     syncOptions:
       - CreateNamespace=true

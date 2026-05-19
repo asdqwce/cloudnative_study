@@ -1,16 +1,16 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-namespace: medical-platform-prod
+namespace: medical-platform
 resources:
   - namespace.yaml
   - policy.yaml
-  - ../../../base/apps
-  - ../../../ingress/auth
-  - ../../../ingress/patient
-  - ../../../ingress/appointment
-  - ../../../ingress/prescription
-  - ../../../ingress/notification
-  - ../../../ingress/dashboard
+  - ../../base/apps
+  - ../../ingress/auth
+  - ../../ingress/patient
+  - ../../ingress/appointment
+  - ../../ingress/prescription
+  - ../../ingress/notification
+  - ../../ingress/dashboard
 images:
   # Placeholder account/repository values are replaced by the release workflow.
   # Decision point: add Kong/Python service images here after their manifests land on main.
@@ -40,7 +40,7 @@ patches:
     patch: |-
       - op: add
         path: /spec/rules/0/host
-        value: api.medical-platform.example.com
+        value: medical-platform.example.com
   - target:
       group: apps
       version: v1
@@ -69,5 +69,5 @@ patches:
       name: notification-service
     patch: |-
       - op: replace
-        path: /spec/template/spec/containers/0/env/1/value
+        path: /spec/template/spec/containers/0/env/2/value
         value: kafka:9092

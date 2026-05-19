@@ -10,29 +10,21 @@ on:
         description: 'Git tag to build and deploy, for example v1.2.3'
         required: true
         type: string
-      manifest_branch:
-        description: 'Release state branch to update'
-        required: true
-        default: release/dev
-        type: choice
-        options:
-          - release/dev
-          - release/prod
 
 permissions:
   contents: write
   id-token: write
 
 concurrency:
-  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.manifest_branch || github.ref }}
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
   cancel-in-progress: false
 
 env:
   AWS_REGION: ap-northeast-2
   ECR_REPOSITORY_PREFIX: ${{ vars.ECR_REPOSITORY_PREFIX }}
   IMAGE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
-  KUSTOMIZE_BASE_DIR: k8s/overlays/aws
-  MANIFEST_BRANCH: ${{ github.event_name == 'workflow_dispatch' && inputs.manifest_branch || 'release/dev' }}
+  KUSTOMIZE_DIR: k8s/overlays/aws
+  MANIFEST_BRANCH: release
 
 jobs:
   source-security:
@@ -204,21 +196,6 @@ jobs:
             v*) ;;
             *)
               echo "IMAGE_TAG must be a Git release tag such as v1.2.3." >&2
-              exit 1
-              ;;
-          esac
-
-      - name: Resolve manifest overlay
-        run: |
-          case "$MANIFEST_BRANCH" in
-            release/dev|feature/*)
-              echo "KUSTOMIZE_DIR=${KUSTOMIZE_BASE_DIR}/dev" >> "$GITHUB_ENV"
-              ;;
-            release/prod)
-              echo "KUSTOMIZE_DIR=${KUSTOMIZE_BASE_DIR}/prod" >> "$GITHUB_ENV"
-              ;;
-            *)
-              echo "Unsupported MANIFEST_BRANCH: ${MANIFEST_BRANCH}" >&2
               exit 1
               ;;
           esac

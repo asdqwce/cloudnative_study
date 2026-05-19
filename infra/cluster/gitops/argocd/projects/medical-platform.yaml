@@ -9,9 +9,7 @@ spec:
     - https://github.com/asdqwce/cloudnative_study.git
   destinations:
     - server: https://kubernetes.default.svc
-      namespace: medical-platform-dev
-    - server: https://kubernetes.default.svc
-      namespace: medical-platform-prod
+      namespace: medical-platform
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace

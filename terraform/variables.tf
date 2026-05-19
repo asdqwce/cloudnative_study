@@ -37,7 +37,7 @@ variable "k8s_public_key" {
 }
 
 variable "ecr_repository_prefix" {
-  description = "Base prefix for service ECR repositories. Terraform appends the current workspace, for example cloudnative-study-dang-dev/patient-service."
+  description = "Base prefix for service ECR repositories. Terraform appends the current workspace, for example cloudnative-study-lab/patient-service."
   type        = string
   default     = "cloudnative-study"
 }
@@ -87,7 +87,7 @@ variable "github_repository_name" {
 variable "github_actions_release_branches" {
   description = "Release state branches allowed to assume the GitHub Actions release role."
   type        = set(string)
-  default     = ["release/dev", "release/prod"]
+  default     = ["release"]
 }
 
 variable "github_actions_tag_pattern" {

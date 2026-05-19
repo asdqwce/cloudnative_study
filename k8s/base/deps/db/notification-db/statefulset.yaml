@@ -15,19 +15,12 @@ spec:
     spec:
       containers:
         - name: notification-db
-          image: postgres:15
+          image: mongo:7
           ports:
-            - containerPort: 5432
-          env:
-            - name: POSTGRES_USER
-              value: user
-            - name: POSTGRES_PASSWORD
-              value: password
-            - name: POSTGRES_DB
-              value: notification_db
+            - containerPort: 27017
           volumeMounts:
             - name: notification-db-storage
-              mountPath: /var/lib/postgresql/data
+              mountPath: /data/db
   volumeClaimTemplates:
     - metadata:
         name: notification-db-storage

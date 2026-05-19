@@ -18,10 +18,12 @@ spec:
           ports:
             - containerPort: 8084
           env:
-            - name: DATABASE_URL
-              value: postgresql+psycopg://user:password@notification-db:5432/notification_db
+            - name: MONGODB_URL
+              value: mongodb://notification-db:27017
+            - name: MONGODB_DB_NAME
+              value: notification_db
             - name: KAFKA_BOOTSTRAP_SERVERS
-              value: kafka.medical-messaging.svc.cluster.local:9092
+              value: kafka.medical-platform.svc.cluster.local:9092
             - name: KAFKA_GROUP_ID
               value: notification-service
             - name: APPOINTMENT_CONFIRMED_TOPIC

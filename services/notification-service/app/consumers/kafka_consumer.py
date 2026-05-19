@@ -4,7 +4,7 @@ import json
 from aiokafka import AIOKafkaConsumer
 
 from app.config import settings
-from app.database import SessionLocal
+from app.database import get_db
 from app.services.notification_service import handle_business_event
 
 
@@ -22,8 +22,8 @@ async def consume_events(stop_event: asyncio.Event) -> None:
     await consumer.start()
     try:
         async for message in consumer:
-            with SessionLocal() as db:
-                handle_business_event(db, message.value)
+            db = get_db()
+            await handle_business_event(db, message.value)
             if stop_event.is_set():
                 break
     finally:

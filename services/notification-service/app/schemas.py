@@ -1,17 +1,16 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 
 
 class NotificationResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
+    id: str
     patientId: int
     type: str
     message: str
     status: str
     sourceId: int
+    metadata: dict
     createdAt: datetime
 
 

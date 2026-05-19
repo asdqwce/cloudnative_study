@@ -1,26 +1,20 @@
-from collections.abc import Generator
-
-from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
 from app.config import settings
 
-
-connect_args = {}
-if settings.database_url.startswith("sqlite"):
-    connect_args["check_same_thread"] = False
-
-engine = create_engine(settings.database_url, connect_args=connect_args)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+client: AsyncIOMotorClient = None
 
 
-class Base(DeclarativeBase):
-    pass
+def get_db() -> AsyncIOMotorDatabase:
+    return client[settings.mongodb_db_name]
 
 
-def get_db() -> Generator[Session, None, None]:
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+async def connect_db() -> None:
+    global client
+    client = AsyncIOMotorClient(settings.mongodb_url)
+
+
+def close_db() -> None:
+    global client
+    if client:
+        client.close()
