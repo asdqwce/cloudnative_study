@@ -2,6 +2,7 @@ kubernetes_apt_release: "{{ lookup('env', 'KUBERNETES_APT_RELEASE') | default('v
 kubernetes_admin_conf_path: /etc/kubernetes/admin.conf
 kubernetes_cri_socket: unix:///run/containerd/containerd.sock
 kubernetes_pod_network_cidr: "{{ lookup('env', 'KUBERNETES_POD_NETWORK_CIDR') | default('192.168.0.0/16', true) }}"
+kubernetes_node_ip: "{{ ansible_facts['default_ipv4']['address'] | default(ansible_host) }}"
 kubernetes_node_ready_timeout: "{{ lookup('env', 'KUBERNETES_NODE_READY_TIMEOUT') | default('300s', true) }}"
 kubeadm_image_pull_timeout: "{{ lookup('env', 'KUBEADM_IMAGE_PULL_TIMEOUT') | default('600s', true) }}"
 kubeadm_init_timeout: "{{ lookup('env', 'KUBEADM_INIT_TIMEOUT') | default('600s', true) }}"
@@ -10,6 +11,7 @@ containerd_config_path: /etc/containerd/config.toml
 containerd_registry_config_path: /etc/containerd/certs.d
 crictl_config_path: /etc/crictl.yaml
 bootstrap_marker_path: /etc/cloudnative-cluster-ready
+local_registry_enabled: "{{ lookup('env', 'LOCAL_REGISTRY_ENABLED') | default('true', true) | bool }}"
 calico_version: "{{ lookup('env', 'CALICO_VERSION') | default('v3.31.4', true) }}"
 calico_manifest_url: "https://raw.githubusercontent.com/projectcalico/calico/{{ calico_version }}/manifests/calico.yaml"
 calico_local_manifest_path: "/tmp/calico-{{ calico_version }}-local-registry.yaml"

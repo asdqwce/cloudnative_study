@@ -2,7 +2,7 @@
 - name: Prepare kubelet node identity
   hosts: k8s_cluster
   become: true
-  gather_facts: false
+  gather_facts: true
   vars_files:
     - ../group_vars/all.yml
 
@@ -12,7 +12,7 @@
         dest: /etc/default/kubelet
         mode: "0644"
         content: |
-          KUBELET_EXTRA_ARGS=--node-ip={{ ansible_host }}
+          KUBELET_EXTRA_ARGS=--node-ip={{ kubernetes_node_ip | default(ansible_host) }} --hostname-override={{ inventory_hostname }}
       register: kubelet_default
 
     - name: Check whether node already joined a cluster
@@ -44,11 +44,12 @@
       retries: 6
       delay: 10
       until: calico_image_pull.rc == 0
+      when: local_registry_enabled | bool
 
 - name: Initialize Kubernetes control plane
   hosts: control_plane
   become: true
-  gather_facts: false
+  gather_facts: true
   vars_files:
     - ../group_vars/all.yml
 
@@ -57,6 +58,66 @@
       ansible.builtin.stat:
         path: "{{ kubernetes_admin_conf_path }}"
       register: kubeadm_admin_conf
+
+    - name: Check existing control-plane health
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ kubernetes_admin_conf_path }}"
+          - get
+          - --raw=/readyz
+      register: kubeadm_control_plane_ready
+      changed_when: false
+      failed_when: false
+      when: kubeadm_admin_conf.stat.exists
+
+    - name: Check whether the inventory control-plane node is registered
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ kubernetes_admin_conf_path }}"
+          - get
+          - node
+          - "{{ inventory_hostname }}"
+      register: kubeadm_inventory_node
+      changed_when: false
+      failed_when: false
+      when:
+        - kubeadm_admin_conf.stat.exists
+        - kubeadm_control_plane_ready.rc | default(1) == 0
+
+    - name: Decide whether kubeadm init must run
+      ansible.builtin.set_fact:
+        kubeadm_needs_init: "{{ (not kubeadm_admin_conf.stat.exists) or (kubeadm_control_plane_ready.rc | default(1) != 0) or (kubeadm_inventory_node.rc | default(1) != 0) }}"
+
+    - name: Reset incomplete control-plane initialization
+      ansible.builtin.command:
+        argv:
+          - kubeadm
+          - reset
+          - -f
+          - "--cri-socket={{ kubernetes_cri_socket }}"
+      when:
+        - kubeadm_admin_conf.stat.exists
+        - (kubeadm_control_plane_ready.rc | default(1) != 0) or (kubeadm_inventory_node.rc | default(1) != 0)
+
+    - name: Remove incomplete Kubernetes config directory
+      ansible.builtin.file:
+        path: /etc/kubernetes
+        state: absent
+      when:
+        - kubeadm_admin_conf.stat.exists
+        - (kubeadm_control_plane_ready.rc | default(1) != 0) or (kubeadm_inventory_node.rc | default(1) != 0)
+
+    - name: Remove incomplete etcd data directory
+      ansible.builtin.file:
+        path: /var/lib/etcd
+        state: absent
+      when:
+        - kubeadm_admin_conf.stat.exists
+        - (kubeadm_control_plane_ready.rc | default(1) != 0) or (kubeadm_inventory_node.rc | default(1) != 0)
 
     - name: Pre-pull Kubernetes control-plane images
       ansible.builtin.command:
@@ -73,7 +134,7 @@
       retries: 3
       delay: 10
       until: kubeadm_image_pull.rc == 0
-      when: not kubeadm_admin_conf.stat.exists
+      when: kubeadm_needs_init | bool
 
     - name: Initialize the control plane with kubeadm
       ansible.builtin.command:
@@ -82,11 +143,12 @@
           - "{{ kubeadm_init_timeout }}"
           - kubeadm
           - init
-          - "--apiserver-advertise-address={{ ansible_host }}"
+          - "--node-name={{ inventory_hostname }}"
+          - "--apiserver-advertise-address={{ kubernetes_node_ip | default(ansible_host) }}"
+          - "--apiserver-cert-extra-sans={{ ansible_host }}"
           - "--pod-network-cidr={{ kubernetes_pod_network_cidr }}"
           - "--cri-socket={{ kubernetes_cri_socket }}"
-        creates: "{{ kubernetes_admin_conf_path }}"
-      when: not kubeadm_admin_conf.stat.exists
+      when: kubeadm_needs_init | bool
 
     - name: Ensure user kubeconfig directory exists
       ansible.builtin.file:
@@ -105,7 +167,36 @@
         mode: "0600"
         remote_src: true
 
-    - name: Download Calico manifest for local registry rendering
+    - name: Ensure the inventory control-plane node has the control-plane labels
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ kubernetes_admin_conf_path }}"
+          - label
+          - node
+          - "{{ inventory_hostname }}"
+          - node-role.kubernetes.io/control-plane=
+          - node.kubernetes.io/exclude-from-external-load-balancers=
+          - --overwrite
+      register: control_plane_label
+      changed_when: "'not labeled' not in control_plane_label.stdout"
+
+    - name: Ensure the inventory control-plane node has the control-plane taint
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ kubernetes_admin_conf_path }}"
+          - taint
+          - node
+          - "{{ inventory_hostname }}"
+          - node-role.kubernetes.io/control-plane:NoSchedule
+          - --overwrite
+      register: control_plane_taint
+      changed_when: "'not tainted' not in control_plane_taint.stdout"
+
+    - name: Download Calico manifest
       ansible.builtin.get_url:
         url: "{{ calico_manifest_url }}"
         dest: "{{ calico_local_manifest_path }}"
@@ -118,6 +209,7 @@
         regexp: "{{ item | regex_escape }}"
         replace: "{{ local_registry_endpoint }}/{{ item }}"
       loop: "{{ calico_images }}"
+      when: local_registry_enabled | bool
 
     - name: Install Calico CNI
       ansible.builtin.command:
@@ -160,7 +252,7 @@
       register: kubelet_config
 
     - name: Join worker to the cluster
-      ansible.builtin.command: "{{ hostvars[groups['control_plane'][0]].kubeadm_join_command.stdout }} --cri-socket={{ kubernetes_cri_socket }}"
+      ansible.builtin.command: "{{ hostvars[groups['control_plane'][0]].kubeadm_join_command.stdout }} --node-name={{ inventory_hostname }} --cri-socket={{ kubernetes_cri_socket }}"
       when: not kubelet_config.stat.exists
 
 - name: Wait for Kubernetes cluster readiness

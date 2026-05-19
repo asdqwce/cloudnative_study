@@ -22,6 +22,16 @@ SECURITY_IMAGE_TARGETS ?=
 TERRAFORM ?= $(CURDIR)/.tools/terraform
 TERRAFORM_DIR ?= terraform
 TERRAFORM_COMMANDS := init validate plan apply destroy output show fmt version providers workspace state import taint untaint refresh console graph force-unlock
+DEFAULT_AWS_INVENTORY ?= .tools/ansible/aws.ini
+AWS_INVENTORY ?= $(DEFAULT_AWS_INVENTORY)
+AWS_GENERATE_INVENTORY ?= $(if $(filter $(DEFAULT_AWS_INVENTORY),$(AWS_INVENTORY)),true,false)
+AWS_ANSIBLE_PLAYBOOK_DIR ?= infra/cluster/provision/ansible/playbooks
+AWS_ANSIBLE_GENERATED_INVENTORY_DIR ?= $(dir $(AWS_INVENTORY))
+AWS_ANSIBLE_SSH_USER ?= ubuntu
+AWS_ANSIBLE_SSH_PRIVATE_KEY_FILE ?= $(shell public_key_path="$$(sed -n 's/^[[:space:]]*k8s_public_key_path[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' $(TERRAFORM_DIR)/terraform.tfvars 2>/dev/null | tail -n 1)"; if [ -n "$$public_key_path" ]; then printf '%s' "$${public_key_path%.pub}"; else printf '%s' ~/.ssh/k8s-key; fi)
+ANSIBLE_PLAYBOOK ?= ansible-playbook
+ANSIBLE_FLAGS ?=
+AWS_ANSIBLE_FLAGS ?= -e '{"local_registry_enabled": false}'
 
 INFRA_CLUSTER_DIR ?= infra/cluster
 INFRA_MAKE := $(MAKE) -C $(INFRA_CLUSTER_DIR)
@@ -45,6 +55,7 @@ INFRA_TARGETS := \
 
 .PHONY: help list install activate terraform test-runner-build test-unit test test-all test-e2e e2e-up e2e-wait e2e-newman e2e-down \
 	security security-install security-bootstrap security-pre-push security-image-scan security-hooks-install \
+	aws-inventory aws-servers-bootstrap aws-cluster-bootstrap aws-helm-bootstrap aws-argocd-bootstrap aws-bootstrap aws-ansible-syntax-check \
 	$(TERRAFORM_COMMANDS) \
 	$(INFRA_TARGETS)
 
@@ -73,6 +84,15 @@ help:
 	@printf '%s\n' ''
 	@printf '%s\n' '보안'
 	@printf '  %-28s %s\n' 'make security' '필요한 보안 도구를 준비하고 전체 보안 검사를 실행합니다.'
+	@printf '%s\n' ''
+	@printf '%s\n' 'AWS GitOps bootstrap'
+	@printf '  %-32s %s\n' 'make aws-servers-bootstrap' 'Terraform workspace/tag 기준 AWS inventory로 서버 기본 설정 playbook을 실행합니다.'
+	@printf '  %-32s %s\n' 'make aws-cluster-bootstrap' 'AWS inventory로 kubeadm 클러스터를 구성합니다.'
+	@printf '  %-32s %s\n' 'make aws-helm-bootstrap' 'AWS control-plane에 Helm을 설치합니다.'
+	@printf '  %-32s %s\n' 'make aws-argocd-bootstrap' 'AWS control-plane에 Argo CD와 Application manifest를 설치합니다.'
+	@printf '  %-32s %s\n' 'make aws-bootstrap' 'Terraform output으로 AWS inventory를 만든 뒤 서버, 클러스터, Helm, Argo CD 순서로 실행합니다.'
+	@printf '  %-32s %s\n' 'make aws-ansible-syntax-check' 'AWS bootstrap playbook syntax를 확인합니다.'
+	@printf '  %-32s %s\n' 'AWS_INVENTORY=... make aws-bootstrap' '필요하면 정적 inventory로 override합니다.'
 	@printf '%s\n' ''
 	@printf '%s\n' '로컬 k8s 환경 설치'
 	@printf '  %-28s %s\n' 'make local-k8s-bootstrap' 'VM, Kubernetes, registry, Metrics Server, 앱 의존성을 준비합니다.'
@@ -153,6 +173,80 @@ terraform:
 
 $(TERRAFORM_COMMANDS):
 	@:
+
+aws-inventory:
+	@set -e; \
+	if [ ! -x "$(TERRAFORM)" ]; then \
+		printf '%s\n' 'Terraform not found. Run make install first.' >&2; \
+		exit 1; \
+	fi; \
+	master_ip="$$( $(TERRAFORM) -chdir=$(TERRAFORM_DIR) output -raw master_public_ip )"; \
+	worker_ips="$$( $(TERRAFORM) -chdir=$(TERRAFORM_DIR) output -json worker_public_ips | sed 's/[][]//g; s/"//g; s/,/ /g' )"; \
+	if [ -z "$$master_ip" ] || [ -z "$$worker_ips" ]; then \
+		printf '%s\n' 'Terraform outputs master_public_ip and worker_public_ips are required. Run make terraform apply first.' >&2; \
+		exit 1; \
+	fi; \
+	private_key_file="$(AWS_ANSIBLE_SSH_PRIVATE_KEY_FILE)"; \
+	case "$$private_key_file" in "~/"*) private_key_check_path="$$HOME/$${private_key_file#\~/}" ;; *) private_key_check_path="$$private_key_file" ;; esac; \
+	if [ ! -f "$$private_key_check_path" ]; then \
+		printf 'SSH private key not found: %s\n' "$$private_key_file" >&2; \
+		printf '%s\n' 'Set AWS_ANSIBLE_SSH_PRIVATE_KEY_FILE=/path/to/private-key if needed.' >&2; \
+		exit 1; \
+	fi; \
+	mkdir -p "$(AWS_ANSIBLE_GENERATED_INVENTORY_DIR)"; \
+	{ \
+		printf '%s\n' '# Generated from Terraform outputs. Do not edit.'; \
+		printf '%s\n\n' '# Override AWS_INVENTORY to use a different inventory file.'; \
+		printf '%s\n' '[control_plane]'; \
+		printf 'control-plane-1 ansible_host=%s ansible_user=%s ansible_port=22 ansible_ssh_private_key_file=%s\n\n' "$$master_ip" "$(AWS_ANSIBLE_SSH_USER)" "$$private_key_file"; \
+		printf '%s\n' '[workers]'; \
+		i=1; \
+		for worker_ip in $$worker_ips; do \
+			printf 'worker-%s ansible_host=%s ansible_user=%s ansible_port=22 ansible_ssh_private_key_file=%s\n' "$$i" "$$worker_ip" "$(AWS_ANSIBLE_SSH_USER)" "$$private_key_file"; \
+			i=$$((i + 1)); \
+		done; \
+		printf '\n%s\n\n' '[platform_nodes]'; \
+		printf '%s\n\n' '[app_nodes]'; \
+		printf '%s\n\n' '[postgres_nodes]'; \
+		printf '%s\n\n' '[kafka_nodes]'; \
+		printf '%s\n%s\n\n' '[kube_control_plane:children]' 'control_plane'; \
+		printf '%s\n%s\n\n' '[kube_workers:children]' 'workers'; \
+		printf '%s\n%s\n%s\n\n' '[k8s_cluster:children]' 'control_plane' 'workers'; \
+		printf '%s\n' '[k8s_cluster:vars]'; \
+		printf '%s\n' 'ansible_python_interpreter=/usr/bin/python3'; \
+		printf '%s\n' "ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'"; \
+	} > "$(AWS_INVENTORY)"; \
+	printf 'Generated %s from Terraform outputs.\n' "$(AWS_INVENTORY)"
+
+aws-servers-bootstrap:
+	$(ANSIBLE_PLAYBOOK) $(ANSIBLE_FLAGS) $(AWS_ANSIBLE_FLAGS) -i $(AWS_INVENTORY) $(AWS_ANSIBLE_PLAYBOOK_DIR)/bootstrap-servers.yml
+
+aws-cluster-bootstrap:
+	$(ANSIBLE_PLAYBOOK) $(ANSIBLE_FLAGS) $(AWS_ANSIBLE_FLAGS) -i $(AWS_INVENTORY) $(AWS_ANSIBLE_PLAYBOOK_DIR)/bootstrap-cluster.yml
+
+aws-helm-bootstrap:
+	$(ANSIBLE_PLAYBOOK) $(ANSIBLE_FLAGS) $(AWS_ANSIBLE_FLAGS) -i $(AWS_INVENTORY) $(AWS_ANSIBLE_PLAYBOOK_DIR)/bootstrap-helm.yml
+
+aws-argocd-bootstrap:
+	$(ANSIBLE_PLAYBOOK) $(ANSIBLE_FLAGS) $(AWS_ANSIBLE_FLAGS) -i $(AWS_INVENTORY) $(AWS_ANSIBLE_PLAYBOOK_DIR)/bootstrap-argocd.yml
+
+aws-bootstrap:
+	@if [ "$(AWS_GENERATE_INVENTORY)" = "true" ]; then \
+		$(MAKE) aws-inventory; \
+	fi
+	$(MAKE) aws-servers-bootstrap
+	$(MAKE) aws-cluster-bootstrap
+	$(MAKE) aws-helm-bootstrap
+	$(MAKE) aws-argocd-bootstrap
+
+aws-ansible-syntax-check:
+	@if [ "$(AWS_GENERATE_INVENTORY)" = "true" ]; then \
+		$(MAKE) aws-inventory; \
+	fi
+	$(ANSIBLE_PLAYBOOK) $(ANSIBLE_FLAGS) $(AWS_ANSIBLE_FLAGS) -i $(AWS_INVENTORY) --syntax-check $(AWS_ANSIBLE_PLAYBOOK_DIR)/bootstrap-servers.yml
+	$(ANSIBLE_PLAYBOOK) $(ANSIBLE_FLAGS) $(AWS_ANSIBLE_FLAGS) -i $(AWS_INVENTORY) --syntax-check $(AWS_ANSIBLE_PLAYBOOK_DIR)/bootstrap-cluster.yml
+	$(ANSIBLE_PLAYBOOK) $(ANSIBLE_FLAGS) $(AWS_ANSIBLE_FLAGS) -i $(AWS_INVENTORY) --syntax-check $(AWS_ANSIBLE_PLAYBOOK_DIR)/bootstrap-helm.yml
+	$(ANSIBLE_PLAYBOOK) $(ANSIBLE_FLAGS) $(AWS_ANSIBLE_FLAGS) -i $(AWS_INVENTORY) --syntax-check $(AWS_ANSIBLE_PLAYBOOK_DIR)/bootstrap-argocd.yml
 
 test-runner-build:
 	docker build -f tests/docker/Dockerfile -t $(TEST_RUNNER_IMAGE) .

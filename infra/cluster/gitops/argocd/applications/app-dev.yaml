@@ -7,7 +7,8 @@ spec:
   project: medical-platform
   source:
     repoURL: https://github.com/asdqwce/cloudnative_study.git
-    targetRevision: release/dev
+    # TODO: Feature branch smoke test용입니다. 운영 promotion 결정점에서는 release/dev로 되돌립니다.
+    targetRevision: feature/aws-gitops-release-foundation
     path: k8s/overlays/aws/dev
   destination:
     server: https://kubernetes.default.svc

@@ -183,6 +183,28 @@ GitOps 원칙을 살리려면 GitHub Actions가 `kubectl apply`를 직접 실행
 
 또 하나의 decision point는 Argo CD가 추적할 릴리즈 브랜치다. GitHub Actions OIDC role은 `release/**` 전체를 허용할 수 있지만, Argo CD `targetRevision`은 하나의 구체적인 브랜치를 보는 편이 운영상 명확하다. 실습 기준은 `release/dev`, `release/prod`처럼 환경별 브랜치를 두고, 각 Argo CD Application의 `targetRevision`과 workflow 운용 브랜치를 함께 맞춘다.
 
+### Feature branch smoke test
+
+AWS Argo CD bootstrap을 feature 브랜치에서 먼저 확인할 때는 dev Application만 임시로 현재 feature 브랜치를 바라보게 둘 수 있다. 이 브랜치에서는 `infra/cluster/gitops/argocd/applications/app-dev.yaml`의 `targetRevision`을 `feature/aws-gitops-release-foundation`으로 둔다.
+
+이 설정은 smoke test용 결정이다. 운영 promotion 흐름으로 넘기기 전에는 dev Application의 `targetRevision`을 `release/dev`로 되돌리고, prod Application은 계속 `release/prod`와 manual sync를 유지한다.
+
+클러스터 bootstrap은 root `Makefile`의 AWS wrapper로 실행한다.
+
+AWS bootstrap은 기본적으로 Terraform output에서 EC2 public IP를 읽어 Ansible inventory를 생성한다. Terraform workspace가 선택한 상태 파일에서 `master_public_ip`, `worker_public_ips`를 읽고, `control_plane`, `workers`, `kube_control_plane`, `kube_workers`, `k8s_cluster` 그룹을 담은 `.tools/ansible/aws.ini`를 만든다.
+
+이 방식이면 `terraform apply` 뒤에 public IP를 `dev.ini`에 다시 적지 않아도 된다. 고정 IP inventory는 public IP가 바뀔 때마다 수동 갱신해야 하므로 기본 흐름에서는 생성된 `.tools/ansible/aws.ini`를 사용한다. `infra/cluster/provision/ansible/inventories/aws/dev.ini`는 필요할 때 `AWS_INVENTORY=...`로 지정하는 예시/비상용 fallback으로만 둔다.
+
+```bash
+make aws-ansible-syntax-check
+make aws-servers-bootstrap
+make aws-cluster-bootstrap
+make aws-helm-bootstrap
+make aws-argocd-bootstrap
+```
+
+전체 순서를 한 번에 실행하려면 `make aws-bootstrap`을 사용한다. 이 target은 Terraform output으로 inventory를 먼저 만든 뒤 bootstrap playbook을 순서대로 실행한다. 목표 흐름은 `make terraform apply && make aws-bootstrap`이다. Terraform `apply`와 원격 Ansible 실행은 실제 AWS 리소스와 EC2 서버에 영향을 주므로, dry-run이나 syntax check로 명령을 먼저 확인한 뒤 명시적으로 실행한다.
+
 ## Repository 변경 후보
 
 - `terraform/`: ECR repositories, GitHub OIDC IAM role, EC2 node IAM role을 추가한다.
