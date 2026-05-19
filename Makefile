@@ -21,6 +21,7 @@ E2E_NOTIFICATION_SERVICE_URL ?= http://notification-service:8084
 SECURITY_IMAGE_TARGETS ?=
 TERRAFORM ?= $(CURDIR)/.tools/terraform
 TERRAFORM_DIR ?= terraform
+TERRAFORM_COMMANDS := init validate plan apply destroy output show fmt version providers workspace state import taint untaint refresh console graph force-unlock
 
 INFRA_CLUSTER_DIR ?= infra/cluster
 INFRA_MAKE := $(MAKE) -C $(INFRA_CLUSTER_DIR)
@@ -44,7 +45,7 @@ INFRA_TARGETS := \
 
 .PHONY: help list install activate terraform test-runner-build test-unit test test-all test-e2e e2e-up e2e-wait e2e-newman e2e-down \
 	security security-install security-bootstrap security-pre-push security-image-scan security-hooks-install \
-	init validate plan apply destroy output show fmt version providers workspace state import taint untaint refresh console graph force-unlock \
+	$(TERRAFORM_COMMANDS) \
 	$(INFRA_TARGETS)
 
 help:
@@ -56,6 +57,9 @@ help:
 	@printf '  %-28s %s\n' 'make install' 'Python venv, Terraform, 로컬 pre-push 보안 게이트를 준비합니다.'
 	@printf '  %-28s %s\n' 'make activate' '프로젝트 venv가 활성화된 새 셸을 엽니다.'
 	@printf '  %-28s %s\n' 'make terraform init' 'repo-local Terraform으로 terraform/ 디렉터리에서 명령을 실행합니다.'
+	@printf '  %-28s %s\n' 'make terraform plan' 'terraform/ 디렉터리에서 Terraform plan을 확인합니다.'
+	@printf '  %-28s %s\n' 'make terraform apply' 'terraform/ 디렉터리의 Terraform 변경을 적용합니다.'
+	@printf '  %-28s %s\n' 'make terraform output' 'terraform/ 디렉터리의 Terraform output을 조회합니다.'
 	@printf '%s\n' ''
 	@printf '%s\n' '테스트'
 	@printf '  %-28s %s\n' 'make test-unit' 'Docker Python 러너에서 FastAPI 서비스 pytest를 실행합니다.'
@@ -133,26 +137,21 @@ activate:
 	@printf '%s\n' 'Opening a venv shell from $(VENV_DIR). Type exit to leave.'
 	@. "$(VENV_DIR)/bin/activate"; "$${SHELL:-/bin/sh}" -i
 
-TERRAFORM_KNOWN_ARGS := init validate plan apply destroy output show fmt version providers workspace state import taint untaint refresh console graph force-unlock
 TERRAFORM_ARGS = $(filter-out terraform,$(MAKECMDGOALS))
 
 ifneq ($(filter terraform,$(MAKECMDGOALS)),)
-$(foreach arg,$(filter-out $(TERRAFORM_KNOWN_ARGS),$(TERRAFORM_ARGS)),$(eval $(arg):;@:))
+$(foreach arg,$(filter-out $(TERRAFORM_COMMANDS),$(TERRAFORM_ARGS)),$(eval $(arg):;@:))
 endif
 
 terraform:
-	@if [ ! -x "$(TERRAFORM)" ]; then \
-		printf '%s\n' 'Terraform not found. Run make install first.' >&2; \
-		exit 1; \
-	fi
 	@if [ -z "$(TERRAFORM_ARGS)" ]; then \
 		printf '%s\n' 'Usage: make terraform <command>'; \
 		printf '%s\n' 'Example: make terraform init'; \
 		exit 1; \
 	fi
-	$(TERRAFORM) -chdir=$(TERRAFORM_DIR) $(TERRAFORM_ARGS) $(TF_ARGS)
+	$(MAKE) -C $(TERRAFORM_DIR) $(TERRAFORM_ARGS) TF_ARGS="$(TF_ARGS)" TERRAFORM="$(TERRAFORM)"
 
-init validate plan apply destroy output show fmt version providers workspace state import taint untaint refresh console graph force-unlock:
+$(TERRAFORM_COMMANDS):
 	@:
 
 test-runner-build:
