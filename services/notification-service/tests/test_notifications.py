@@ -1,83 +1,76 @@
-from collections.abc import Generator
-
 import pytest
+import pytest_asyncio
+from mongomock_motor import AsyncMongoMockClient
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.pool import StaticPool
 
-from app.database import Base, get_db
+import app.database as database
 from app.main import app
 from app.services.notification_service import handle_business_event
 
 
-engine = create_engine(
-    "sqlite://",
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+def override_get_db():
+    return database.client["notification_db"]
 
 
-def override_get_db() -> Generator[Session, None, None]:
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-app.dependency_overrides[get_db] = override_get_db
-client = TestClient(app)
+app.dependency_overrides[database.get_db] = override_get_db
 
 
 @pytest.fixture(autouse=True)
-def reset_db() -> Generator[None, None, None]:
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
+def setup_mock_db():
+    database.client = AsyncMongoMockClient()
     yield
+    database.client = None
+
+
+client = TestClient(app, raise_server_exceptions=True)
 
 
 def test_appointment_confirmed_event_creates_notification() -> None:
-    with TestingSessionLocal() as db:
-        notification = handle_business_event(db, appointment_event(patient_id=1, source_id=100))
+    import asyncio
+    db = database.client["notification_db"]
+    notification = asyncio.get_event_loop().run_until_complete(
+        handle_business_event(db, appointment_event(patient_id=1, source_id=100))
+    )
 
-    assert notification.patient_id == 1
-    assert notification.type == "appointment-confirmed"
-    assert "예약이 확정되었습니다" in notification.message
+    assert notification["patient_id"] == 1
+    assert notification["type"] == "appointment-confirmed"
+    assert "예약이 확정되었습니다" in notification["message"]
 
 
 def test_prescription_issued_event_creates_notification() -> None:
-    with TestingSessionLocal() as db:
-        notification = handle_business_event(db, prescription_event(patient_id=1, source_id=200))
+    import asyncio
+    db = database.client["notification_db"]
+    notification = asyncio.get_event_loop().run_until_complete(
+        handle_business_event(db, prescription_event(patient_id=1, source_id=200))
+    )
 
-    assert notification.patient_id == 1
-    assert notification.type == "prescription-issued"
-    assert "처방이 발행되었습니다" in notification.message
+    assert notification["patient_id"] == 1
+    assert notification["type"] == "prescription-issued"
+    assert "처방이 발행되었습니다" in notification["message"]
 
 
 def test_duplicate_event_id_returns_existing_notification() -> None:
-    with TestingSessionLocal() as db:
-        first = handle_business_event(db, appointment_event(patient_id=1, source_id=100))
-        second = handle_business_event(db, appointment_event(patient_id=1, source_id=100))
-        notification_count = db.query(first.__class__).count()
+    import asyncio
+    db = database.client["notification_db"]
+    loop = asyncio.get_event_loop()
+    first = loop.run_until_complete(handle_business_event(db, appointment_event(patient_id=1, source_id=100)))
+    second = loop.run_until_complete(handle_business_event(db, appointment_event(patient_id=1, source_id=100)))
+    count = loop.run_until_complete(db["notifications"].count_documents({}))
 
-    assert second.id == first.id
-    assert notification_count == 1
+    assert second["id"] == first["id"]
+    assert count == 1
 
 
 def test_patient_can_list_only_own_notifications() -> None:
     seed_notifications()
-
     response = client.get("/notifications", headers=patient_headers(1))
 
     assert response.status_code == 200
-    assert [item["patientId"] for item in response.json()] == [1]
+    assert all(item["patientId"] == 1 for item in response.json())
 
 
 def test_staff_can_list_all_notifications() -> None:
     seed_notifications()
-
     response = client.get("/notifications", headers=staff_headers())
 
     assert response.status_code == 200
@@ -85,17 +78,23 @@ def test_staff_can_list_all_notifications() -> None:
 
 
 def test_patient_cannot_read_other_patient_notification() -> None:
-    seed_notifications()
+    import asyncio
+    db = database.client["notification_db"]
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(handle_business_event(db, appointment_event(patient_id=2, source_id=100)))
+    notifications = loop.run_until_complete(db["notifications"].find().to_list(None))
+    other_id = str(notifications[0]["_id"])
 
-    response = client.get("/notifications/2", headers=patient_headers(1))
-
+    response = client.get(f"/notifications/{other_id}", headers=patient_headers(1))
     assert response.status_code == 403
 
 
 def seed_notifications() -> None:
-    with TestingSessionLocal() as db:
-        handle_business_event(db, appointment_event(patient_id=1, source_id=100))
-        handle_business_event(db, prescription_event(patient_id=2, source_id=200))
+    import asyncio
+    db = database.client["notification_db"]
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(handle_business_event(db, appointment_event(patient_id=1, source_id=100)))
+    loop.run_until_complete(handle_business_event(db, prescription_event(patient_id=2, source_id=200)))
 
 
 def appointment_event(patient_id: int, source_id: int) -> dict:
