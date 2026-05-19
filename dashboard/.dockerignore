@@ -1,6 +1,7 @@
 .git
 .env
 .env.*
+Dockerfile
 *.tfvars
 *.pem
 id_rsa*
