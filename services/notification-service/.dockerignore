@@ -1,3 +1,14 @@
+.git
+.env
+.env.*
+*.tfvars
+*.pem
+id_rsa*
+kubeconfig*
+*secret*
+*credential*
+*token*
+
 __pycache__/
 *.py[cod]
 .pytest_cache/

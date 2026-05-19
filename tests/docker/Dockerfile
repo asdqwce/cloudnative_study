@@ -12,6 +12,7 @@ COPY services/appointment-service/requirements.txt services/appointment-service/
 COPY services/prescription-service/requirements.txt services/prescription-service/requirements.txt
 COPY services/notification-service/requirements.txt services/notification-service/requirements.txt
 
+# hadolint ignore=DL3013
 RUN python -m pip install --no-cache-dir --root-user-action=ignore --upgrade pip \
     && python -m pip install --no-cache-dir --root-user-action=ignore \
       -r services/auth-service/requirements.txt \

@@ -12,4 +12,4 @@ kubeconfig*
 __pycache__/
 *.py[cod]
 .pytest_cache/
-prescription_service.db
+auth_service.db
