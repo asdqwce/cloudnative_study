@@ -29,7 +29,7 @@ concurrency:
 
 env:
   AWS_REGION: ap-northeast-2
-  ECR_REPOSITORY_PREFIX: cloudnative-study
+  ECR_REPOSITORY_PREFIX: ${{ vars.ECR_REPOSITORY_PREFIX }}
   IMAGE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
   KUSTOMIZE_BASE_DIR: k8s/overlays/aws
   MANIFEST_BRANCH: ${{ github.event_name == 'workflow_dispatch' && inputs.manifest_branch || 'release/dev' }}
@@ -109,6 +109,19 @@ jobs:
         with:
           ref: ${{ env.IMAGE_TAG }}
 
+      - name: Validate release configuration
+        env:
+          AWS_RELEASE_ROLE_ARN: ${{ vars.AWS_RELEASE_ROLE_ARN }}
+        run: |
+          if [ -z "$AWS_RELEASE_ROLE_ARN" ]; then
+            echo "AWS_RELEASE_ROLE_ARN repository variable is required." >&2
+            exit 1
+          fi
+          if [ -z "$ECR_REPOSITORY_PREFIX" ]; then
+            echo "ECR_REPOSITORY_PREFIX repository variable is required." >&2
+            exit 1
+          fi
+
       - name: Normalize image tag
         run: |
           echo "LOCAL_IMAGE=${ECR_REPOSITORY_PREFIX}/${{ matrix.service }}:${IMAGE_TAG}" >> "$GITHUB_ENV"
@@ -158,6 +171,19 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ env.MANIFEST_BRANCH }}
+
+      - name: Validate release configuration
+        env:
+          AWS_RELEASE_ROLE_ARN: ${{ vars.AWS_RELEASE_ROLE_ARN }}
+        run: |
+          if [ -z "$AWS_RELEASE_ROLE_ARN" ]; then
+            echo "AWS_RELEASE_ROLE_ARN repository variable is required." >&2
+            exit 1
+          fi
+          if [ -z "$ECR_REPOSITORY_PREFIX" ]; then
+            echo "ECR_REPOSITORY_PREFIX repository variable is required." >&2
+            exit 1
+          fi
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
