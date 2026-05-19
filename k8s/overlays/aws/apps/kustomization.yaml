@@ -118,30 +118,30 @@ patches:
       - op: replace
         path: /spec/template/spec/containers/0/env/0
         value:
-          name: EUREKA_CLIENT_ENABLED
-          value: "false"
+          name: MONGODB_URL
+          value: mongodb://notification-db:27017
       - op: add
         path: /spec/template/spec/containers/0/env/-
         value:
-          name: SPRING_KAFKA_BOOTSTRAP_SERVERS
-          value: kafka:9092
+          name: MONGODB_DB_NAME
+          value: notification_db
       - op: add
         path: /spec/template/spec/containers/0/env/-
         value:
-          name: SPRING_KAFKA_CONSUMER_GROUP_ID
-          value: notification-group
+          name: KAFKA_BOOTSTRAP_SERVERS
+          value: kafka.medical-platform.svc.cluster.local:9092
       - op: add
         path: /spec/template/spec/containers/0/env/-
         value:
-          name: SPRING_KAFKA_CONSUMER_KEY_DESERIALIZER
-          value: org.apache.kafka.common.serialization.StringDeserializer
+          name: KAFKA_GROUP_ID
+          value: notification-service
       - op: add
         path: /spec/template/spec/containers/0/env/-
         value:
-          name: SPRING_KAFKA_CONSUMER_VALUE_DESERIALIZER
-          value: org.springframework.kafka.support.serializer.JsonDeserializer
+          name: APPOINTMENT_CONFIRMED_TOPIC
+          value: appointment-confirmed
       - op: add
         path: /spec/template/spec/containers/0/env/-
         value:
-          name: SPRING_KAFKA_CONSUMER_PROPERTIES_SPRING_JSON_TRUSTED_PACKAGES
-          value: "*"
+          name: PRESCRIPTION_ISSUED_TOPIC
+          value: prescription-issued
