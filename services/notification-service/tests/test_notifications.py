@@ -31,7 +31,7 @@ def test_appointment_confirmed_event_creates_notification() -> None:
         handle_business_event(db, appointment_event(patient_id=1, source_id=100))
     )
 
-    assert notification["patient_id"] == 1
+    assert notification["patientId"] == 1
     assert notification["type"] == "appointment-confirmed"
     assert "예약이 확정되었습니다" in notification["message"]
 
@@ -43,7 +43,7 @@ def test_prescription_issued_event_creates_notification() -> None:
         handle_business_event(db, prescription_event(patient_id=1, source_id=200))
     )
 
-    assert notification["patient_id"] == 1
+    assert notification["patientId"] == 1
     assert notification["type"] == "prescription-issued"
     assert "처방이 발행되었습니다" in notification["message"]
 
