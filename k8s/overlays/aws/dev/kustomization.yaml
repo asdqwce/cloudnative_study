@@ -11,29 +11,27 @@ resources:
 - ../../../ingress/prescription
 - ../../../ingress/notification
 - ../../../ingress/dashboard
-# TODO(smoke-test): Temporary feature-branch smoke images.
-# Revert these explicit ECR values to release workflow-managed values before
-# returning app-dev targetRevision to release/dev.
-# Decision point: add Kong/Python service images here after their manifests land on main.
 images:
-- name: zexpand/appointment-service
-  newName: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study-everlit/appointment-service
-  newTag: v0.0.1-smoke.8
+# Placeholder account/repository values are replaced by the release workflow.
+# Decision point: add Kong/Python service images here after their manifests land on main.
 - name: zexpand/auth-service
-  newName: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study-everlit/auth-service
-  newTag: v0.0.1-smoke.8
-- name: zexpand/dashboard
-  newName: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study-everlit/dashboard
-  newTag: v0.0.1-smoke.8
-- name: zexpand/notification-service
-  newName: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study-everlit/notification-service
-  newTag: v0.0.1-smoke.8
+  newName: 000000000000.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study/auth-service
+  newTag: release-placeholder
 - name: zexpand/patient-service
-  newName: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study-everlit/patient-service
-  newTag: v0.0.1-smoke.8
+  newName: 000000000000.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study/patient-service
+  newTag: release-placeholder
+- name: zexpand/appointment-service
+  newName: 000000000000.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study/appointment-service
+  newTag: release-placeholder
 - name: zexpand/prescription-service
-  newName: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study-everlit/prescription-service
-  newTag: v0.0.1-smoke.8
+  newName: 000000000000.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study/prescription-service
+  newTag: release-placeholder
+- name: zexpand/notification-service
+  newName: 000000000000.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study/notification-service
+  newTag: release-placeholder
+- name: zexpand/dashboard
+  newName: 000000000000.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study/dashboard
+  newTag: release-placeholder
 patches:
 - patch: |-
     - op: add
