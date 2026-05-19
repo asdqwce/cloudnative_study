@@ -2,74 +2,74 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: medical-platform-dev
 resources:
-  - namespace.yaml
-  - policy.yaml
-  - ../../../base/apps
-  - ../../../ingress/auth
-  - ../../../ingress/patient
-  - ../../../ingress/appointment
-  - ../../../ingress/prescription
-  - ../../../ingress/notification
-  - ../../../ingress/dashboard
+- namespace.yaml
+- policy.yaml
+- ../../../base/apps
+- ../../../ingress/auth
+- ../../../ingress/patient
+- ../../../ingress/appointment
+- ../../../ingress/prescription
+- ../../../ingress/notification
+- ../../../ingress/dashboard
 # TODO(smoke-test): Temporary feature-branch smoke images.
 # Revert these explicit ECR values to release workflow-managed values before
 # returning app-dev targetRevision to release/dev.
 # Decision point: add Kong/Python service images here after their manifests land on main.
 images:
-  - name: zexpand/appointment-service
-    newName: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study-everlit/appointment-service
-    newTag: v0.0.1-smoke.7
-  - name: zexpand/auth-service
-    newName: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study-everlit/auth-service
-    newTag: v0.0.1-smoke.7
-  - name: zexpand/dashboard
-    newName: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study-everlit/dashboard
-    newTag: v0.0.1-smoke.7
-  - name: zexpand/notification-service
-    newName: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study-everlit/notification-service
-    newTag: v0.0.1-smoke.7
-  - name: zexpand/patient-service
-    newName: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study-everlit/patient-service
-    newTag: v0.0.1-smoke.7
-  - name: zexpand/prescription-service
-    newName: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study-everlit/prescription-service
-    newTag: v0.0.1-smoke.7
+- name: zexpand/appointment-service
+  newName: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study-everlit/appointment-service
+  newTag: v0.0.1-smoke.8
+- name: zexpand/auth-service
+  newName: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study-everlit/auth-service
+  newTag: v0.0.1-smoke.8
+- name: zexpand/dashboard
+  newName: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study-everlit/dashboard
+  newTag: v0.0.1-smoke.8
+- name: zexpand/notification-service
+  newName: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study-everlit/notification-service
+  newTag: v0.0.1-smoke.8
+- name: zexpand/patient-service
+  newName: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study-everlit/patient-service
+  newTag: v0.0.1-smoke.8
+- name: zexpand/prescription-service
+  newName: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study-everlit/prescription-service
+  newTag: v0.0.1-smoke.8
 patches:
-  - patch: |-
-      - op: add
-        path: /spec/rules/0/host
-        value: dev.medical-platform.example.com
-    target:
-      group: networking.k8s.io
-      kind: Ingress
-      version: v1
-  - patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/env/1/value
-        value: kafka:9092
-    target:
-      group: apps
-      kind: Deployment
-      name: appointment-service
-      version: v1
-  - patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/env/1/value
-        value: http://patient-service:8081
-      - op: replace
-        path: /spec/template/spec/containers/0/env/2/value
-        value: kafka:9092
-    target:
-      group: apps
-      kind: Deployment
-      name: prescription-service
-      version: v1
-  - patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/env/1/value
-        value: kafka:9092
-    target:
-      group: apps
-      kind: Deployment
-      name: notification-service
-      version: v1
+- patch: |-
+    - op: add
+      path: /spec/rules/0/host
+      value: dev.medical-platform.example.com
+  target:
+    group: networking.k8s.io
+    kind: Ingress
+    version: v1
+- patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/env/1/value
+      value: kafka:9092
+  target:
+    group: apps
+    kind: Deployment
+    name: appointment-service
+    version: v1
+- patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/env/1/value
+      value: http://patient-service:8081
+    - op: replace
+      path: /spec/template/spec/containers/0/env/2/value
+      value: kafka:9092
+  target:
+    group: apps
+    kind: Deployment
+    name: prescription-service
+    version: v1
+- patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/env/1/value
+      value: kafka:9092
+  target:
+    group: apps
+    kind: Deployment
+    name: notification-service
+    version: v1
