@@ -39,7 +39,9 @@ INFRA_TARGETS := \
 	app-images-build app-images-push local-kustomize-tag third-party-images-push local-k8s-render local-k8s-apply local-k8s-deps-prepare local-k8s-deps-apply local-k8s-app-apply local-k8s-app-stop local-k8s-app-pods-delete local-k8s-deps-verify local-k8s-app-verify local-k8s-verify local-k8s-pods local-k8s-app-pods local-k8s-app-services local-k8s-status local-k8s-node-top local-k8s-app-top local-k8s-top local-k8s-crud-smoke local-k8s-deploy \
 	wsl-local-ssh-keys-sync wsl-local-inventory wsl-bootstrap-after-vagrant wsl-local-k8s-bootstrap wsl-metallb-bootstrap wsl-metallb-verify wsl-upload-k8s wsl-kong-bootstrap wsl-kong-verify wsl-local-k8s-apply wsl-local-k8s-deps-apply wsl-local-k8s-app-apply wsl-local-k8s-deps-verify wsl-local-k8s-app-verify wsl-local-k8s-verify wsl-local-k8s-pods wsl-local-k8s-app-pods wsl-local-k8s-app-services wsl-local-k8s-status wsl-local-k8s-node-top wsl-local-k8s-app-top wsl-local-k8s-top wsl-local-k8s-crud-smoke wsl-local-k8s-deploy
 
-.PHONY: help list install activate test-runner-build test-unit test test-all test-e2e e2e-up e2e-wait e2e-newman e2e-down $(INFRA_TARGETS)
+.PHONY: help list install activate test-runner-build test-unit test test-all test-e2e e2e-up e2e-wait e2e-newman e2e-down \
+	security-install security-bootstrap security-pre-push security-hooks-install \
+	$(INFRA_TARGETS)
 
 help:
 	@printf '%s\n' 'Medical Platform commands'
@@ -47,7 +49,7 @@ help:
 	@printf '%s\n' '기본'
 	@printf '  %-28s %s\n' 'make help' '사용 가능한 명령 목록을 출력합니다.'
 	@printf '  %-28s %s\n' 'make list' '사용 가능한 명령 목록을 출력합니다.'
-	@printf '  %-28s %s\n' 'make install' '프로젝트 전용 Python venv를 만들고 의존성을 설치합니다.'
+	@printf '  %-28s %s\n' 'make install' '프로젝트 전용 Python venv와 로컬 pre-push 보안 게이트를 준비합니다.'
 	@printf '  %-28s %s\n' 'make activate' '프로젝트 venv가 활성화된 새 셸을 엽니다.'
 	@printf '%s\n' ''
 	@printf '%s\n' '테스트'
@@ -59,6 +61,11 @@ help:
 	@printf '  %-28s %s\n' 'make e2e-wait' 'Docker curl 컨테이너로 E2E 서비스 준비 상태를 확인합니다.'
 	@printf '  %-28s %s\n' 'make e2e-newman' 'Docker Newman 컨테이너로 E2E collection을 실행합니다.'
 	@printf '  %-28s %s\n' 'make e2e-down' 'E2E Docker Compose stack을 정리합니다.'
+	@printf '%s\n' ''
+	@printf '%s\n' '보안'
+	@printf '  %-28s %s\n' 'make security-install' 'gitleaks/hadolint와 Git hook을 준비합니다.'
+	@printf '  %-28s %s\n' 'make security-bootstrap' 'gitleaks/hadolint를 .tools/에 설치하거나 재사용합니다.'
+	@printf '  %-28s %s\n' 'make security-pre-push' '로컬 pre-push 보안 게이트를 수동 실행합니다.'
 	@printf '%s\n' ''
 	@printf '%s\n' '로컬 k8s 환경 설치'
 	@printf '  %-28s %s\n' 'make local-k8s-bootstrap' 'VM, Kubernetes, registry, Metrics Server, 앱 의존성을 준비합니다.'
@@ -99,7 +106,7 @@ help:
 
 list: help
 
-install:
+install: security-install
 	@set -e; \
 	if ! command -v $(VENV_BOOTSTRAP_PYTHON) >/dev/null 2>&1; then \
 		printf '%s\n' '$(VENV_BOOTSTRAP_PYTHON) command not found. Set VENV_BOOTSTRAP_PYTHON=python3 to use another interpreter.' >&2; \
@@ -168,6 +175,19 @@ e2e-newman:
 
 e2e-down:
 	$(DOCKER_COMPOSE) -p $(E2E_COMPOSE_PROJECT) -f $(E2E_COMPOSE_FILE) down -v --remove-orphans
+
+security-install:
+	sh scripts/security/bootstrap.sh
+	sh scripts/security/install-git-hooks.sh
+
+security-bootstrap:
+	sh scripts/security/bootstrap.sh
+
+security-hooks-install:
+	sh scripts/security/install-git-hooks.sh
+
+security-pre-push:
+	sh scripts/security/pre-push.sh
 
 $(INFRA_TARGETS):
 	$(INFRA_MAKE) $@

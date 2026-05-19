@@ -18,7 +18,48 @@
 
 ## Push 전 보안 게이트
 
-ECR image push 전에는 GitHub Actions에서 보안 차단 게이트를 먼저 통과해야 한다. 이 단계는 완전한 보장을 의미하지 않고, repo에 들어온 비밀값이나 Docker build 과정에서 남을 수 있는 위험을 push 전에 최대한 빨리 막는 역할을 한다.
+보안 게이트는 막아야 하는 노출 위치에 따라 두 층으로 나눈다.
+
+1. public repo 노출 방지
+   - 목적: GitHub에 push되기 전에 source 안의 secret, 위험한 Docker build context, Dockerfile 문제를 막는다.
+   - 로컬 pre-push hook과 GitHub Push Protection을 함께 사용한다.
+   - Actions의 secret scan은 GitHub push 이후에 실행되므로 public repo 노출을 사전에 막는 장치로만 보기에는 늦다.
+
+2. public registry 노출 방지
+   - 목적: ECR 같은 registry에 image가 올라가기 전에 image layer와 history에 남은 secret-like 값을 막는다.
+   - 현재 release workflow의 Trivy image scan과 Docker history scan이 담당한다.
+
+### 로컬 pre-push 게이트
+
+로컬 개발자는 sh 기반 Git hook을 설치해서 `git push` 직전에 source security gate를 실행한다. Windows는 Git for Windows가 제공하는 Git Bash 기준으로 지원하고, macOS/Linux는 기본 shell 환경에서 실행한다. hook wrapper는 `scripts/security/pre-push.sh`를 호출한다.
+
+처음 한 번만 다음 명령을 실행한다.
+
+```bash
+make install
+```
+
+`make install`은 `scripts/security/bootstrap.sh`로 repo-local 보안 도구를 준비하고, `scripts/security/install-git-hooks.sh`로 Git hook을 설치한다. PowerShell 7이나 Python은 필요하지 않다.
+
+hook 설치 스크립트는 다음 Git 설정을 repo-local로 적용한다.
+
+```bash
+git config core.hooksPath .githooks
+```
+
+보안 도구는 시스템 전역 설치보다 repo-local `.tools/`를 우선한다. `gitleaks`와 `hadolint`가 `.tools/`에 없으면 `scripts/security/bootstrap.sh`가 OS/architecture에 맞는 고정 버전을 다운로드하고 checksum을 검증한 뒤 재사용한다.
+
+로컬 pre-push에서 실행하는 검사는 다음과 같다.
+
+- repository secret scan: `gitleaks detect --source <repo> --redact --verbose`
+- build context 검증: root Java 서비스는 repo root context, dashboard는 `dashboard/` context로 보고 각 context의 `.dockerignore` 필수 패턴을 검사한다.
+- Dockerfile lint: repo 안의 모든 `Dockerfile`을 repo-local `hadolint`로 검사한다.
+
+GitHub Push Protection은 별도 repository 설정이 필요하다. 로컬 pre-push hook은 개발자 장비의 빠른 차단선이고, GitHub Push Protection은 GitHub 원격에 도달하는 push를 한 번 더 막는 차단선이다.
+
+### GitHub Actions 게이트
+
+ECR image push 전에는 GitHub Actions에서 보안 차단 게이트를 먼저 통과해야 한다. 이 단계는 완전한 보장을 의미하지 않고, repo에 들어온 비밀값이나 Docker build 과정에서 남을 수 있는 위험을 push 이후 CI에서 다시 확인하는 역할을 한다.
 
 PR과 일반 push에서는 `.github/workflows/security.yml`이 빠른 source 검증을 담당한다.
 

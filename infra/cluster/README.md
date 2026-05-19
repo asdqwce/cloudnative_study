@@ -80,11 +80,11 @@ infra/cluster/
 
 `CLUSTER_TOPOLOGY` 기본값은 `compact`입니다.
 
-| Topology         | 목적                                          | VM                                                                             | 기본 리소스              |
-| ---------------- | --------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------ |
-| `compact`        | 16GB 팀원도 실행 가능한 공통 기본 구성        | `control-plane-1`, `worker-1`, `worker-2`                                      | `6 vCPU`, `7GB RAM`      |
-| `balanced`       | Observability 실험용 4VM 중간 구성            | `control-plane-1`, `platform-1`, `app-1`, `data-1`                             | `8 vCPU`, `9GB RAM`      |
-| `role-separated` | platform/app/data 역할 배치와 node label 실험 | `control-plane-1`, `platform-1`, `app-a-1`, `app-b-1`, `postgres-1`, `kafka-1` | `10 vCPU`, `11GB RAM`    |
+| Topology         | 목적                                          | VM                                                                             | 기본 리소스           |
+| ---------------- | --------------------------------------------- | ------------------------------------------------------------------------------ | --------------------- |
+| `compact`        | 16GB 팀원도 실행 가능한 공통 기본 구성        | `control-plane-1`, `worker-1`, `worker-2`                                      | `6 vCPU`, `7GB RAM`   |
+| `balanced`       | Observability 실험용 4VM 중간 구성            | `control-plane-1`, `platform-1`, `app-1`, `data-1`                             | `8 vCPU`, `9GB RAM`   |
+| `role-separated` | platform/app/data 역할 배치와 node label 실험 | `control-plane-1`, `platform-1`, `app-a-1`, `app-b-1`, `postgres-1`, `kafka-1` | `10 vCPU`, `11GB RAM` |
 
 `compact` 기본 리소스는 16GB RAM 노트북에서도 실행 가능하도록 낮게 잡았습니다. 기존 `CONTROL_PLANE_*`, `WORKER_*` 설정은 이 기본 topology용으로 유지합니다.
 
@@ -99,12 +99,12 @@ infra/cluster/
 
 `balanced`는 `compact`보다 큰 관측성 실험용 구성이고, `role-separated`보다 VM 오버헤드가 작은 구성입니다. Prometheus/Grafana/Loki/Tempo는 `platform-1`에 배치하고, `data-1`은 PostgreSQL과 Kafka 후보 역할을 함께 맡습니다.
 
-| VM                | 역할                             | 기본 CPU | 기본 Memory | 기본 Disk |
-| ----------------- | -------------------------------- | -------: | ----------: | --------: |
-| `control-plane-1` | Kubernetes control-plane          |      `2` |    `2048MB` |    `25GB` |
-| `platform-1`      | Prometheus/Grafana/Loki/Tempo     |      `2` |    `3072MB` |    `45GB` |
-| `app-1`           | application workload              |      `2` |    `2048MB` |    `25GB` |
-| `data-1`          | PostgreSQL + Kafka 후보           |      `2` |    `2048MB` |    `45GB` |
+| VM                | 역할                          | 기본 CPU | 기본 Memory | 기본 Disk |
+| ----------------- | ----------------------------- | -------: | ----------: | --------: |
+| `control-plane-1` | Kubernetes control-plane      |      `2` |    `2048MB` |    `25GB` |
+| `platform-1`      | Prometheus/Grafana/Loki/Tempo |      `2` |    `3072MB` |    `45GB` |
+| `app-1`           | application workload          |      `2` |    `2048MB` |    `25GB` |
+| `data-1`          | PostgreSQL + Kafka 후보       |      `2` |    `2048MB` |    `45GB` |
 
 `.env`에 다음처럼 설정한 뒤 새 VM을 구성합니다.
 
@@ -344,34 +344,34 @@ make local-dev-down
 
 ## 주요 명령
 
-| 명령                         | 설명                                                              |
-| ---------------------------- | ----------------------------------------------------------------- |
-| `make check-tools`           | Vagrant, Ansible, Helm, VMware plugin 설치 여부 확인              |
-| `make local-vms-up`          | 선택된 topology의 VM 생성 또는 시작                               |
-| `make local-vms-status`      | VM 상태 확인                                                      |
-| `make local-vms-ssh-config`  | Vagrant SSH 설정 출력                                             |
-| `make local-vms-halt`        | VM 종료                                                           |
-| `make local-vms-destroy`     | VM과 디스크 삭제                                                  |
-| `make local-inventory`       | Vagrant SSH 설정으로 Ansible inventory 생성                       |
-| `make ansible-ping`          | 모든 VM에 Ansible 접속 확인                                       |
-| `make servers-bootstrap`     | containerd와 Kubernetes 패키지 설치                               |
-| `make servers-verify`        | 서버 기본 설정 검증                                               |
-| `make cluster-bootstrap`     | kubeadm 클러스터 구성                                             |
-| `make cluster-verify`        | Kubernetes 노드와 시스템 Pod 상태 검증                            |
-| `make metrics-bootstrap`     | Metrics Server 설치와 로컬 kubelet TLS 옵션 적용                  |
-| `make metrics-verify`        | `kubectl top nodes/pods` 동작 검증                                |
-| `make helm-bootstrap`        | control-plane VM에 Helm 설치                                      |
-| `make observability-images-push` | Observability chart image를 local registry로 mirror            |
-| `make observability-install` | control-plane VM 안에서 Observability stack 설치                  |
-| `make observability-status`  | control-plane VM 안에서 Observability 상태 확인                   |
-| `make grafana`               | Grafana 접속용 port-forward 실행                                  |
-| `make registry-bootstrap`    | control-plane VM에 HTTPS local registry 구성                      |
-| `make registry-verify`       | 모든 노드에서 local registry API 접근 검증                        |
-| `make registry-ca-install`   | 호스트 Docker가 local registry CA를 신뢰하도록 설치               |
-| `make local-k8s-deploy`      | 앱 image build/push, local apps overlay tag 갱신, 앱 apply/verify |
-| `make local-k8s-status`      | 앱 pod/service/PVC/event 확인                                     |
-| `make local-k8s-top`         | node와 pod/container 리소스 사용량 확인                           |
-| `make local-vms-reset`       | VM 삭제 후 처음부터 재구성                                        |
+| 명령                             | 설명                                                              |
+| -------------------------------- | ----------------------------------------------------------------- |
+| `make check-tools`               | Vagrant, Ansible, Helm, VMware plugin 설치 여부 확인              |
+| `make local-vms-up`              | 선택된 topology의 VM 생성 또는 시작                               |
+| `make local-vms-status`          | VM 상태 확인                                                      |
+| `make local-vms-ssh-config`      | Vagrant SSH 설정 출력                                             |
+| `make local-vms-halt`            | VM 종료                                                           |
+| `make local-vms-destroy`         | VM과 디스크 삭제                                                  |
+| `make local-inventory`           | Vagrant SSH 설정으로 Ansible inventory 생성                       |
+| `make ansible-ping`              | 모든 VM에 Ansible 접속 확인                                       |
+| `make servers-bootstrap`         | containerd와 Kubernetes 패키지 설치                               |
+| `make servers-verify`            | 서버 기본 설정 검증                                               |
+| `make cluster-bootstrap`         | kubeadm 클러스터 구성                                             |
+| `make cluster-verify`            | Kubernetes 노드와 시스템 Pod 상태 검증                            |
+| `make metrics-bootstrap`         | Metrics Server 설치와 로컬 kubelet TLS 옵션 적용                  |
+| `make metrics-verify`            | `kubectl top nodes/pods` 동작 검증                                |
+| `make helm-bootstrap`            | control-plane VM에 Helm 설치                                      |
+| `make observability-images-push` | Observability chart image를 local registry로 mirror               |
+| `make observability-install`     | control-plane VM 안에서 Observability stack 설치                  |
+| `make observability-status`      | control-plane VM 안에서 Observability 상태 확인                   |
+| `make grafana`                   | Grafana 접속용 port-forward 실행                                  |
+| `make registry-bootstrap`        | control-plane VM에 HTTPS local registry 구성                      |
+| `make registry-verify`           | 모든 노드에서 local registry API 접근 검증                        |
+| `make registry-ca-install`       | 호스트 Docker가 local registry CA를 신뢰하도록 설치               |
+| `make local-k8s-deploy`          | 앱 image build/push, local apps overlay tag 갱신, 앱 apply/verify |
+| `make local-k8s-status`          | 앱 pod/service/PVC/event 확인                                     |
+| `make local-k8s-top`             | node와 pod/container 리소스 사용량 확인                           |
+| `make local-vms-reset`           | VM 삭제 후 처음부터 재구성                                        |
 
 ## 검증 기준
 

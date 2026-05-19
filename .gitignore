@@ -474,6 +474,9 @@ gradle-app.setting
 # Newman test reports
 tests/e2e/newman/reports/
 
+# Repo-local security tools downloaded by scripts/security/bootstrap.sh
+.tools/
+
 # End of https://www.toptal.com/developers/gitignore/api/java,node,gradle,intellij,visualstudiocode,eclipse,macos,windows,linux
 
 # Local VM state and generated infrastructure files
