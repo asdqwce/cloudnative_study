@@ -28,10 +28,27 @@
         - kubelet_default.changed
         - kubelet_config.stat.exists
 
+    - name: Pre-pull Calico images from local registry
+      ansible.builtin.command:
+        argv:
+          - timeout
+          - "{{ calico_image_pull_timeout }}"
+          - crictl
+          - --runtime-endpoint
+          - "{{ kubernetes_cri_socket }}"
+          - pull
+          - "{{ item }}"
+      loop: "{{ calico_local_images }}"
+      register: calico_image_pull
+      changed_when: false
+      retries: 6
+      delay: 10
+      until: calico_image_pull.rc == 0
+
 - name: Initialize Kubernetes control plane
   hosts: control_plane
   become: true
-  gather_facts: true  # 프라이빗 IP 자동 수집을 위해 true로 변경
+  gather_facts: false
   vars_files:
     - ../group_vars/all.yml
 
@@ -65,7 +82,7 @@
           - "{{ kubeadm_init_timeout }}"
           - kubeadm
           - init
-          - "--apiserver-advertise-address={{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}"  # 프라이빗 IP 자동 수집
+          - "--apiserver-advertise-address={{ ansible_host }}"
           - "--pod-network-cidr={{ kubernetes_pod_network_cidr }}"
           - "--cri-socket={{ kubernetes_cri_socket }}"
         creates: "{{ kubernetes_admin_conf_path }}"
@@ -88,13 +105,27 @@
         mode: "0600"
         remote_src: true
 
+    - name: Download Calico manifest for local registry rendering
+      ansible.builtin.get_url:
+        url: "{{ calico_manifest_url }}"
+        dest: "{{ calico_local_manifest_path }}"
+        mode: "0644"
+        force: true
+
+    - name: Rewrite Calico images to local registry
+      ansible.builtin.replace:
+        path: "{{ calico_local_manifest_path }}"
+        regexp: "{{ item | regex_escape }}"
+        replace: "{{ local_registry_endpoint }}/{{ item }}"
+      loop: "{{ calico_images }}"
+
     - name: Install Calico CNI
       ansible.builtin.command:
         argv:
           - kubectl
           - apply
           - -f
-          - "{{ calico_manifest_url }}"
+          - "{{ calico_local_manifest_path }}"
       environment:
         KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
       register: calico_apply

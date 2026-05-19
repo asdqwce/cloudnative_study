@@ -1,39 +1,28 @@
-from datetime import datetime
-
-from sqlalchemy import DateTime, Integer, String, func
-from sqlalchemy.orm import Mapped, mapped_column
-
-from app.database import Base
+from datetime import datetime, timezone
 
 
-class Notification(Base):
-    __tablename__ = "notifications"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    patient_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
-    type: Mapped[str] = mapped_column(String(80), nullable=False)
-    message: Mapped[str] = mapped_column(String(500), nullable=False)
-    status: Mapped[str] = mapped_column(String(30), nullable=False, default="CREATED")
-    source_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-    @property
-    def patientId(self) -> int:
-        return self.patient_id
-
-    @property
-    def sourceId(self) -> int:
-        return self.source_id
-
-    @property
-    def createdAt(self) -> datetime:
-        return self.created_at
+def notification_to_doc(
+    patient_id: int,
+    type: str,
+    message: str,
+    status: str,
+    source_id: int,
+    metadata: dict | None = None,
+) -> dict:
+    return {
+        "patient_id": patient_id,
+        "type": type,
+        "message": message,
+        "status": status,
+        "source_id": source_id,
+        "metadata": metadata or {},
+        "created_at": datetime.now(timezone.utc),
+    }
 
 
-class ProcessedEvent(Base):
-    __tablename__ = "processed_events"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    event_id: Mapped[str] = mapped_column(String(120), unique=True, index=True, nullable=False)
-    notification_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+def processed_event_to_doc(event_id: str, notification_id: str) -> dict:
+    return {
+        "event_id": event_id,
+        "notification_id": notification_id,
+        "created_at": datetime.now(timezone.utc),
+    }

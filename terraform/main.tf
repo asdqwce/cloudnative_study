@@ -6,14 +6,14 @@ provider "aws" {
 
 # 키페어 등록
 resource "aws_key_pair" "k8s_key" {
-  key_name   = "k8s-key-${terraform.workspace}"
-  public_key = file(var.public_key_path)
+  key_name   = "k8s-key"
+  public_key = file("C:/.ssh/k8s-key.pub")
 }
 
 # 보안그룹
 resource "aws_security_group" "k8s_sg" {
-  name        = "k8s-sg-${terraform.workspace}"
-  description = "Security group for K8s cluster (${terraform.workspace})"
+  name        = "k8s-security-group"
+  description = "Security group for K8s cluster"
 
   # SSH
   ingress {
@@ -22,6 +22,7 @@ resource "aws_security_group" "k8s_sg" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
   # HTTP
   ingress {
     from_port   = 80
@@ -29,6 +30,7 @@ resource "aws_security_group" "k8s_sg" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
   # HTTPS
   ingress {
     from_port   = 443
@@ -36,6 +38,7 @@ resource "aws_security_group" "k8s_sg" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
   # K8s API 서버
   ingress {
     from_port   = 6443
@@ -43,6 +46,7 @@ resource "aws_security_group" "k8s_sg" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
   # NodePort 범위
   ingress {
     from_port   = 30000
@@ -50,13 +54,15 @@ resource "aws_security_group" "k8s_sg" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
   # 노드간 통신
   ingress {
-    from_port = 0
-    to_port   = 0
-    protocol  = "-1"
-    self      = true
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    self        = true
   }
+
   # 아웃바운드 모두 허용
   egress {
     from_port   = 0
@@ -66,16 +72,15 @@ resource "aws_security_group" "k8s_sg" {
   }
 
   tags = {
-    Name      = "k8s-sg-${terraform.workspace}"
-    Workspace = terraform.workspace
+    Name = "k8s-security-group"
   }
 }
 
 # 마스터 노드
 resource "aws_instance" "master" {
-  ami                    = "ami-0f5ddb19e2fbe4cc4"  # Ubuntu 24.04 ARM64 서울 리전
-  instance_type          = "r6g.large"
-  key_name               = aws_key_pair.k8s_key.key_name
+  ami           = "ami-0f5ddb19e2fbe4cc4"  # Ubuntu 24.04 ARM64 서울 리전
+  instance_type = "r6g.large"
+  key_name      = aws_key_pair.k8s_key.key_name
   vpc_security_group_ids = [aws_security_group.k8s_sg.id]
 
   root_block_device {
@@ -84,20 +89,20 @@ resource "aws_instance" "master" {
   }
 
   tags = {
-    Name      = "k8s-master-${terraform.workspace}"
-    Role      = "master"
-    Workspace = terraform.workspace
+    Name = "k8s-master"
+    Role = "master"
   }
 }
 
 # 워커 노드 2개
 resource "aws_instance" "worker" {
-  count                  = 2
-  ami                    = "ami-0f5ddb19e2fbe4cc4"  # Ubuntu 24.04 ARM64 서울 리전
-  instance_type          = "r6g.medium"
-  key_name               = aws_key_pair.k8s_key.key_name
+  count         = 2
+  ami           = "ami-0f5ddb19e2fbe4cc4"  # Ubuntu 24.04 ARM64 서울 리전
+  instance_type = "r6g.medium"
+  key_name      = aws_key_pair.k8s_key.key_name
   vpc_security_group_ids = [aws_security_group.k8s_sg.id]
-  depends_on             = [aws_instance.master]
+
+  depends_on = [aws_instance.master]
 
   root_block_device {
     volume_size = 20
@@ -105,9 +110,8 @@ resource "aws_instance" "worker" {
   }
 
   tags = {
-    Name      = "k8s-worker-${terraform.workspace}-${count.index + 1}"
-    Role      = "worker"
-    Workspace = terraform.workspace
+    Name = "k8s-worker-${count.index + 1}"
+    Role = "worker"
   }
 }
 
@@ -115,9 +119,7 @@ resource "aws_instance" "worker" {
 output "master_public_ip" {
   value = aws_instance.master.public_ip
 }
+
 output "worker_public_ips" {
   value = aws_instance.worker[*].public_ip
-}
-output "workspace" {
-  value = terraform.workspace
 }

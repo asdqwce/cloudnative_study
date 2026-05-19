@@ -109,39 +109,4 @@ patches:
         value:
           name: PATIENT_SERVICE_URL
           value: http://patient-service:8081
-  - target:
-      group: apps
-      version: v1
-      kind: Deployment
-      name: notification-service
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/env/0
-        value:
-          name: EUREKA_CLIENT_ENABLED
-          value: "false"
-      - op: add
-        path: /spec/template/spec/containers/0/env/-
-        value:
-          name: SPRING_KAFKA_BOOTSTRAP_SERVERS
-          value: kafka:9092
-      - op: add
-        path: /spec/template/spec/containers/0/env/-
-        value:
-          name: SPRING_KAFKA_CONSUMER_GROUP_ID
-          value: notification-group
-      - op: add
-        path: /spec/template/spec/containers/0/env/-
-        value:
-          name: SPRING_KAFKA_CONSUMER_KEY_DESERIALIZER
-          value: org.apache.kafka.common.serialization.StringDeserializer
-      - op: add
-        path: /spec/template/spec/containers/0/env/-
-        value:
-          name: SPRING_KAFKA_CONSUMER_VALUE_DESERIALIZER
-          value: org.springframework.kafka.support.serializer.JsonDeserializer
-      - op: add
-        path: /spec/template/spec/containers/0/env/-
-        value:
-          name: SPRING_KAFKA_CONSUMER_PROPERTIES_SPRING_JSON_TRUSTED_PACKAGES
-          value: "*"
+
