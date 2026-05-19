@@ -47,7 +47,7 @@ INFRA_TARGETS := \
 
 .PHONY: help list install activate terraform test-runner-build test-unit test test-all test-e2e e2e-up e2e-wait e2e-newman e2e-down \
 	security security-install security-bootstrap security-pre-push security-image-scan security-hooks-install \
-	aws-bootstrap \
+	aws-ssh aws-bootstrap \
 	$(TERRAFORM_COMMANDS) \
 	$(INFRA_TARGETS)
 
@@ -78,6 +78,7 @@ help:
 	@printf '  %-28s %s\n' 'make security' '필요한 보안 도구를 준비하고 전체 보안 검사를 실행합니다.'
 	@printf '%s\n' ''
 	@printf '%s\n' 'AWS GitOps bootstrap'
+	@printf '  %-32s %s\n' 'make aws-ssh' 'Terraform output의 control-plane public IP로 SSH 접속합니다.'
 	@printf '  %-32s %s\n' 'make aws-bootstrap' 'Terraform output으로 AWS inventory를 만든 뒤 서버, 클러스터, Helm, Argo CD 순서로 실행합니다.'
 	@printf '%s\n' ''
 	@printf '%s\n' '로컬 k8s 환경 설치'
@@ -162,6 +163,9 @@ $(TERRAFORM_COMMANDS):
 
 aws-bootstrap:
 	$(MAKE) -C $(TERRAFORM_DIR) aws-bootstrap ROOT_DIR="$(CURDIR)" TERRAFORM="$(TERRAFORM)" ANSIBLE_PLAYBOOK="$(ANSIBLE_PLAYBOOK)" ANSIBLE_FLAGS="$(ANSIBLE_FLAGS)"
+
+aws-ssh:
+	$(MAKE) -C $(TERRAFORM_DIR) aws-ssh ROOT_DIR="$(CURDIR)" TERRAFORM="$(TERRAFORM)"
 
 test-runner-build:
 	docker build -f tests/docker/Dockerfile -t $(TEST_RUNNER_IMAGE) .

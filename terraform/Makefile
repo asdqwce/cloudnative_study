@@ -14,11 +14,12 @@ AWS_ANSIBLE_PLAYBOOK_DIR ?= $(ROOT_DIR)/infra/cluster/provision/ansible/playbook
 AWS_ANSIBLE_GENERATED_INVENTORY_DIR ?= $(dir $(AWS_INVENTORY))
 AWS_ANSIBLE_SSH_USER ?= ubuntu
 AWS_ANSIBLE_SSH_PRIVATE_KEY_FILE ?= $(shell public_key_path="$$(sed -n 's/^[[:space:]]*k8s_public_key_path[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' terraform.tfvars 2>/dev/null | tail -n 1)"; if [ -n "$$public_key_path" ]; then printf '%s' "$${public_key_path%.pub}"; else printf '%s' ~/.ssh/k8s-key; fi)
+AWS_SSH_FLAGS ?= -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
 ANSIBLE_PLAYBOOK ?= ansible-playbook
 ANSIBLE_FLAGS ?=
 AWS_ANSIBLE_FLAGS ?= -e '{"local_registry_enabled": false}'
 
-.PHONY: help aws-bootstrap aws-ansible-syntax-check \
+.PHONY: help aws-ssh aws-bootstrap aws-ansible-syntax-check \
 	_aws-inventory _aws-servers-bootstrap _aws-cluster-bootstrap _aws-ecr-credential-provider-bootstrap _aws-helm-bootstrap _aws-argocd-bootstrap \
 	$(TERRAFORM_COMMANDS)
 
@@ -29,6 +30,7 @@ help:
 	@printf '  %-28s %s\n' 'make plan' 'Terraform 변경 계획을 확인합니다.'
 	@printf '  %-28s %s\n' 'make apply' 'Terraform 변경을 적용합니다.'
 	@printf '  %-28s %s\n' 'make output' 'Terraform output을 조회합니다.'
+	@printf '  %-28s %s\n' 'make aws-ssh' 'Terraform output의 control-plane public IP로 SSH 접속합니다.'
 	@printf '  %-28s %s\n' 'make aws-bootstrap' 'Terraform output 기반 AWS inventory로 클러스터 bootstrap을 실행합니다.'
 	@printf '  %-28s %s\n' 'TF_ARGS="..." make plan' '추가 Terraform 인자를 전달합니다.'
 
@@ -82,6 +84,27 @@ _aws-inventory:
 		printf '%s\n' "ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'"; \
 	} > "$(AWS_INVENTORY)"; \
 	printf 'Generated %s from Terraform outputs.\n' "$(AWS_INVENTORY)"
+
+aws-ssh:
+	@set -e; \
+	if [ ! -x "$(TERRAFORM)" ]; then \
+		printf '%s\n' 'Terraform not found. Run make install first.' >&2; \
+		exit 1; \
+	fi; \
+	master_ip="$$( $(TERRAFORM) output -raw master_public_ip )"; \
+	if [ -z "$$master_ip" ]; then \
+		printf '%s\n' 'Terraform output master_public_ip is required. Run make terraform apply first.' >&2; \
+		exit 1; \
+	fi; \
+	private_key_file="$(AWS_ANSIBLE_SSH_PRIVATE_KEY_FILE)"; \
+	case "$$private_key_file" in "~/"*) private_key_check_path="$$HOME/$${private_key_file#\~/}" ;; *) private_key_check_path="$$private_key_file" ;; esac; \
+	if [ ! -f "$$private_key_check_path" ]; then \
+		printf 'SSH private key not found: %s\n' "$$private_key_file" >&2; \
+		printf '%s\n' 'Set AWS_ANSIBLE_SSH_PRIVATE_KEY_FILE=/path/to/private-key if needed.' >&2; \
+		exit 1; \
+	fi; \
+	printf 'Connecting to %s@%s...\n' "$(AWS_ANSIBLE_SSH_USER)" "$$master_ip"; \
+	exec ssh $(AWS_SSH_FLAGS) -i "$$private_key_check_path" "$(AWS_ANSIBLE_SSH_USER)@$$master_ip"
 
 _aws-servers-bootstrap:
 	$(ANSIBLE_PLAYBOOK) $(ANSIBLE_FLAGS) $(AWS_ANSIBLE_FLAGS) -i $(AWS_INVENTORY) $(AWS_ANSIBLE_PLAYBOOK_DIR)/bootstrap-servers.yml
