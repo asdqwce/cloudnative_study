@@ -1,19 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${APP_NAMESPACE:=medical-platform}"
-: "${APP_DEPLOYMENTS:=deployment/api-gateway deployment/patient-service deployment/appointment-service deployment/prescription-service deployment/notification-service deployment/dashboard}"
-: "${APP_POD_SELECTOR:=app in (api-gateway,patient-service,appointment-service,prescription-service,notification-service,dashboard)}"
-: "${LOCAL_K8S_WAIT_TIMEOUT:=300s}"
+targets="${APP_ROLLOUT_TARGETS:-medical-auth:deployment/auth-service medical-patient:deployment/patient-service medical-appointment:deployment/appointment-service medical-prescription:deployment/prescription-service medical-notification:deployment/notification-service medical-dashboard:deployment/dashboard}"
+timeout="${LOCAL_K8S_WAIT_TIMEOUT:-300s}"
 
-mapfile -t running_pods < <(kubectl -n "$APP_NAMESPACE" get pods -l "$APP_POD_SELECTOR" -o name)
+for target in $targets; do
+  namespace="${target%%:*}"
+  resource="${target#*:}"
+  printf "== scale down: %s/%s ==\n" "$namespace" "$resource"
+  kubectl -n "$namespace" scale "$resource" --replicas=0
+done
 
-kubectl -n "$APP_NAMESPACE" scale $APP_DEPLOYMENTS --replicas=0
+for target in $targets; do
+  namespace="${target%%:*}"
+  resource="${target#*:}"
+  printf "== wait stopped: %s/%s ==\n" "$namespace" "$resource"
+  kubectl -n "$namespace" rollout status "$resource" --timeout="$timeout"
+done
 
-if ((${#running_pods[@]} > 0)); then
-  kubectl -n "$APP_NAMESPACE" wait --for=delete "${running_pods[@]}" --timeout="$LOCAL_K8S_WAIT_TIMEOUT"
-else
-  printf "%s\n" "No running app pods matched selector: $APP_POD_SELECTOR"
-fi
-
-kubectl -n "$APP_NAMESPACE" get pods -o wide
+kubectl get pods -A -o wide

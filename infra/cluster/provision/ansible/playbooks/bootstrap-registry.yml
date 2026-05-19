@@ -4,6 +4,8 @@
   connection: local
   become: false
   gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
 
   tasks:
     - name: Ensure local registry CA cache directory exists
@@ -45,6 +47,8 @@
   hosts: control_plane
   become: true
   gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
 
   handlers:
     - name: Restart docker-registry
@@ -234,6 +238,8 @@
   hosts: k8s_cluster
   become: true
   gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
 
   handlers:
     - name: Restart containerd

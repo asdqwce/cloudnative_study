@@ -1,22 +1,16 @@
 # 테스트 실행 가이드
 
-이 프로젝트의 테스트 진입점은 루트 `Makefile`입니다. 개발자 로컬에는 Docker, Docker Compose, Make만 준비하고, Java/Gradle/Newman 실행은 컨테이너 안에서 수행합니다.
+이 프로젝트의 테스트 진입점은 루트 `Makefile`이다. 개발자 로컬에는 Docker, Docker Compose, Make를 준비하고, Python pytest, curl, Newman 실행은 컨테이너 안에서 수행한다.
 
-통합 테스트는 Testcontainers로 PostgreSQL과 Kafka를 직접 띄워 실제 인프라에 가까운 환경에서 실행합니다. E2E 테스트는 기존처럼 Docker Compose 서비스와 Newman 컨테이너로 전체 사용자 흐름을 검증합니다.
+업무 흐름을 사람이 직접 검증하거나 장애를 주입해 확인하는 절차는 [project_docs/SCENARIO_TEST_GUIDE.md](../project_docs/SCENARIO_TEST_GUIDE.md)에 정리한다.
 
-## 준비물
+## 테스트 범위
 
-| OS | 기준 환경 |
-| --- | --- |
-| macOS | Docker Desktop, Make |
-| Linux | Docker Engine, Docker Compose plugin, Make |
-| Windows | Docker Desktop, Make를 사용할 수 있는 터미널 환경 |
-
-Windows에서는 Git Bash, WSL, Chocolatey/winget으로 설치한 Make 등 `make` 명령을 실행할 수 있는 환경을 사용합니다. Docker Desktop은 Linux container 모드로 실행합니다.
-
-`make test-integration`은 Docker Gradle 러너 안에서 다시 Testcontainers 컨테이너를 띄웁니다. 그래서 러너 컨테이너에는 `/var/run/docker.sock`이 마운트되고, 테스트 프로세스에는 `TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal`이 전달됩니다. Linux에서 `host.docker.internal` 해석이 필요하므로 Makefile은 기본적으로 `--add-host=host.docker.internal:host-gateway`를 붙입니다. Docker Desktop 29처럼 낮은 Docker API 버전 협상을 거부하는 환경을 위해 `DOCKER_API_VERSION=1.41`도 명시합니다.
-
-Testcontainers reusable mode는 팀 기본값으로 강제하지 않습니다. 개인 로컬에서 반복 실행 시간을 줄이고 싶다면 본인 환경의 `~/.testcontainers.properties`에 `testcontainers.reuse.enable=true`를 선택적으로 설정합니다.
+| 구분 | 도구 | 대상 |
+| --- | --- | --- |
+| 단위 테스트 | Docker Python pytest 러너 | `auth-service`, `patient-service`, `appointment-service`, `prescription-service`, `notification-service` |
+| E2E 테스트 | Docker Compose, PostgreSQL, Kafka, Docker curl/Newman 컨테이너 | 서비스 DNS 직접 호출로 환자 생성, 예약 확정, 이벤트 발행/소비, 알림 저장, 처방 발행 흐름 |
+| Gateway E2E | 별도 future scope | Kong/JWT/Ingress 라우팅과 MetalLB 노출 검증 |
 
 ## 폴더 구조
 
@@ -24,89 +18,93 @@ Testcontainers reusable mode는 팀 기본값으로 강제하지 않습니다. �
 tests/
   docker/
     Dockerfile
-  integration-support/
-    java/
-      com/medical/testsupport/AbstractIntegrationTest.java
   e2e/
+    docker-compose.yml
     postman/
       medical-platform.postman_collection.json
+    postgres-init/
+      01-create-databases.sql
     newman/
       docker.postman_environment.json
     scripts/
       wait-for-services.sh
 ```
 
-서비스 내부 단위/통합 테스트는 각 모듈의 `src/test/java` 아래에 둡니다. 여러 서비스를 관통하는 Newman E2E 테스트만 루트 `tests/e2e` 아래에 둡니다.
+서비스별 pytest는 각 서비스 디렉터리 안의 `tests/`에 둔다.
 
-## 통합 테스트 흐름
-
-`patient-service`, `appointment-service`, `prescription-service`, `notification-service`의 통합 테스트는 공통 `AbstractIntegrationTest`를 상속합니다.
-
-| 인프라 | 실행 방식 | 격리 기준 |
-| --- | --- | --- |
-| PostgreSQL | `PostgreSQLContainer` 공유 | 테스트 실행 ID 기반 schema suffix |
-| Kafka | `KafkaContainer` 공유 | 테스트 실행 ID 기반 topic/group suffix |
-
-Spring 설정은 `DynamicPropertySource`로 주입합니다. 테스트 클래스에는 H2 datasource를 직접 지정하지 않으며, Hibernate는 Testcontainers PostgreSQL의 실행별 schema에 테이블을 생성합니다.
-
-Kafka가 필요한 흐름은 mock 로그가 아니라 실제 Kafka topic을 사용합니다. `appointment-service`는 예약 확정 이벤트가 Kafka topic에 발행되는지 확인하고, `notification-service`는 Kafka 이벤트를 소비해 알림을 저장하는지 확인합니다.
-
-`PrescriptionIntegrationTest`의 `PatientClient @MockBean`은 유지합니다. 이 테스트의 범위는 처방 서비스 내부 통합 테스트이고, 서비스 간 실제 HTTP 흐름은 Newman E2E가 담당합니다.
-
-## 실행 명령
-
-```sh
-make help
-make list
-make test-unit
-make test-integration
-make test-e2e
-make test
+```text
+services/patient-service/tests/
+services/appointment-service/tests/
+services/prescription-service/tests/
+services/notification-service/tests/
 ```
 
-`make test-all`은 `make test`와 같은 전체 테스트 흐름입니다.
+## 로컬 단위 테스트
 
-| 명령 | 실행 내용 |
+루트에서 전체 서비스 테스트를 실행한다. `make test-unit`은 `tests/docker/Dockerfile`로 Python 테스트 러너 이미지를 빌드한 뒤, 현재 소스 트리를 컨테이너에 마운트해 서비스별 pytest를 실행한다.
+
+```bash
+make test-unit
+```
+
+## E2E 테스트 흐름
+
+Newman 컬렉션은 Docker Compose 네트워크 DNS로 각 서비스를 직접 호출해 다음 흐름을 검증한다. Kong/JWT/Ingress는 기본 `make test-e2e` 범위가 아니며, 서비스가 기대하는 `X-User-*` 헤더를 요청에 직접 넣는다.
+
+1. `STAFF` 사용자 헤더로 `patient-service`의 `POST /patients`를 호출해 환자를 생성한다.
+2. `PATIENT` 사용자 헤더로 `appointment-service`의 `POST /appointments`를 호출해 예약을 요청한다.
+3. `DOCTOR` 사용자 헤더로 `POST /appointments/{appointmentId}/confirm`을 호출해 예약을 확정한다.
+4. 예약 확정 이벤트가 `appointment-confirmed` 토픽으로 발행되고 `notification-service`가 알림을 저장한다.
+5. `DOCTOR` 사용자 헤더로 `prescription-service`의 `POST /prescriptions`를 호출해 처방을 발행한다.
+6. 처방 발행 이벤트가 `prescription-issued` 토픽으로 발행되고 `notification-service`가 알림을 저장한다.
+7. `PATIENT` 사용자 헤더로 `GET /notifications`, `GET /prescriptions`를 호출해 본인 데이터가 조회되는지 확인한다.
+
+## 로컬 E2E 실행
+
+`make test-e2e`는 Docker Compose로 PostgreSQL, Kafka, FastAPI 서비스를 띄운 뒤 같은 Compose 네트워크에서 Newman을 실행한다. 서비스 URL은 Compose DNS 이름을 사용한다.
+
+```bash
+make test-e2e
+```
+
+기본 URL은 다음과 같다.
+
+| 서비스 | 기본 URL |
 | --- | --- |
-| `make help` | 사용 가능한 Make 테스트 명령 목록 출력 |
-| `make list` | `make help`와 같은 명령 목록 출력 |
-| `make test-unit` | Docker 테스트 러너를 빌드한 뒤 Gradle `testUnit` 실행 |
-| `make test-integration` | Docker 테스트 러너를 빌드한 뒤 Testcontainers PostgreSQL/Kafka 기반 Gradle `testIntegration` 실행 |
-| `make test-e2e` | Docker Compose로 서비스 기동, readiness 확인, Newman 컨테이너 실행, 서비스 정리 |
-| `make test` | 단위, 통합, E2E 순서로 전체 실행 |
-| `make clean-test` | E2E Compose 리소스와 Gradle 캐시 볼륨 정리 |
+| `patient-service` | `http://patient-service:8081` |
+| `appointment-service` | `http://appointment-service:8082` |
+| `prescription-service` | `http://prescription-service:8083` |
+| `notification-service` | `http://notification-service:8084` |
 
-## E2E 흐름
+`tests/e2e/scripts/wait-for-services.sh`는 Docker curl 컨테이너 안에서 실행된다. Newman 컬렉션도 Docker Newman 컨테이너 안에서 실행되므로 로컬에 curl이나 newman을 따로 설치하지 않는다.
 
-Newman 컬렉션은 API Gateway 기준으로 다음 사용자 흐름을 검증합니다.
+수동으로 stack을 살펴보려면 다음 명령을 사용한다.
 
-1. `/auth/token`에서 테스트 토큰 발급
-2. `/patient-service/patients`로 환자 생성
-3. `/patient-service/patients/{id}`로 환자 조회
-4. `/appointment-service/appointments`로 예약 생성
-5. `/appointment-service/appointments/{id}/confirm`로 예약 확정
-6. `/prescription-service/prescriptions`로 처방 생성
-7. `/notification-service/notifications`로 알림 조회
+```bash
+make e2e-up
+make e2e-wait
+make e2e-newman
+make e2e-down
+```
 
-`tests/e2e/scripts/wait-for-services.sh`는 Newman 실행 전에 API Gateway 토큰 엔드포인트와 Eureka 등록 상태를 확인합니다.
+## CI
+
+`.github/workflows/ci.yml`은 `make test-unit`을 실행해 Docker Python 테스트 러너에서 서비스 pytest를 실행한다.
+
+`.github/workflows/e2e.yml`은 수동 실행 workflow다. GitHub runner 안에서 `make test-e2e`를 실행해 Docker Compose 기반 PostgreSQL/Kafka E2E stack과 Newman을 함께 실행한다.
+
+Kong/JWT/Ingress 검증은 기본 E2E와 분리한다. 이후 필요해지면 `make test-gateway-e2e` 같은 별도 타깃에서 MetalLB IP 또는 Ingress 주소, JWT 생성, Gateway 라우팅 검증을 다룬다.
 
 ## 실패 시 점검 포인트
 
 | 증상 | 점검 |
 | --- | --- |
-| Docker build 실패 | Docker Desktop/Engine이 실행 중인지 확인 |
-| `docker compose` 명령 실패 | Compose plugin 설치 여부 확인 |
-| `make` 명령 없음 | macOS/Linux는 Make 설치, Windows는 Git Bash/WSL/Make 설치 확인 |
-| Testcontainers가 Docker에 연결하지 못함 | `/var/run/docker.sock` 마운트 여부와 Docker daemon 실행 상태 확인 |
-| 통합 테스트에서 mapped port 접속 실패 | `TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal` 값과 `--add-host=host.docker.internal:host-gateway` 지원 여부 확인 |
-| Docker API 400 응답 | `DOCKER_API_VERSION=1.41` 이상으로 실행되는지 확인 |
-| Kafka 이벤트 테스트 timeout | topic suffix가 테스트 실행 ID로 주입됐는지, consumer group이 이전 실행과 충돌하지 않는지 확인 |
-| E2E readiness timeout | `docker compose -p medical-platform-test ps`와 서비스 로그 확인 |
-| Newman 401 응답 | 토큰 발급 요청이 먼저 성공했는지, Authorization 헤더가 유지되는지 확인 |
-| Newman 404 응답 | Gateway 라우트와 서비스 컨트롤러 경로가 맞는지 확인 |
-
-E2E 실패 후 수동 정리는 다음 명령을 사용합니다.
-
-```sh
-make e2e-down
-```
+| Docker build 실패 | Docker Desktop/Engine 실행 상태 확인 |
+| `docker compose` 실패 | Docker Compose plugin 설치 여부 확인 |
+| pytest import 실패 | `make test-unit`로 Docker 테스트 러너를 통해 실행했는지 확인 |
+| DB 연결 실패 | `DATABASE_URL` 값과 PostgreSQL 실행 상태 확인 |
+| Kafka 이벤트 검증 실패 | Compose `kafka:29092`, topic auto-create, `notification-service` consumer 로그 확인 |
+| Newman 401 | `X-User-Id`, `X-User-Role` 헤더 누락 여부 확인 |
+| Newman 403 | `X-Patient-Id`, `X-Doctor-Id`와 요청 데이터의 권한 관계 확인 |
+| Newman 404 | 서비스 URL과 API path 확인 |
+| Newman readiness timeout | `docker compose -p medical-platform-e2e -f tests/e2e/docker-compose.yml ps`와 각 서비스 로그 확인 |

@@ -3,6 +3,8 @@
   hosts: control_plane
   become: true
   gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
 
   tasks:
     - name: Check Metrics Server deployment
@@ -49,7 +51,7 @@
           - kubectl
           - get
           - namespace
-          - "{{ lookup('env', 'APP_NAMESPACE') | default('medical-platform', true) }}"
+          - "{{ lookup('env', 'APP_NAMESPACE') | default('medical-patient', true) }}"
       environment:
         KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
       register: app_namespace
@@ -63,7 +65,7 @@
           - top
           - pods
           - -n
-          - "{{ lookup('env', 'APP_NAMESPACE') | default('medical-platform', true) }}"
+          - "{{ lookup('env', 'APP_NAMESPACE') | default('medical-patient', true) }}"
           - --containers
       environment:
         KUBECONFIG: "{{ kubernetes_admin_conf_path }}"

@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-namespace="${APP_NAMESPACE:-medical-platform}"
 timeout="${LOCAL_K8S_WAIT_TIMEOUT:-300s}"
-statefulsets="${DEPENDENCY_STATEFULSETS:-statefulset/patient-db statefulset/appointment-db statefulset/prescription-db statefulset/kafka}"
+targets="${DEPENDENCY_ROLLOUT_TARGETS:-medical-auth:statefulset/auth-db medical-patient:statefulset/patient-db medical-appointment:statefulset/appointment-db medical-prescription:statefulset/prescription-db medical-notification:statefulset/notification-db medical-messaging:statefulset/kafka}"
 
 timeout_seconds() {
   case "$timeout" in
@@ -14,6 +13,7 @@ timeout_seconds() {
 }
 
 show_diagnostics() {
+  local namespace="$1"
   kubectl -n "$namespace" get pods -o wide || true
   kubectl -n "$namespace" get statefulset || true
   kubectl -n "$namespace" get pvc || true
@@ -21,6 +21,7 @@ show_diagnostics() {
 }
 
 fail_on_blocked_pods() {
+  local namespace="$1"
   local blocked
   blocked="$(
     kubectl -n "$namespace" get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{range .status.initContainerStatuses[*]}{.state.waiting.reason}{" "}{.state.waiting.message}{" "}{end}{range .status.containerStatuses[*]}{.state.waiting.reason}{" "}{.state.waiting.message}{" "}{end}{"\n"}{end}' \
@@ -30,20 +31,21 @@ fail_on_blocked_pods() {
   if [ -n "$blocked" ]; then
     printf "%s\n" "dependency pod is blocked:"
     printf "%s\n" "$blocked"
-    show_diagnostics
+    show_diagnostics "$namespace"
     exit 1
   fi
 }
 
 wait_for_statefulset() {
-  local resource="$1"
+  local namespace="$1"
+  local resource="$2"
   local deadline ready replicas
   deadline=$(( SECONDS + $(timeout_seconds) ))
 
-  printf "== rollout: %s ==\n" "$resource"
+  printf "== rollout: %s/%s ==\n" "$namespace" "$resource"
 
   while [ "$SECONDS" -lt "$deadline" ]; do
-    fail_on_blocked_pods
+    fail_on_blocked_pods "$namespace"
 
     read -r ready replicas < <(
       kubectl -n "$namespace" get "$resource" -o jsonpath='{.status.readyReplicas}{" "}{.spec.replicas}{"\n"}'
@@ -52,21 +54,23 @@ wait_for_statefulset() {
     replicas="${replicas:-0}"
 
     if [ "$replicas" != "0" ] && [ "$ready" = "$replicas" ]; then
-      printf "%s ready: %s/%s\n" "$resource" "$ready" "$replicas"
+      printf "%s/%s ready: %s/%s\n" "$namespace" "$resource" "$ready" "$replicas"
       return 0
     fi
 
-    printf "%s waiting: %s/%s ready\n" "$resource" "$ready" "$replicas"
+    printf "%s/%s waiting: %s/%s ready\n" "$namespace" "$resource" "$ready" "$replicas"
     sleep 5
   done
 
-  printf "%s timed out after %s\n" "$resource" "$timeout"
-  show_diagnostics
+  printf "%s/%s timed out after %s\n" "$namespace" "$resource" "$timeout"
+  show_diagnostics "$namespace"
   return 1
 }
 
-kubectl -n "$namespace" get pods -o wide
-for resource in $statefulsets; do
-  wait_for_statefulset "$resource"
+for target in $targets; do
+  namespace="${target%%:*}"
+  resource="${target#*:}"
+  kubectl -n "$namespace" get pods -o wide
+  wait_for_statefulset "$namespace" "$resource"
 done
-kubectl -n "$namespace" get pods -o wide
+kubectl get pods -A -o wide

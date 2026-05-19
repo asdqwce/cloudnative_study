@@ -1,13 +1,14 @@
 #!/bin/sh
 set -eu
 
-BASE_URL="${E2E_BASE_URL:-http://api-gateway:8080}"
-EUREKA_URL="${EUREKA_URL:-http://eureka-server:8761/eureka/apps}"
+PATIENT_SERVICE_URL="${E2E_PATIENT_SERVICE_URL:-http://patient-service:8081}"
+APPOINTMENT_SERVICE_URL="${E2E_APPOINTMENT_SERVICE_URL:-http://appointment-service:8082}"
+PRESCRIPTION_SERVICE_URL="${E2E_PRESCRIPTION_SERVICE_URL:-http://prescription-service:8083}"
+NOTIFICATION_SERVICE_URL="${E2E_NOTIFICATION_SERVICE_URL:-http://notification-service:8084}"
 TIMEOUT_SECONDS="${E2E_WAIT_TIMEOUT_SECONDS:-180}"
 SLEEP_SECONDS="${E2E_WAIT_SLEEP_SECONDS:-5}"
 
 start_time="$(date +%s)"
-services="PATIENT-SERVICE APPOINTMENT-SERVICE PRESCRIPTION-SERVICE NOTIFICATION-SERVICE"
 
 log() {
   printf '%s\n' "$*"
@@ -19,31 +20,36 @@ deadline_exceeded() {
   [ "$elapsed" -ge "$TIMEOUT_SECONDS" ]
 }
 
-check_gateway() {
-  curl -fsS "$BASE_URL/auth/token" >/dev/null
+check_health() {
+  service_name="$1"
+  service_url="$2"
+  status_code="$(curl -sS -o /dev/null -w '%{http_code}' "$service_url/health" || true)"
+  if [ "$status_code" != "200" ]; then
+    log "$service_name is not ready yet. HTTP status: $status_code"
+    return 1
+  fi
+  return 0
 }
 
-check_gateway_routes() {
-  curl -fsS "$BASE_URL/patient-service/patients" >/dev/null
-}
-
-check_eureka_services() {
-  body="$(curl -fsS -H 'Accept: application/json' "$EUREKA_URL")"
-  for service in $services; do
-    printf '%s' "$body" | grep -q "$service" || return 1
-  done
+check_services() {
+  check_health "patient-service" "$PATIENT_SERVICE_URL" &&
+    check_health "appointment-service" "$APPOINTMENT_SERVICE_URL" &&
+    check_health "prescription-service" "$PRESCRIPTION_SERVICE_URL" &&
+    check_health "notification-service" "$NOTIFICATION_SERVICE_URL"
 }
 
 while true; do
-  if check_gateway && check_eureka_services && check_gateway_routes; then
+  if check_services; then
     log "E2E services are ready."
     exit 0
   fi
 
   if deadline_exceeded; then
     log "Timed out waiting for E2E services."
-    log "Gateway: $BASE_URL"
-    log "Eureka: $EUREKA_URL"
+    log "patient-service: $PATIENT_SERVICE_URL"
+    log "appointment-service: $APPOINTMENT_SERVICE_URL"
+    log "prescription-service: $PRESCRIPTION_SERVICE_URL"
+    log "notification-service: $NOTIFICATION_SERVICE_URL"
     exit 1
   fi
 
