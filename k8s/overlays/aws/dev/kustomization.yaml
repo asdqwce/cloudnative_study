@@ -18,22 +18,22 @@ resources:
 images:
 - name: zexpand/appointment-service
   newName: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study-everlit/appointment-service
-  newTag: v0.0.1-smoke.6
+  newTag: v0.0.1-smoke.7
 - name: zexpand/auth-service
   newName: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study-everlit/auth-service
-  newTag: v0.0.1-smoke.6
+  newTag: v0.0.1-smoke.7
 - name: zexpand/dashboard
   newName: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study-everlit/dashboard
-  newTag: v0.0.1-smoke.6
+  newTag: v0.0.1-smoke.7
 - name: zexpand/notification-service
   newName: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study-everlit/notification-service
-  newTag: v0.0.1-smoke.6
+  newTag: v0.0.1-smoke.7
 - name: zexpand/patient-service
   newName: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study-everlit/patient-service
-  newTag: v0.0.1-smoke.6
+  newTag: v0.0.1-smoke.7
 - name: zexpand/prescription-service
   newName: 941141115079.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study-everlit/prescription-service
-  newTag: v0.0.1-smoke.6
+  newTag: v0.0.1-smoke.7
 patches:
 - patch: |-
     - op: add
