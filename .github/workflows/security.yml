@@ -26,8 +26,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install Gitleaks
+        run: SECURITY_BOOTSTRAP_TOOLS=gitleaks sh scripts/security/bootstrap.sh
+
       - name: Scan repository secrets
-        uses: gitleaks/gitleaks-action@v2
+        run: ./.tools/gitleaks detect --source . --redact --verbose
 
       - name: Verify Docker build contexts
         run: ./scripts/verify-dockerignore.sh

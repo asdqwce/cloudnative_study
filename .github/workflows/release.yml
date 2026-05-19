@@ -58,8 +58,11 @@ jobs:
           git rev-parse -q --verify "refs/tags/${IMAGE_TAG}^{tag}" >/dev/null ||
             git rev-parse -q --verify "refs/tags/${IMAGE_TAG}^{commit}" >/dev/null
 
+      - name: Install Gitleaks
+        run: SECURITY_BOOTSTRAP_TOOLS=gitleaks sh scripts/security/bootstrap.sh
+
       - name: Scan repository secrets
-        uses: gitleaks/gitleaks-action@v2
+        run: ./.tools/gitleaks detect --source . --redact --verbose
 
       - name: Verify Docker build contexts
         run: ./scripts/verify-dockerignore.sh
