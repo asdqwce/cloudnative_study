@@ -159,7 +159,16 @@ EC2 worker instance profile에는 최소한 다음 ECR pull 권한이 필요하�
 
 `imagePullSecrets`는 ECR token이 12시간 후 만료되므로 장기 운영 방식으로 쓰지 않는다. 장애 대응이나 credential provider 도입 전 임시 검증에는 사용할 수 있지만, Git에 token이나 Docker config를 남기지 않는다.
 
-현재 GitOps bootstrap은 Argo CD와 Application 등록까지 담당한다. worker node의 ECR credential provider 설치는 별도 클러스터 hardening 작업으로 남아 있으므로, Argo CD sync 완료 판단 전에는 worker에서 Private ECR image pull smoke를 먼저 통과시켜야 한다. 이 전제가 충족되지 않으면 Argo CD sync는 성공하더라도 Pod는 `ImagePullBackOff`가 될 수 있다.
+AWS bootstrap은 로컬 registry를 끄고, 별도 AWS 전용 playbook으로 kubelet ECR credential provider를 켠다. 공용 `bootstrap-servers.yml`와 `bootstrap-cluster.yml`는 Vagrant/local kubeadm 흐름에서도 쓰이므로 ECR 설정을 넣지 않는다.
+
+root `Makefile`은 사용자가 직접 실행할 `make aws-bootstrap`만 노출한다. 세부 bootstrap 단계는 `terraform/Makefile` 안에서 내부 target으로 관리하고, 공용 cluster bootstrap 뒤에 `bootstrap-aws-ecr-credential-provider.yml`을 실행한다. 이 AWS 전용 playbook은 worker node에 provider binary와 `CredentialProviderConfig`를 설치하고, `/etc/default/kubelet`의 `KUBELET_EXTRA_ARGS`에 다음 flag를 추가한다.
+
+```text
+--image-credential-provider-config=/etc/kubernetes/ecr-credential-provider.yaml
+--image-credential-provider-bin-dir=/opt/kubelet-credential-providers
+```
+
+이 설정 뒤에도 실제 인증 경계는 worker node의 IAM Role이다. provider는 node IAM credential로 ECR authorization token을 얻어 kubelet/containerd image pull 경로에 전달할 뿐이고, GitHub Actions나 Argo CD가 직접 `kubectl apply`하거나 registry token을 Kubernetes Secret으로 주입하지 않는다.
 
 ## Argo CD 배포 방식
 
@@ -196,14 +205,16 @@ AWS bootstrap은 기본적으로 Terraform output에서 EC2 public IP를 읽어 
 이 방식이면 `terraform apply` 뒤에 public IP를 `dev.ini`에 다시 적지 않아도 된다. 고정 IP inventory는 public IP가 바뀔 때마다 수동 갱신해야 하므로 기본 흐름에서는 생성된 `.tools/ansible/aws.ini`를 사용한다. `infra/cluster/provision/ansible/inventories/aws/dev.ini`는 필요할 때 `AWS_INVENTORY=...`로 지정하는 예시/비상용 fallback으로만 둔다.
 
 ```bash
-make aws-ansible-syntax-check
-make aws-servers-bootstrap
-make aws-cluster-bootstrap
-make aws-helm-bootstrap
-make aws-argocd-bootstrap
+make aws-bootstrap
 ```
 
-전체 순서를 한 번에 실행하려면 `make aws-bootstrap`을 사용한다. 이 target은 Terraform output으로 inventory를 먼저 만든 뒤 bootstrap playbook을 순서대로 실행한다. 목표 흐름은 `make terraform apply && make aws-bootstrap`이다. Terraform `apply`와 원격 Ansible 실행은 실제 AWS 리소스와 EC2 서버에 영향을 주므로, dry-run이나 syntax check로 명령을 먼저 확인한 뒤 명시적으로 실행한다.
+이 target은 root에서 노출되는 유일한 AWS bootstrap 진입점이다. 내부적으로는 Terraform output으로 inventory를 먼저 만든 뒤 서버, 클러스터, ECR credential provider, Helm, Argo CD bootstrap playbook을 순서대로 실행한다. 목표 흐름은 `make terraform apply && make aws-bootstrap`이다. Terraform `apply`와 원격 Ansible 실행은 실제 AWS 리소스와 EC2 서버에 영향을 주므로, dry-run이나 syntax check로 명령을 먼저 확인한 뒤 명시적으로 실행한다.
+
+개발 중 세부 playbook syntax를 확인해야 할 때는 root 명령으로 노출하지 않고 Terraform 작업 디렉터리에서 내부 검증 target을 실행한다.
+
+```bash
+make -C terraform aws-ansible-syntax-check
+```
 
 ## Repository 변경 후보
 
