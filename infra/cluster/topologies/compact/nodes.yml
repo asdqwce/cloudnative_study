@@ -1,0 +1,36 @@
+cluster_topology: compact
+description: 16GB class local laptops, three VM shared team baseline.
+nodes:
+  - name: control-plane-1
+    ip: 10.10.10.10
+    role: control-plane
+    ansible_groups: control_plane
+    cpus_env: CONTROL_PLANE_CPUS
+    cpus: 2
+    memory_env: CONTROL_PLANE_MEMORY_MB
+    memory_mb: 3072
+    disk_env: CONTROL_PLANE_DISK_SIZE
+    disk_size: 30270
+    labels:
+  - name: worker-1
+    ip: 10.10.10.11
+    role: worker
+    ansible_groups: workers
+    cpus_env: WORKER_CPUS
+    cpus: 2
+    memory_env: WORKER_MEMORY_MB
+    memory_mb: 2048
+    disk_env: WORKER_DISK_SIZE
+    disk_size: 30270
+    labels:
+  - name: worker-2
+    ip: 10.10.10.12
+    role: worker
+    ansible_groups: workers
+    cpus_env: WORKER_CPUS
+    cpus: 2
+    memory_env: WORKER_MEMORY_MB
+    memory_mb: 2048
+    disk_env: WORKER_DISK_SIZE
+    disk_size: 30270
+    labels:

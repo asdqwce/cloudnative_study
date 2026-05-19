@@ -1,0 +1,254 @@
+---
+- name: Bootstrap Linux servers for kubeadm
+  hosts: k8s_cluster
+  become: true
+  gather_facts: true
+  vars_files:
+    - ../group_vars/all.yml
+
+  handlers:
+    - name: Restart containerd
+      ansible.builtin.service:
+        name: containerd
+        state: restarted
+
+  tasks:
+    - name: Clean stale apt package cache
+      ansible.builtin.command: apt-get clean
+      changed_when: false
+
+    - name: Remove stale partial apt downloads
+      ansible.builtin.file:
+        path: /var/cache/apt/archives/partial
+        state: absent
+
+    - name: Recreate apt partial download directory
+      ansible.builtin.file:
+        path: /var/cache/apt/archives/partial
+        state: directory
+        owner: _apt
+        group: root
+        mode: "0700"
+
+    - name: Refresh apt package cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 0
+      register: apt_cache_refresh
+      retries: 3
+      delay: 10
+      until: apt_cache_refresh is succeeded
+
+    - name: Install base packages
+      ansible.builtin.apt:
+        name: "{{ server_base_packages }}"
+        state: present
+      register: base_package_install
+      retries: 3
+      delay: 15
+      until: base_package_install is succeeded
+
+    - name: Install debug packages
+      ansible.builtin.apt:
+        name: "{{ server_debug_packages }}"
+        state: present
+      register: debug_package_install
+      retries: 3
+      delay: 15
+      until: debug_package_install is succeeded
+
+    - name: Collect Ubuntu service state for local cleanup
+      ansible.builtin.service_facts:
+
+    - name: Disable unnecessary background services for local experiments
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+      loop:
+        - snapd.service
+        - multipathd.service
+        - multipathd.socket
+      loop_control:
+        label: "{{ item }}"
+      when: item in ansible_facts.services
+
+    - name: Disable swap for kubelet
+      ansible.builtin.command: swapoff -a
+      changed_when: false
+
+    - name: Remove swap entries from fstab
+      ansible.builtin.replace:
+        path: /etc/fstab
+        regexp: '^([^#].*\sswap\s.*)$'
+        replace: '# \1'
+
+    - name: Load Kubernetes kernel modules now
+      ansible.builtin.command: "modprobe {{ item }}"
+      changed_when: false
+      loop:
+        - overlay
+        - br_netfilter
+
+    - name: Persist Kubernetes kernel modules
+      ansible.builtin.copy:
+        dest: /etc/modules-load.d/k8s.conf
+        mode: "0644"
+        content: |
+          overlay
+          br_netfilter
+
+    - name: Configure Kubernetes sysctl settings
+      ansible.builtin.copy:
+        dest: /etc/sysctl.d/99-kubernetes-cri.conf
+        mode: "0644"
+        content: |
+          net.bridge.bridge-nf-call-iptables = 1
+          net.bridge.bridge-nf-call-ip6tables = 1
+          net.ipv4.ip_forward = 1
+
+    - name: Apply sysctl settings
+      ansible.builtin.command: sysctl --system
+      changed_when: false
+
+    - name: Ensure containerd config directory exists
+      ansible.builtin.file:
+        path: /etc/containerd
+        state: directory
+        mode: "0755"
+
+    - name: Generate default containerd config
+      ansible.builtin.command: containerd config default
+      register: containerd_default_config
+      changed_when: false
+
+    - name: Configure containerd to use systemd cgroup driver
+      ansible.builtin.copy:
+        dest: "{{ containerd_config_path }}"
+        mode: "0644"
+        content: "{{ containerd_default_config.stdout | regex_replace('SystemdCgroup = false', 'SystemdCgroup = true') }}"
+      notify: Restart containerd
+
+    - name: Configure containerd registry config path
+      ansible.builtin.replace:
+        path: "{{ containerd_config_path }}"
+        regexp: "(?s)(\\[plugins\\.'io\\.containerd\\.cri\\.v1\\.images'\\.registry\\])\\s*config_path\\s*=.*?(\\n\\s*\\[plugins\\.'io\\.containerd\\.cri\\.v1\\.images'\\.image_decryption\\])"
+        replace: |-
+          \1
+                config_path = "{{ containerd_registry_config_path }}"
+          \2
+      notify: Restart containerd
+
+    - name: Ensure local registry trust directory exists
+      ansible.builtin.file:
+        path: "{{ containerd_registry_config_path }}/{{ local_registry_endpoint }}"
+        state: directory
+        mode: "0755"
+
+    - name: Trust the local registry CA path from containerd
+      ansible.builtin.copy:
+        dest: "{{ containerd_registry_config_path }}/{{ local_registry_endpoint }}/hosts.toml"
+        mode: "0644"
+        content: |
+          server = "https://{{ local_registry_endpoint }}"
+
+          [host."https://{{ local_registry_endpoint }}"]
+            capabilities = ["pull", "resolve", "push"]
+            ca = "{{ containerd_registry_config_path }}/{{ local_registry_endpoint }}/ca.crt"
+      notify: Restart containerd
+
+    - name: Ensure containerd is enabled
+      ansible.builtin.service:
+        name: containerd
+        enabled: true
+        state: started
+
+    - name: Configure crictl to use containerd
+      ansible.builtin.copy:
+        dest: "{{ crictl_config_path }}"
+        mode: "0644"
+        content: |
+          runtime-endpoint: {{ kubernetes_cri_socket }}
+          image-endpoint: {{ kubernetes_cri_socket }}
+          timeout: 10
+          debug: false
+
+    - name: Ensure apt keyring directory exists
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Download Kubernetes apt Release key
+      ansible.builtin.get_url:
+        url: "https://pkgs.k8s.io/core:/stable:/{{ kubernetes_apt_release }}/deb/Release.key"
+        dest: /tmp/kubernetes-release.key
+        mode: "0644"
+
+    - name: Install Kubernetes apt keyring
+      ansible.builtin.shell: |
+        gpg --dearmor < /tmp/kubernetes-release.key > /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+      args:
+        creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+    - name: Add Kubernetes apt repository
+      ansible.builtin.copy:
+        dest: /etc/apt/sources.list.d/kubernetes.list
+        mode: "0644"
+        content: |
+          deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/{{ kubernetes_apt_release }}/deb/ /
+
+    - name: Install kubelet, kubeadm, kubectl, and CRI tools
+      ansible.builtin.apt:
+        name:
+          - cri-tools
+          - kubelet
+          - kubeadm
+          - kubectl
+        state: present
+        update_cache: true
+
+    - name: Hold Kubernetes packages
+      ansible.builtin.dpkg_selections:
+        name: "{{ item }}"
+        selection: hold
+      loop:
+        - cri-tools
+        - kubelet
+        - kubeadm
+        - kubectl
+
+    - name: Enable kubelet
+      ansible.builtin.service:
+        name: kubelet
+        enabled: true
+
+    - name: Install kubectl bash completion
+      ansible.builtin.shell: |
+        kubectl completion bash > /etc/bash_completion.d/kubectl
+      args:
+        creates: /etc/bash_completion.d/kubectl
+
+    - name: Install kubeadm bash completion
+      ansible.builtin.shell: |
+        kubeadm completion bash > /etc/bash_completion.d/kubeadm
+      args:
+        creates: /etc/bash_completion.d/kubeadm
+
+    - name: Enable kubectl alias completion for root
+      ansible.builtin.copy:
+        dest: /etc/profile.d/kubernetes-completion.sh
+        mode: "0644"
+        content: |
+          if [ -f /usr/share/bash-completion/bash_completion ]; then
+            . /usr/share/bash-completion/bash_completion
+          fi
+          alias k=kubectl
+          complete -o default -F __start_kubectl k
+
+    - name: Write bootstrap marker
+      ansible.builtin.copy:
+        dest: "{{ bootstrap_marker_path }}"
+        mode: "0644"
+        content: |
+          cloudnative cluster server initialization completed

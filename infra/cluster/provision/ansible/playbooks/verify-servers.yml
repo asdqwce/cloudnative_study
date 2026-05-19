@@ -1,0 +1,49 @@
+---
+- name: Verify server bootstrap result
+  hosts: k8s_cluster
+  become: true
+  gather_facts: false
+  vars_files:
+    - ../group_vars/all.yml
+
+  tasks:
+    - name: Check bootstrap marker
+      ansible.builtin.stat:
+        path: "{{ bootstrap_marker_path }}"
+      register: bootstrap_marker
+
+    - name: Fail when bootstrap marker is missing
+      ansible.builtin.fail:
+        msg: "Server bootstrap marker is missing. Run make servers-bootstrap first."
+      when: not bootstrap_marker.stat.exists
+
+    - name: Check required commands
+      ansible.builtin.command: "which {{ item }}"
+      changed_when: false
+      loop:
+        - containerd
+        - btop
+        - curl
+        - jq
+        - kubeadm
+        - kubelet
+        - kubectl
+        - ncdu
+        - tcpdump
+        - tmux
+
+    - name: Check containerd service
+      ansible.builtin.systemd:
+        name: containerd
+      register: containerd_service
+
+    - name: Fail when containerd is not running
+      ansible.builtin.fail:
+        msg: "containerd is not running."
+      when: containerd_service.status.ActiveState != "active"
+
+    - name: Check swap is disabled
+      ansible.builtin.command: swapon --show
+      register: swapon_result
+      changed_when: false
+      failed_when: swapon_result.stdout | length > 0

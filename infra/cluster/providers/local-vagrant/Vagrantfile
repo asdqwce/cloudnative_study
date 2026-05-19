@@ -1,0 +1,77 @@
+# frozen_string_literal: true
+
+require "yaml"
+
+env_file = File.expand_path("../../.env", __dir__)
+if File.exist?(env_file)
+  File.readlines(env_file).each do |line|
+    line = line.strip
+    next if line.empty? || line.start_with?("#")
+
+    key, value = line.split("=", 2)
+    ENV[key] ||= value if key && value
+  end
+end
+
+VAGRANT_BOX = ENV.fetch("LOCAL_VAGRANT_BOX", "bento/ubuntu-22.04")
+CLUSTER_TOPOLOGY = ENV.fetch("CLUSTER_TOPOLOGY", "compact")
+
+TOPOLOGY_FILE = File.expand_path("../../topologies/#{CLUSTER_TOPOLOGY}/nodes.yml", __dir__)
+unless File.exist?(TOPOLOGY_FILE)
+  raise "Unknown CLUSTER_TOPOLOGY=#{CLUSTER_TOPOLOGY}. Expected nodes.yml at #{TOPOLOGY_FILE}"
+end
+
+def env_int(name, default)
+  ENV.fetch(name, default.to_s).to_i
+end
+
+def env_value(name, default)
+  ENV.fetch(name, default.to_s)
+end
+
+def disk_size(name, default)
+  value = env_value(name, default)
+  value.match?(/\A\d+\z/) ? value.to_i : value
+end
+
+topology = YAML.load_file(TOPOLOGY_FILE)
+NODES = topology.fetch("nodes").map do |node|
+  {
+    name: node.fetch("name"),
+    ip: node.fetch("ip"),
+    cpus: env_int(node.fetch("cpus_env"), node.fetch("cpus")),
+    memory: env_int(node.fetch("memory_env"), node.fetch("memory_mb")),
+    disk: disk_size(node.fetch("disk_env"), node.fetch("disk_size"))
+  }
+end.freeze
+
+HOSTS = NODES.map { |node| "#{node[:ip]} #{node[:name]}" }.join("\n")
+
+Vagrant.configure("2") do |config|
+  config.vm.box = VAGRANT_BOX
+  config.ssh.insert_key = true
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+
+  NODES.each do |node|
+    config.vm.define node[:name] do |machine|
+      machine.vm.hostname = node[:name]
+      machine.vm.network "private_network", ip: node[:ip]
+      machine.vm.disk :disk, primary: true, size: node[:disk]
+
+      machine.vm.provider "vmware_desktop" do |vmware|
+        vmware.gui = false
+        vmware.vmx["memsize"] = node[:memory].to_s
+        vmware.vmx["numvcpus"] = node[:cpus].to_s
+      end
+
+      machine.vm.provision "shell", inline: <<-SHELL
+        set -eu
+        sudo hostnamectl set-hostname #{node[:name]}
+        sudo sed -i '/cloudnative-local-cluster/d' /etc/hosts
+        cat <<'HOSTS' | sudo tee -a /etc/hosts >/dev/null
+#{HOSTS.lines.map { |line| "#{line.chomp} # cloudnative-local-cluster" }.join("\n")}
+HOSTS
+      SHELL
+    end
+  end
+end
