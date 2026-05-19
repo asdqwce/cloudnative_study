@@ -107,3 +107,9 @@ variable "github_oidc_thumbprints" {
   type        = list(string)
   default     = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
 }
+
+variable "public_key_path" {
+  description = "SSH 공개키 경로 (각자 본인 경로로 설정)"
+  type        = string
+  default     = "~/.ssh/k8s-key.pub"
+}

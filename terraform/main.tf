@@ -11,14 +11,14 @@ data "aws_caller_identity" "current" {}
 
 # 키페어 등록
 resource "aws_key_pair" "k8s_key" {
-  key_name   = "k8s-key"
+  key_name   = "k8s-key-${terraform.workspace}"
   public_key = var.k8s_public_key_path != "" ? file(pathexpand(var.k8s_public_key_path)) : var.k8s_public_key
 }
 
 # 보안그룹
 resource "aws_security_group" "k8s_sg" {
-  name        = "k8s-security-group"
-  description = "Security group for K8s cluster"
+  name        = "k8s-sg-${terraform.workspace}"
+  description = "Security group for K8s cluster (${terraform.workspace})"
 
   # SSH
   ingress {
@@ -77,7 +77,8 @@ resource "aws_security_group" "k8s_sg" {
   }
 
   tags = {
-    Name = "k8s-security-group"
+    Name      = "k8s-sg-${terraform.workspace}"
+    Workspace = terraform.workspace
   }
 }
 
@@ -94,8 +95,9 @@ resource "aws_instance" "master" {
   }
 
   tags = {
-    Name = "k8s-master"
-    Role = "master"
+    Name      = "k8s-master-${terraform.workspace}"
+    Role      = "master"
+    Workspace = terraform.workspace
   }
 }
 
@@ -107,8 +109,7 @@ resource "aws_instance" "worker" {
   key_name               = aws_key_pair.k8s_key.key_name
   iam_instance_profile   = aws_iam_instance_profile.worker_node.name
   vpc_security_group_ids = [aws_security_group.k8s_sg.id]
-
-  depends_on = [aws_instance.master]
+  depends_on             = [aws_instance.master]
 
   root_block_device {
     volume_size = 20
@@ -116,8 +117,9 @@ resource "aws_instance" "worker" {
   }
 
   tags = {
-    Name = "k8s-worker-${count.index + 1}"
-    Role = "worker"
+    Name      = "k8s-worker-${terraform.workspace}-${count.index + 1}"
+    Role      = "worker"
+    Workspace = terraform.workspace
   }
 }
 
@@ -128,6 +130,10 @@ output "master_public_ip" {
 
 output "worker_public_ips" {
   value = aws_instance.worker[*].public_ip
+}
+
+output "workspace" {
+  value = terraform.workspace
 }
 
 # 서비스별 ECR repository URL 출력
