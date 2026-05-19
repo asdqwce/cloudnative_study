@@ -51,9 +51,9 @@ hook 설치 스크립트는 다음 Git 설정을 repo-local로 적용한다.
 git config core.hooksPath .githooks
 ```
 
-보안 도구는 시스템 전역 설치보다 repo-local `.tools/`를 우선한다. `gitleaks`와 `hadolint`가 `.tools/`에 없으면 `scripts/security/bootstrap.sh`가 OS/architecture에 맞는 고정 버전을 다운로드하고 checksum을 검증한 뒤 재사용한다.
+보안 도구는 시스템 전역 설치보다 repo-local `.tools/`를 우선한다. `make install` 또는 `make security-bootstrap`을 실행하면 `scripts/security/bootstrap.sh`가 OS/architecture에 맞는 고정 버전을 다운로드하고 checksum을 검증한 뒤 재사용한다.
 
-로컬 pre-push에서 실행하는 검사는 다음과 같다.
+로컬 pre-push에서 실행하는 검사는 다음과 같다. 단, `pre-push`는 push 시점에 보안 도구를 자동 설치하지 않는다. repo-local `.tools/`에 `gitleaks` 또는 `hadolint`가 준비되어 있으면 해당 검사를 실행하고, 없으면 안내 메시지만 출력한 뒤 스킵한다.
 
 - repository secret scan: `gitleaks detect --source <repo> --redact --verbose`
 - build context 검증: root Java 서비스는 repo root context, dashboard는 `dashboard/` context로 보고 각 context의 `.dockerignore` 필수 패턴을 검사한다.

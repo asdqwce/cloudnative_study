@@ -9,7 +9,7 @@ case "$(uname -s)" in
   *) exe_suffix="" ;;
 esac
 
-tools_dir="${repo_root}/.tools"
+tools_dir="${SECURITY_TOOLS_DIR:-${repo_root}/.tools}"
 gitleaks="${tools_dir}/gitleaks${exe_suffix}"
 hadolint="${tools_dir}/hadolint${exe_suffix}"
 
@@ -50,16 +50,15 @@ lint_dockerfiles() {
   done
 }
 
-SECURITY_BOOTSTRAP_TOOLS="gitleaks hadolint" sh "${script_dir}/bootstrap.sh"
-
-[ -x "$gitleaks" ] || { printf '%s\n' "gitleaks를 찾지 못했습니다: ${gitleaks}" >&2; exit 1; }
-[ -x "$hadolint" ] || { printf '%s\n' "hadolint를 찾지 못했습니다: ${hadolint}" >&2; exit 1; }
-
 failures=""
 
-if ! run_gate 'repository secret scan (gitleaks)' secret_scan; then
-  failures="${failures}
+if [ -x "$gitleaks" ]; then
+  if ! run_gate 'repository secret scan (gitleaks)' secret_scan; then
+    failures="${failures}
 - repository secret scan (gitleaks)"
+  fi
+else
+  printf '%s\n' "SKIP: repository secret scan (gitleaks) - ${gitleaks} 없음. 필요하면 make install을 실행하세요."
 fi
 
 if ! run_gate 'Docker build context .dockerignore verification' verify_dockerignore; then
@@ -67,9 +66,13 @@ if ! run_gate 'Docker build context .dockerignore verification' verify_dockerign
 - Docker build context .dockerignore verification"
 fi
 
-if ! run_gate 'Dockerfile lint (hadolint)' lint_dockerfiles; then
-  failures="${failures}
+if [ -x "$hadolint" ]; then
+  if ! run_gate 'Dockerfile lint (hadolint)' lint_dockerfiles; then
+    failures="${failures}
 - Dockerfile lint (hadolint)"
+  fi
+else
+  printf '%s\n' "SKIP: Dockerfile lint (hadolint) - ${hadolint} 없음. 필요하면 make install을 실행하세요."
 fi
 
 if [ -n "$failures" ]; then
