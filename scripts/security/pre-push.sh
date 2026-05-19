@@ -50,7 +50,7 @@ lint_dockerfiles() {
   done
 }
 
-sh "${script_dir}/bootstrap.sh"
+SECURITY_BOOTSTRAP_TOOLS="gitleaks hadolint" sh "${script_dir}/bootstrap.sh"
 
 [ -x "$gitleaks" ] || { printf '%s\n' "gitleaks를 찾지 못했습니다: ${gitleaks}" >&2; exit 1; }
 [ -x "$hadolint" ] || { printf '%s\n' "hadolint를 찾지 못했습니다: ${hadolint}" >&2; exit 1; }

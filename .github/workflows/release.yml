@@ -49,26 +49,25 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Decision point: replace or extend this matrix when Kong/Python services land on main.
-          - service: api-gateway
-            context: .
-            dockerfile: ./api-gateway/Dockerfile
-            image: zexpand/api-gateway
+          - service: auth-service
+            context: ./services/auth-service
+            dockerfile: ./services/auth-service/Dockerfile
+            image: zexpand/auth-service
           - service: patient-service
-            context: .
-            dockerfile: ./patient-service/Dockerfile
+            context: ./services/patient-service
+            dockerfile: ./services/patient-service/Dockerfile
             image: zexpand/patient-service
           - service: appointment-service
-            context: .
-            dockerfile: ./appointment-service/Dockerfile
+            context: ./services/appointment-service
+            dockerfile: ./services/appointment-service/Dockerfile
             image: zexpand/appointment-service
           - service: prescription-service
-            context: .
-            dockerfile: ./prescription-service/Dockerfile
+            context: ./services/prescription-service
+            dockerfile: ./services/prescription-service/Dockerfile
             image: zexpand/prescription-service
           - service: notification-service
-            context: .
-            dockerfile: ./notification-service/Dockerfile
+            context: ./services/notification-service
+            dockerfile: ./services/notification-service/Dockerfile
             image: zexpand/notification-service
           - service: dashboard
             context: ./dashboard
@@ -86,20 +85,18 @@ jobs:
           echo "LOCAL_IMAGE=${ECR_REPOSITORY_PREFIX}/${{ matrix.service }}:${IMAGE_TAG:0:80}" >> "$GITHUB_ENV"
 
       - name: Verify Docker build context
-        run: ./scripts/verify-dockerignore.sh "${{ matrix.context }}"
+        run: |
+          test -f "${{ matrix.dockerfile }}"
+          ./scripts/verify-dockerignore.sh "${{ matrix.context }}"
 
       - name: Build image
-        run: docker build -f "${{ matrix.dockerfile }}" -t "$LOCAL_IMAGE" "${{ matrix.context }}"
+        run: docker build --pull -f "${{ matrix.dockerfile }}" -t "$LOCAL_IMAGE" "${{ matrix.context }}"
+
+      - name: Install Trivy
+        run: SECURITY_BOOTSTRAP_TOOLS=trivy sh scripts/security/bootstrap.sh
 
       - name: Scan image before push
-        uses: aquasecurity/trivy-action@0.29.0
-        with:
-          image-ref: ${{ env.LOCAL_IMAGE }}
-          scanners: vuln,secret,misconfig
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          format: table
-          exit-code: '1'
+        run: ./.tools/trivy image --scanners vuln,secret --severity HIGH,CRITICAL --ignore-unfixed --format table --exit-code 1 "$LOCAL_IMAGE"
 
       - name: Scan image history before push
         run: ./scripts/scan-docker-history.sh "$LOCAL_IMAGE"
@@ -156,7 +153,7 @@ jobs:
           ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
         run: |
           cd "$KUSTOMIZE_DIR"
-          kustomize edit set image zexpand/api-gateway="${ECR_REGISTRY}/${ECR_REPOSITORY_PREFIX}/api-gateway:${IMAGE_TAG}"
+          kustomize edit set image zexpand/auth-service="${ECR_REGISTRY}/${ECR_REPOSITORY_PREFIX}/auth-service:${IMAGE_TAG}"
           kustomize edit set image zexpand/patient-service="${ECR_REGISTRY}/${ECR_REPOSITORY_PREFIX}/patient-service:${IMAGE_TAG}"
           kustomize edit set image zexpand/appointment-service="${ECR_REGISTRY}/${ECR_REPOSITORY_PREFIX}/appointment-service:${IMAGE_TAG}"
           kustomize edit set image zexpand/prescription-service="${ECR_REGISTRY}/${ECR_REPOSITORY_PREFIX}/prescription-service:${IMAGE_TAG}"

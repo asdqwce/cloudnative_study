@@ -3,8 +3,11 @@ set -eu
 
 GITLEAKS_VERSION="${GITLEAKS_VERSION:-8.24.3}"
 HADOLINT_VERSION="${HADOLINT_VERSION:-2.14.0}"
+TRIVY_VERSION="${TRIVY_VERSION:-0.70.0}"
+SECURITY_BOOTSTRAP_TOOLS="${SECURITY_BOOTSTRAP_TOOLS:-gitleaks hadolint trivy}"
 GITLEAKS_BASE_URL="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
 HADOLINT_BASE_URL="https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}"
+TRIVY_BASE_URL="https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}"
 
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 repo_root="$(CDPATH= cd -- "${script_dir}/../.." && pwd)"
@@ -100,6 +103,15 @@ normalize_arch() {
   esac
 }
 
+wants_tool() {
+  tool="$1"
+
+  case " ${SECURITY_BOOTSTRAP_TOOLS} " in
+    *" ${tool} "*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 extract_archive() {
   archive="$1"
   dest="$2"
@@ -176,6 +188,32 @@ hadolint_plan() {
   printf '%s|%s|%s\n' "${asset}" "${HADOLINT_BASE_URL}/${asset}" "${HADOLINT_BASE_URL}/${asset}.sha256"
 }
 
+trivy_plan() {
+  os="$1"
+  arch="$2"
+
+  case "$os" in
+    windows)
+      [ "$arch" = x64 ] || die "trivy Windows 자동 다운로드는 x64만 지원합니다."
+      asset="trivy_${TRIVY_VERSION}_windows-64bit.zip"
+      ;;
+    macos)
+      case "$arch" in
+        x64) asset="trivy_${TRIVY_VERSION}_macOS-64bit.tar.gz" ;;
+        arm64) asset="trivy_${TRIVY_VERSION}_macOS-ARM64.tar.gz" ;;
+      esac
+      ;;
+    linux)
+      case "$arch" in
+        x64) asset="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" ;;
+        arm64) asset="trivy_${TRIVY_VERSION}_Linux-ARM64.tar.gz" ;;
+      esac
+      ;;
+  esac
+
+  printf '%s|%s|%s\n' "${asset}" "${TRIVY_BASE_URL}/${asset}" "${TRIVY_BASE_URL}/trivy_${TRIVY_VERSION}_checksums.txt"
+}
+
 install_gitleaks() {
   os="$1"
   arch="$2"
@@ -245,10 +283,48 @@ install_hadolint() {
   trap - EXIT HUP INT TERM
 }
 
+install_trivy() {
+  os="$1"
+  arch="$2"
+  exe_suffix=""
+  [ "$os" = windows ] && exe_suffix=".exe"
+  target="${tools_dir}/trivy${exe_suffix}"
+
+  if [ -f "$target" ]; then
+    log "Using existing ${target}"
+    return
+  fi
+
+  plan="$(trivy_plan "$os" "$arch")"
+  asset="$(printf '%s' "$plan" | cut -d '|' -f 1)"
+  url="$(printf '%s' "$plan" | cut -d '|' -f 2)"
+  checksum_url="$(printf '%s' "$plan" | cut -d '|' -f 3)"
+  temp_dir="$(mktemp -d 2>/dev/null || mktemp -d -t cloudnative-security)"
+  archive_path="${temp_dir}/${asset}"
+  checksum_path="${temp_dir}/checksums.txt"
+  extract_dir="${temp_dir}/extract"
+
+  trap 'rm -rf "${temp_dir}"' EXIT HUP INT TERM
+  download "$url" "$archive_path"
+  download "$checksum_url" "$checksum_path"
+  verify_checksum "$archive_path" "$checksum_path" "$asset"
+  extract_archive "$archive_path" "$extract_dir"
+
+  binary="$(find "$extract_dir" -type f -name "trivy${exe_suffix}" | head -n 1)"
+  [ -n "$binary" ] || die "trivy binary를 archive에서 찾지 못했습니다: ${asset}"
+
+  cp "$binary" "$target"
+  chmod +x "$target"
+  log "Installed ${target}"
+  rm -rf "$temp_dir"
+  trap - EXIT HUP INT TERM
+}
+
 os="$(normalize_os)"
 arch="$(normalize_arch)"
 
-install_gitleaks "$os" "$arch"
-install_hadolint "$os" "$arch"
+wants_tool gitleaks && install_gitleaks "$os" "$arch"
+wants_tool hadolint && install_hadolint "$os" "$arch"
+wants_tool trivy && install_trivy "$os" "$arch"
 
 log "Security tools are ready in ${tools_dir}"

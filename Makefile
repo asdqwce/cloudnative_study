@@ -18,6 +18,7 @@ E2E_PATIENT_SERVICE_URL ?= http://patient-service:8081
 E2E_APPOINTMENT_SERVICE_URL ?= http://appointment-service:8082
 E2E_PRESCRIPTION_SERVICE_URL ?= http://prescription-service:8083
 E2E_NOTIFICATION_SERVICE_URL ?= http://notification-service:8084
+SECURITY_IMAGE_TARGETS ?=
 
 INFRA_CLUSTER_DIR ?= infra/cluster
 INFRA_MAKE := $(MAKE) -C $(INFRA_CLUSTER_DIR)
@@ -40,7 +41,7 @@ INFRA_TARGETS := \
 	wsl-local-ssh-keys-sync wsl-local-inventory wsl-bootstrap-after-vagrant wsl-local-k8s-bootstrap wsl-metallb-bootstrap wsl-metallb-verify wsl-upload-k8s wsl-kong-bootstrap wsl-kong-verify wsl-local-k8s-apply wsl-local-k8s-deps-apply wsl-local-k8s-app-apply wsl-local-k8s-deps-verify wsl-local-k8s-app-verify wsl-local-k8s-verify wsl-local-k8s-pods wsl-local-k8s-app-pods wsl-local-k8s-app-services wsl-local-k8s-status wsl-local-k8s-node-top wsl-local-k8s-app-top wsl-local-k8s-top wsl-local-k8s-crud-smoke wsl-local-k8s-deploy
 
 .PHONY: help list install activate test-runner-build test-unit test test-all test-e2e e2e-up e2e-wait e2e-newman e2e-down \
-	security-install security-bootstrap security-pre-push security-hooks-install \
+	security security-install security-bootstrap security-pre-push security-image-scan security-hooks-install \
 	$(INFRA_TARGETS)
 
 help:
@@ -63,9 +64,7 @@ help:
 	@printf '  %-28s %s\n' 'make e2e-down' 'E2E Docker Compose stack을 정리합니다.'
 	@printf '%s\n' ''
 	@printf '%s\n' '보안'
-	@printf '  %-28s %s\n' 'make security-install' 'gitleaks/hadolint와 Git hook을 준비합니다.'
-	@printf '  %-28s %s\n' 'make security-bootstrap' 'gitleaks/hadolint를 .tools/에 설치하거나 재사용합니다.'
-	@printf '  %-28s %s\n' 'make security-pre-push' '로컬 pre-push 보안 게이트를 수동 실행합니다.'
+	@printf '  %-28s %s\n' 'make security' '필요한 보안 도구를 준비하고 전체 보안 검사를 실행합니다.'
 	@printf '%s\n' ''
 	@printf '%s\n' '로컬 k8s 환경 설치'
 	@printf '  %-28s %s\n' 'make local-k8s-bootstrap' 'VM, Kubernetes, registry, Metrics Server, 앱 의존성을 준비합니다.'
@@ -186,8 +185,14 @@ security-bootstrap:
 security-hooks-install:
 	sh scripts/security/install-git-hooks.sh
 
+security: security-bootstrap security-pre-push security-image-scan
+
 security-pre-push:
 	sh scripts/security/pre-push.sh
+
+security-image-scan:
+	SECURITY_BOOTSTRAP_TOOLS=trivy sh scripts/security/bootstrap.sh
+	bash scripts/security-image-scan.sh $(SECURITY_IMAGE_TARGETS)
 
 $(INFRA_TARGETS):
 	$(INFRA_MAKE) $@
