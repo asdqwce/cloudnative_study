@@ -47,7 +47,7 @@ argocd_chart_repo_url: https://argoproj.github.io/argo-helm
 argocd_chart_ref: argo/argo-cd
 argocd_chart_version: "{{ lookup('env', 'ARGOCD_CHART_VERSION') | default('', true) }}"
 argocd_rollout_timeout: "{{ lookup('env', 'ARGOCD_ROLLOUT_TIMEOUT') | default('600s', true) }}"
-argocd_application_remote_path: /tmp/medical-platform-argocd-application.yaml
+argocd_manifests_remote_path: /tmp/medical-platform-argocd
 
 server_base_packages:
   - apt-transport-https

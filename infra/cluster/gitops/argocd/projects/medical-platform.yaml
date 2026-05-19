@@ -1,0 +1,17 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: medical-platform
+  namespace: argocd
+spec:
+  description: Medical platform apps in the single AWS Kubernetes cluster
+  sourceRepos:
+    - https://github.com/asdqwce/cloudnative_study.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: medical-platform-dev
+    - server: https://kubernetes.default.svc
+      namespace: medical-platform-prod
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace

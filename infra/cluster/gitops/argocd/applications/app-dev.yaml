@@ -1,19 +1,17 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: medical-platform-aws-apps
+  name: medical-platform-dev
   namespace: argocd
 spec:
-  project: default
+  project: medical-platform
   source:
     repoURL: https://github.com/asdqwce/cloudnative_study.git
-    # Decision point: Argo CD watches one concrete branch, not the whole release/** glob.
-    # Keep this aligned with the release workflow MANIFEST_BRANCH value.
-    targetRevision: release/aws-dev
-    path: k8s/overlays/aws/apps
+    targetRevision: release/dev
+    path: k8s/overlays/aws/dev
   destination:
     server: https://kubernetes.default.svc
-    namespace: medical-platform
+    namespace: medical-platform-dev
   syncPolicy:
     automated:
       prune: true

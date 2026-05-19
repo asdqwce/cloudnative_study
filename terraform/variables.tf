@@ -4,20 +4,40 @@ variable "aws_region" {
   default     = "ap-northeast-2"
 }
 
+variable "aws_profile" {
+  description = "AWS CLI profile name. When set, Terraform uses this profile instead of direct access keys."
+  type        = string
+  default     = "cloudnative-study"
+}
+
 variable "aws_access_key" {
-  description = "AWS Access Key"
+  description = "AWS Access Key. Used only when aws_profile is empty."
   type        = string
   sensitive   = true
+  default     = ""
 }
 
 variable "aws_secret_key" {
-  description = "AWS Secret Key"
+  description = "AWS Secret Key. Used only when aws_profile is empty."
   type        = string
   sensitive   = true
+  default     = ""
+}
+
+variable "k8s_public_key_path" {
+  description = "Path to the SSH public key registered as the EC2 key pair. When empty, k8s_public_key is used."
+  type        = string
+  default     = ""
+}
+
+variable "k8s_public_key" {
+  description = "Inline SSH public key registered as the EC2 key pair when k8s_public_key_path is empty."
+  type        = string
+  default     = ""
 }
 
 variable "ecr_repository_prefix" {
-  description = "Prefix for service ECR repositories. The default creates repositories such as cloudnative-study/api-gateway."
+  description = "Prefix for service ECR repositories. The default creates repositories such as cloudnative-study/patient-service."
   type        = string
   default     = "cloudnative-study"
 }
@@ -26,7 +46,7 @@ variable "ecr_service_repositories" {
   description = "Service repository names to create in ECR. Keep app-specific future services as explicit placeholders until they exist in the repo."
   type        = set(string)
   default = [
-    "api-gateway",
+    "auth-service",
     "patient-service",
     "appointment-service",
     "prescription-service",
@@ -38,7 +58,7 @@ variable "ecr_service_repositories" {
 variable "ecr_image_tag_mutability" {
   description = "ECR image tag mutability for service repositories."
   type        = string
-  default     = "MUTABLE"
+  default     = "IMMUTABLE"
 
   validation {
     condition     = contains(["MUTABLE", "IMMUTABLE"], var.ecr_image_tag_mutability)
@@ -64,10 +84,16 @@ variable "github_repository_name" {
   default     = "cloudnative_study"
 }
 
-variable "github_actions_branch_pattern" {
-  description = "Branch pattern allowed to assume the GitHub Actions release role."
+variable "github_actions_release_branches" {
+  description = "Release state branches allowed to assume the GitHub Actions release role."
+  type        = set(string)
+  default     = ["release/dev", "release/prod"]
+}
+
+variable "github_actions_tag_pattern" {
+  description = "Git tag pattern allowed to assume the GitHub Actions release role for image publishing."
   type        = string
-  default     = "release/*"
+  default     = "v*"
 }
 
 variable "github_actions_role_name" {

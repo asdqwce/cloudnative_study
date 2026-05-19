@@ -1,20 +1,24 @@
 # AWS GitOps Release Guide
 
-이 문서는 AWS EC2 기반 Kubernetes 클러스터에 Argo CD를 설치하고, GitHub Actions와 ECR을 통해 릴리즈 브랜치 배포를 구성하기 위한 판단용 가이드라인이다.
+이 문서는 AWS EC2 기반 Kubernetes 클러스터에 Argo CD를 설치하고, GitHub Actions와 Private ECR을 통해 릴리즈 브랜치 배포를 구성하기 위한 판단용 가이드라인이다.
 
 로컬 AWS profile은 운영 배포의 필수 요소가 아니라 디버깅이나 수동 확인을 위한 보조 수단으로 둔다. 실제 릴리즈 경로의 핵심 인증은 GitHub Actions가 AWS IAM Role을 assume하고, ECR에 이미지를 push하는 방식으로 잡는다.
+
+브랜치, Git tag, image tag, 단일 클러스터 환경 분리 전략은 `infra/cluster/docs/release-environment-strategy.md`를 기준으로 한다. 이 문서는 그 전략을 AWS GitOps 파이프라인으로 구현할 때 필요한 구성 요소를 다룬다.
+
+ECR과 EC2 Kubernetes 클러스터는 같은 `ap-northeast-2` 리전에 둔다. 같은 리전을 쓰면 image pull 경로가 단순해지고, 리전 간 데이터 전송과 인증 혼동을 줄일 수 있다. 이 실습에서는 ECR Public이 아니라 계정 소유 Private ECR repository를 사용한다.
 
 ## 권장 구성
 
 1. GitHub Actions가 AWS IAM Role을 assume한다.
 2. GitHub Actions가 서비스별 Docker image를 build한다.
 3. GitHub Actions가 ECR에 image를 push한다.
-4. GitHub Actions가 `k8s/overlays/aws/apps/kustomization.yaml`의 image tag를 갱신해서 Git에 commit/push한다.
+4. GitHub Actions가 대상 환경에 따라 `k8s/overlays/aws/dev/kustomization.yaml` 또는 `k8s/overlays/aws/prod/kustomization.yaml`의 image tag를 갱신해서 Git에 commit/push한다.
 5. EC2 Kubernetes 위 Argo CD가 Git 변경을 감지한다.
-6. Argo CD가 `k8s/overlays/aws/apps`를 sync한다.
-7. Kubernetes worker node가 ECR에서 image를 pull한다.
+6. Argo CD가 `release/dev -> k8s/overlays/aws/dev -> medical-platform-dev` 또는 `release/prod -> k8s/overlays/aws/prod -> medical-platform-prod`를 sync한다.
+7. Kubernetes worker node가 Private ECR에서 image를 pull한다.
 
-중요한 점은 Argo CD가 ECR 이미지를 직접 가져오는 주체가 아니라는 것이다. 실제 image pull은 Kubernetes node의 kubelet/containerd가 수행한다. 따라서 EC2 worker node에는 ECR pull 권한이 있는 IAM role이 붙어야 한다.
+중요한 점은 Argo CD가 ECR 이미지를 직접 가져오는 주체가 아니라는 것이다. 실제 image pull은 Kubernetes node의 kubelet/containerd가 수행한다. 따라서 EC2 worker node에는 ECR pull 권한이 있는 IAM role이 필요하고, self-managed Kubernetes에서는 kubelet image credential provider 설정까지 별도로 준비해야 한다.
 
 ## Push 전 보안 게이트
 
@@ -67,7 +71,7 @@ PR과 일반 push에서는 `.github/workflows/security.yml`이 빠른 source 검
 - Dockerfile lint: 현재 repo의 모든 `Dockerfile`을 `hadolint`로 검사한다.
 - build context 검증: 각 Docker build context의 `.dockerignore`에 최소 제외 항목이 있는지 확인한다.
 
-`release/**` push에서는 `.github/workflows/release.yml`이 같은 source 검증을 먼저 실행한 뒤 image build로 넘어간다. image build 후에는 ECR login과 `docker push` 전에 다음 검사를 추가로 실행한다.
+Git tag 기반 릴리즈에서는 `.github/workflows/release.yml`이 같은 source 검증을 먼저 실행한 뒤 image build로 넘어간다. image tag는 Git tag와 같은 값이다. image build 후에는 ECR login과 `docker push` 전에 다음 검사를 추가로 실행한다.
 
 - Trivy image scan: `vuln`, `secret`, `misconfig` scanner로 HIGH/CRITICAL 위험을 차단한다.
 - Docker history scan: `token`, `password`, `secret`, `AWS_ACCESS_KEY`, `AWS_SECRET_ACCESS_KEY`, `PRIVATE KEY` 같은 문자열이 layer history에 남으면 실패시킨다.
@@ -82,11 +86,11 @@ GitHub Actions에는 AWS access key를 저장하기보다 OIDC를 쓰는 편이 
 
 - GitHub OIDC Provider
 - GitHub Actions용 IAM Role
-- 특정 repository와 branch만 assume할 수 있는 role trust policy
+- 특정 repository의 `release/dev`, `release/prod`, `v*` Git tag ref만 assume할 수 있는 role trust policy
 - GitHub Actions role에 부여할 ECR push 권한
 - EC2 node IAM Role에 부여할 ECR pull 권한
 
-릴리즈 브랜치용 workflow는 대략 다음 흐름을 따른다.
+릴리즈 workflow는 Git tag push를 기준으로 이미지를 만들고, 기본적으로 `release/dev` manifest를 갱신한다. `release/prod`는 검증된 Git tag를 승격할 때 같은 image tag를 바라보도록 별도 승인 흐름에서 갱신한다.
 
 ```yaml
 permissions:
@@ -95,8 +99,8 @@ permissions:
 
 on:
   push:
-    branches:
-      - 'release/**'
+    tags:
+      - 'v*'
 
 jobs:
   release:
@@ -113,25 +117,49 @@ jobs:
 
       - name: Build and push images
         run: |
-          IMAGE_TAG=${GITHUB_REF_NAME//\//-}-${GITHUB_SHA::7}
-          docker build -t <account-id>.dkr.ecr.ap-northeast-2.amazonaws.com/api-gateway:$IMAGE_TAG ./api-gateway
-          docker push <account-id>.dkr.ecr.ap-northeast-2.amazonaws.com/api-gateway:$IMAGE_TAG
+          IMAGE_TAG=${GITHUB_REF_NAME}
+          docker build -t <account-id>.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study/patient-service:$IMAGE_TAG ./services/patient-service
+          docker push <account-id>.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study/patient-service:$IMAGE_TAG
 
       - name: Update kustomize image tags
         run: |
-          cd k8s/overlays/aws/apps
-          kustomize edit set image zexpand/api-gateway=<account-id>.dkr.ecr.ap-northeast-2.amazonaws.com/api-gateway:$IMAGE_TAG
+          cd k8s/overlays/aws/dev
+          kustomize edit set image zexpand/patient-service=<account-id>.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study/patient-service:$IMAGE_TAG
 
       - name: Commit manifest change
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
-          git add k8s/overlays/aws/apps/kustomization.yaml
+          git add k8s/overlays/aws/dev/kustomization.yaml
           git commit -m "deploy: update release images"
           git push
 ```
 
-실제 workflow를 만들 때는 `api-gateway`뿐 아니라 배포 대상 서비스 전체에 대해 build, push, image tag 갱신을 반복해야 한다.
+실제 workflow는 배포 대상 서비스 전체에 대해 build, push, image tag 갱신을 반복해야 한다.
+
+현재 구현은 `auth-service`, `patient-service`, `appointment-service`, `prescription-service`, `notification-service`, `dashboard`를 서비스별 Private ECR repository로 다룬다. repository 이름은 `cloudnative-study/<service>` 형식을 유지한다.
+
+## Worker Node의 ECR Pull 인증
+
+이 클러스터는 EKS가 아니라 EC2 self-managed Kubernetes다. EKS worker처럼 기본 통합이 자동으로 처리된다고 가정하지 않는다.
+
+EC2 worker instance profile에는 최소한 다음 ECR pull 권한이 필요하다.
+
+- `ecr:GetAuthorizationToken`
+- `ecr:BatchCheckLayerAvailability`
+- `ecr:BatchGetImage`
+- `ecr:GetDownloadUrlForLayer`
+
+다만 instance profile만 붙였다고 kubelet/containerd가 Private ECR 인증을 자동으로 해결한다고 단정하면 안 된다. kubelet이 registry별 credential provider exec plugin을 호출하도록 각 worker node에 다음 설정을 추가하는 방향을 기준으로 둔다.
+
+- `ecr-credential-provider` binary를 모든 worker node의 고정 경로에 설치한다.
+- kubelet에 `--image-credential-provider-config`와 `--image-credential-provider-bin-dir`를 지정한다.
+- `CredentialProviderConfig`의 `matchImages`에 `*.dkr.ecr.*.amazonaws.com` 패턴을 둔다.
+- credential cache duration은 ECR token 수명에 맞춰 12시간 이내로 둔다.
+
+`imagePullSecrets`는 ECR token이 12시간 후 만료되므로 장기 운영 방식으로 쓰지 않는다. 장애 대응이나 credential provider 도입 전 임시 검증에는 사용할 수 있지만, Git에 token이나 Docker config를 남기지 않는다.
+
+현재 GitOps bootstrap은 Argo CD와 Application 등록까지 담당한다. worker node의 ECR credential provider 설치는 별도 클러스터 hardening 작업으로 남아 있으므로, Argo CD sync 완료 판단 전에는 worker에서 Private ECR image pull smoke를 먼저 통과시켜야 한다. 이 전제가 충족되지 않으면 Argo CD sync는 성공하더라도 Pod는 `ImagePullBackOff`가 될 수 있다.
 
 ## Argo CD 배포 방식
 
@@ -151,17 +179,20 @@ GitOps 원칙을 살리려면 GitHub Actions가 `kubectl apply`를 직접 실행
 
 초기 구성에서는 완전 GitOps 방식을 우선한다. 릴리즈 브랜치 push 후 sync 완료까지 GitHub Actions에서 확인하고 싶어지면, 그때 즉시 sync 방식을 추가한다.
 
-초기 Application은 `k8s/overlays/aws/apps`만 바라보게 둔다. `deps`까지 한 Application에 묶으면 DB/Kafka 같은 상태ful 의존성과 앱 이미지 릴리즈가 같은 sync 주기로 움직이기 때문에, 먼저 앱 release 경로를 분리한다. 의존성 배포 자동화가 필요해지면 `aws-deps` Application을 별도로 추가한다.
+초기 Application은 환경별 앱 overlay만 바라보게 둔다. `deps`까지 한 Application에 묶으면 DB/Kafka 같은 상태ful 의존성과 앱 이미지 릴리즈가 같은 sync 주기로 움직이기 때문에, 먼저 앱 release 경로를 분리한다. 의존성 배포 자동화가 필요해지면 `aws-dev-deps`, `aws-prod-deps` Application을 별도로 추가한다.
 
-또 하나의 decision point는 Argo CD가 추적할 릴리즈 브랜치다. GitHub Actions OIDC role은 `release/**` 전체를 허용할 수 있지만, Argo CD `targetRevision`은 하나의 구체적인 브랜치를 보는 편이 운영상 명확하다. 현재 골격은 `release/aws-dev`를 기준으로 두고, 다른 릴리즈 브랜치를 클러스터별로 쓰려면 `argo/application.yaml`의 `targetRevision`과 workflow 운용 브랜치를 함께 맞춘다.
+또 하나의 decision point는 Argo CD가 추적할 릴리즈 브랜치다. GitHub Actions OIDC role은 `release/**` 전체를 허용할 수 있지만, Argo CD `targetRevision`은 하나의 구체적인 브랜치를 보는 편이 운영상 명확하다. 실습 기준은 `release/dev`, `release/prod`처럼 환경별 브랜치를 두고, 각 Argo CD Application의 `targetRevision`과 workflow 운용 브랜치를 함께 맞춘다.
 
 ## Repository 변경 후보
 
 - `terraform/`: ECR repositories, GitHub OIDC IAM role, EC2 node IAM role을 추가한다.
-- `infra/cluster/provision/ansible/playbooks/bootstrap-argocd.yml`: Helm 기반 Argo CD 설치와 Application apply를 담당한다.
-- `argo/application.yaml`: `path: k8s/overlays/aws/apps`, `namespace: medical-platform`, `targetRevision: release/aws-dev` 기준으로 둔다.
-- `k8s/overlays/aws/apps/kustomization.yaml`: `latest` 대신 ECR image URI와 release tag placeholder를 사용한다.
-- `.github/workflows/release.yml`: `release/**` 브랜치용 ECR build/push와 manifest update workflow를 둔다.
+- `infra/cluster/provision/ansible/playbooks/bootstrap-argocd.yml`: Helm 기반 Argo CD 설치와 `infra/cluster/gitops/argocd` apply를 담당한다.
+- `infra/cluster/gitops/argocd/projects/medical-platform.yaml`: dev/prod namespace destination만 허용하는 AppProject를 둔다.
+- `infra/cluster/gitops/argocd/applications/app-dev.yaml`: `release/dev`, `k8s/overlays/aws/dev`, `medical-platform-dev`를 바라보고 자동 sync한다.
+- `infra/cluster/gitops/argocd/applications/app-prod.yaml`: `release/prod`, `k8s/overlays/aws/prod`, `medical-platform-prod`를 바라보고 초기에는 수동 sync로 둔다.
+- `k8s/overlays/aws/dev/kustomization.yaml`: dev용 ECR image URI와 release tag placeholder를 사용한다.
+- `k8s/overlays/aws/prod/kustomization.yaml`: prod용 ECR image URI와 release tag placeholder를 사용한다.
+- `.github/workflows/release.yml`: `v*` Git tag용 ECR build/push와 대상 release branch manifest update workflow를 둔다.
 
 ## 배포 이해
 
@@ -177,13 +208,13 @@ GitOps에서는 배포 행위가 직접 클러스터에 명령을 실행하는 �
 → 새 이미지로 rollout
 ```
 
-예를 들어 `k8s/overlays/aws/apps/kustomization.yaml`에서 image tag가 바뀌면 Argo CD가 변경을 감지하고 해당 Deployment의 Pod를 새 이미지로 교체한다.
+예를 들어 `k8s/overlays/aws/dev/kustomization.yaml` 또는 `k8s/overlays/aws/prod/kustomization.yaml`에서 image tag가 바뀌면 Argo CD가 변경을 감지하고 해당 Deployment의 Pod를 새 이미지로 교체한다.
 
 ```yaml
 images:
-  - name: zexpand/api-gateway
-    newName: 123456789012.dkr.ecr.ap-northeast-2.amazonaws.com/api-gateway
-    newTag: release-2026-05-18-a1b2c3d
+  - name: zexpand/patient-service
+    newName: 123456789012.dkr.ecr.ap-northeast-2.amazonaws.com/cloudnative-study/patient-service
+    newTag: v1.2.3
 ```
 
 정리하면 앱 배포는 `이미지 태그 변경 -> Git push -> Argo CD sync`로 이루어진다. Terraform과 Ansible은 클러스터와 배포 시스템을 만들고, GitHub Actions는 이미지를 만들고 manifest를 갱신하며, Argo CD는 Git manifest를 Kubernetes에 반영한다.

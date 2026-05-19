@@ -116,22 +116,28 @@
           - "--timeout={{ argocd_rollout_timeout }}"
       changed_when: false
 
-    - name: Copy Argo CD Application manifest
+    - name: Reset remote Argo CD manifest directory
+      ansible.builtin.file:
+        path: "{{ argocd_manifests_remote_path }}"
+        state: absent
+
+    - name: Copy Argo CD GitOps manifests
       ansible.builtin.copy:
-        src: ../../../../../argo/application.yaml
-        dest: "{{ argocd_application_remote_path }}"
+        src: ../../../../../infra/cluster/gitops/argocd/
+        dest: "{{ argocd_manifests_remote_path }}/"
         owner: root
         group: root
         mode: "0644"
+        directory_mode: "0755"
 
-    - name: Apply Argo CD Application manifest
+    - name: Apply Argo CD GitOps manifests
       ansible.builtin.command:
         argv:
           - kubectl
           - --kubeconfig
           - "{{ kubernetes_admin_conf_path }}"
           - apply
-          - -f
-          - "{{ argocd_application_remote_path }}"
-      register: argocd_application_apply
-      changed_when: "'configured' in argocd_application_apply.stdout or 'created' in argocd_application_apply.stdout"
+          - -k
+          - "{{ argocd_manifests_remote_path }}"
+      register: argocd_manifests_apply
+      changed_when: "'configured' in argocd_manifests_apply.stdout or 'created' in argocd_manifests_apply.stdout"

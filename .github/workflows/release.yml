@@ -2,24 +2,37 @@ name: Release
 
 on:
   push:
-    branches:
-      - 'release/**'
+    tags:
+      - 'v*'
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Git tag to build and deploy, for example v1.2.3'
+        required: true
+        type: string
+      manifest_branch:
+        description: 'Release state branch to update'
+        required: true
+        default: release/dev
+        type: choice
+        options:
+          - release/dev
+          - release/prod
 
 permissions:
   contents: write
   id-token: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.manifest_branch || github.ref }}
   cancel-in-progress: false
 
 env:
   AWS_REGION: ap-northeast-2
   ECR_REPOSITORY_PREFIX: cloudnative-study
-  IMAGE_TAG: ${{ github.ref_name }}-${{ github.sha }}
-  KUSTOMIZE_DIR: k8s/overlays/aws/apps
-  MANIFEST_BRANCH: ${{ github.ref_name }}
+  IMAGE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+  KUSTOMIZE_BASE_DIR: k8s/overlays/aws
+  MANIFEST_BRANCH: ${{ github.event_name == 'workflow_dispatch' && inputs.manifest_branch || 'release/dev' }}
 
 jobs:
   source-security:
@@ -30,7 +43,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: ${{ env.IMAGE_TAG }}
           fetch-depth: 0
+
+      - name: Validate release tag
+        run: |
+          case "$IMAGE_TAG" in
+            v*) ;;
+            *)
+              echo "IMAGE_TAG must be a Git release tag such as v1.2.3." >&2
+              exit 1
+              ;;
+          esac
+          git rev-parse -q --verify "refs/tags/${IMAGE_TAG}^{tag}" >/dev/null ||
+            git rev-parse -q --verify "refs/tags/${IMAGE_TAG}^{commit}" >/dev/null
 
       - name: Scan repository secrets
         uses: gitleaks/gitleaks-action@v2
@@ -77,12 +103,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.IMAGE_TAG }}
 
       - name: Normalize image tag
         run: |
-          IMAGE_TAG="${IMAGE_TAG//\//-}"
-          echo "IMAGE_TAG=${IMAGE_TAG:0:80}" >> "$GITHUB_ENV"
-          echo "LOCAL_IMAGE=${ECR_REPOSITORY_PREFIX}/${{ matrix.service }}:${IMAGE_TAG:0:80}" >> "$GITHUB_ENV"
+          echo "LOCAL_IMAGE=${ECR_REPOSITORY_PREFIX}/${{ matrix.service }}:${IMAGE_TAG}" >> "$GITHUB_ENV"
 
       - name: Verify Docker build context
         run: |
@@ -96,7 +122,7 @@ jobs:
         run: SECURITY_BOOTSTRAP_TOOLS=trivy sh scripts/security/bootstrap.sh
 
       - name: Scan image before push
-        run: ./.tools/trivy image --scanners vuln,secret --severity HIGH,CRITICAL --ignore-unfixed --format table --exit-code 1 "$LOCAL_IMAGE"
+        run: ./.tools/trivy image --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --ignore-unfixed --format table --exit-code 1 "$LOCAL_IMAGE"
 
       - name: Scan image history before push
         run: ./scripts/scan-docker-history.sh "$LOCAL_IMAGE"
@@ -145,8 +171,28 @@ jobs:
 
       - name: Normalize image tag
         run: |
-          IMAGE_TAG="${IMAGE_TAG//\//-}"
-          echo "IMAGE_TAG=${IMAGE_TAG:0:80}" >> "$GITHUB_ENV"
+          case "$IMAGE_TAG" in
+            v*) ;;
+            *)
+              echo "IMAGE_TAG must be a Git release tag such as v1.2.3." >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Resolve manifest overlay
+        run: |
+          case "$MANIFEST_BRANCH" in
+            release/dev)
+              echo "KUSTOMIZE_DIR=${KUSTOMIZE_BASE_DIR}/dev" >> "$GITHUB_ENV"
+              ;;
+            release/prod)
+              echo "KUSTOMIZE_DIR=${KUSTOMIZE_BASE_DIR}/prod" >> "$GITHUB_ENV"
+              ;;
+            *)
+              echo "Unsupported MANIFEST_BRANCH: ${MANIFEST_BRANCH}" >&2
+              exit 1
+              ;;
+          esac
 
       - name: Update kustomize image tags
         env:
