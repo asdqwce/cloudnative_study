@@ -32,7 +32,9 @@ env:
   ECR_REPOSITORY_PREFIX: ${{ vars.ECR_REPOSITORY_PREFIX }}
   IMAGE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
   KUSTOMIZE_BASE_DIR: k8s/overlays/aws
-  MANIFEST_BRANCH: ${{ github.event_name == 'workflow_dispatch' && inputs.manifest_branch || 'release/dev' }}
+  # TODO(smoke-test): RELEASE_MANIFEST_BRANCH may point to a feature branch during
+  # feature smoke tests. Set it back to release/dev before normal dev promotion.
+  MANIFEST_BRANCH: ${{ github.event_name == 'workflow_dispatch' && inputs.manifest_branch || vars.RELEASE_MANIFEST_BRANCH || 'release/dev' }}
 
 jobs:
   source-security:
@@ -211,7 +213,7 @@ jobs:
       - name: Resolve manifest overlay
         run: |
           case "$MANIFEST_BRANCH" in
-            release/dev)
+            release/dev|feature/*)
               echo "KUSTOMIZE_DIR=${KUSTOMIZE_BASE_DIR}/dev" >> "$GITHUB_ENV"
               ;;
             release/prod)
