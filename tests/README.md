@@ -78,14 +78,7 @@ make test-e2e
 
 `tests/e2e/scripts/wait-for-services.sh`는 Docker curl 컨테이너 안에서 실행된다. Newman 컬렉션도 Docker Newman 컨테이너 안에서 실행되므로 로컬에 curl이나 newman을 따로 설치하지 않는다.
 
-수동으로 stack을 살펴보려면 다음 명령을 사용한다.
-
-```bash
-make e2e-up
-make e2e-wait
-make e2e-newman
-make e2e-down
-```
+테스트가 끝나면 성공/실패 여부와 관계없이 Compose stack과 volume을 자동으로 정리한다.
 
 ## CI
 

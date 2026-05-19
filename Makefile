@@ -39,7 +39,7 @@ INFRA_TARGETS := \
 	app-images-build app-images-push local-kustomize-tag third-party-images-push local-k8s-render local-k8s-apply local-k8s-deps-prepare local-k8s-deps-apply local-k8s-app-apply local-k8s-app-stop local-k8s-app-pods-delete local-k8s-deps-verify local-k8s-app-verify local-k8s-verify local-k8s-pods local-k8s-app-pods local-k8s-app-services local-k8s-status local-k8s-node-top local-k8s-app-top local-k8s-top local-k8s-crud-smoke local-k8s-deploy \
 	wsl-local-ssh-keys-sync wsl-local-inventory wsl-bootstrap-after-vagrant wsl-local-k8s-bootstrap wsl-metallb-bootstrap wsl-metallb-verify wsl-upload-k8s wsl-kong-bootstrap wsl-kong-verify wsl-local-k8s-apply wsl-local-k8s-deps-apply wsl-local-k8s-app-apply wsl-local-k8s-deps-verify wsl-local-k8s-app-verify wsl-local-k8s-verify wsl-local-k8s-pods wsl-local-k8s-app-pods wsl-local-k8s-app-services wsl-local-k8s-status wsl-local-k8s-node-top wsl-local-k8s-app-top wsl-local-k8s-top wsl-local-k8s-crud-smoke wsl-local-k8s-deploy
 
-.PHONY: help list install activate test-runner-build test-unit test test-all test-e2e e2e-up e2e-wait e2e-newman e2e-down $(INFRA_TARGETS)
+.PHONY: help list install activate test-runner-build test-unit test test-e2e _e2e-up _e2e-wait _e2e-newman $(INFRA_TARGETS)
 
 help:
 	@printf '%s\n' 'Medical Platform commands'
@@ -52,13 +52,8 @@ help:
 	@printf '%s\n' ''
 	@printf '%s\n' '테스트'
 	@printf '  %-28s %s\n' 'make test-unit' 'Docker Python 러너에서 FastAPI 서비스 pytest를 실행합니다.'
-	@printf '  %-28s %s\n' 'make test' 'make test-unit과 같은 기본 테스트입니다.'
-	@printf '  %-28s %s\n' 'make test-all' '단위 테스트와 Docker Compose E2E 테스트를 실행합니다.'
-	@printf '  %-28s %s\n' 'make test-e2e' 'Docker Compose에서 PostgreSQL/Kafka 기반 E2E 시나리오를 실행합니다.'
-	@printf '  %-28s %s\n' 'make e2e-up' 'E2E Docker Compose stack을 시작합니다.'
-	@printf '  %-28s %s\n' 'make e2e-wait' 'Docker curl 컨테이너로 E2E 서비스 준비 상태를 확인합니다.'
-	@printf '  %-28s %s\n' 'make e2e-newman' 'Docker Newman 컨테이너로 E2E collection을 실행합니다.'
-	@printf '  %-28s %s\n' 'make e2e-down' 'E2E Docker Compose stack을 정리합니다.'
+	@printf '  %-28s %s\n' 'make test' '단위 테스트와 Docker Compose E2E 테스트를 실행합니다.'
+	@printf '  %-28s %s\n' 'make test-e2e' 'Docker Compose E2E stack을 실행하고 테스트 종료 후 정리합니다.'
 	@printf '%s\n' ''
 	@printf '%s\n' '로컬 k8s 환경 설치'
 	@printf '  %-28s %s\n' 'make local-k8s-bootstrap' 'VM, Kubernetes, registry, Metrics Server, 앱 의존성을 준비합니다.'
@@ -129,21 +124,20 @@ test-runner-build:
 test-unit: test-runner-build
 	docker run --rm -v "$(CURDIR)":/workspace -w /workspace $(TEST_RUNNER_IMAGE) sh -c 'set -e; for service in $(SERVICES); do printf "%s\n" "Running pytest for $$service"; (cd "$$service" && PYTHONPATH=. python -m pytest $(PYTEST_ARGS)); done'
 
-test: test-unit
-
-test-all: test-unit test-e2e
+test: test-unit test-e2e
 
 test-e2e:
 	@set -e; \
-	trap '$(DOCKER_COMPOSE) -p $(E2E_COMPOSE_PROJECT) -f $(E2E_COMPOSE_FILE) down -v --remove-orphans' EXIT INT TERM; \
-	$(MAKE) e2e-up; \
-	$(MAKE) e2e-wait; \
-	$(MAKE) e2e-newman
+	cleanup() { status=$$?; $(DOCKER_COMPOSE) -p $(E2E_COMPOSE_PROJECT) -f $(E2E_COMPOSE_FILE) down -v --remove-orphans; exit $$status; }; \
+	trap cleanup EXIT INT TERM; \
+	$(MAKE) _e2e-up; \
+	$(MAKE) _e2e-wait; \
+	$(MAKE) _e2e-newman
 
-e2e-up:
+_e2e-up:
 	$(DOCKER_COMPOSE) -p $(E2E_COMPOSE_PROJECT) -f $(E2E_COMPOSE_FILE) up -d --build
 
-e2e-wait:
+_e2e-wait:
 	docker run --rm --network $(E2E_NETWORK) \
 		-v "$(CURDIR)/tests/e2e/scripts":/scripts:ro \
 		-e E2E_PATIENT_SERVICE_URL="$(E2E_PATIENT_SERVICE_URL)" \
@@ -154,7 +148,7 @@ e2e-wait:
 		-e E2E_WAIT_SLEEP_SECONDS \
 		$(CURL_IMAGE) sh /scripts/wait-for-services.sh
 
-e2e-newman:
+_e2e-newman:
 	mkdir -p tests/e2e/newman/reports
 	docker run --rm --network $(E2E_NETWORK) -v "$(CURDIR)/tests/e2e":/etc/newman -w /etc/newman $(NEWMAN_IMAGE) run postman/medical-platform.postman_collection.json \
 		-e newman/docker.postman_environment.json \
@@ -165,9 +159,6 @@ e2e-newman:
 		--reporters cli,junit \
 		--delay-request 1000 \
 		--reporter-junit-export newman/reports/e2e.xml
-
-e2e-down:
-	$(DOCKER_COMPOSE) -p $(E2E_COMPOSE_PROJECT) -f $(E2E_COMPOSE_FILE) down -v --remove-orphans
 
 $(INFRA_TARGETS):
 	$(INFRA_MAKE) $@
