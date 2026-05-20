@@ -8,3 +8,4 @@ resources:
   - db/appointment-db
   - db/prescription-db
   - db/notification-db
+  - outbox-publisher
