@@ -1,136 +1,85 @@
-# MediKong Cloud Native Study
+# MediKong
 
-FastAPI 기반 의료 MSA를 로컬 Kubernetes에서 검증하고, 이후 AWS 배포로 확장하기 위한 실습 프로젝트입니다.
+FastAPI로 만든 의료 MSA를 Kubernetes 위에서 직접 운영해보는 클라우드 네이티브 학습 프로젝트입니다.
 
-현재 로컬 표준 실행 방식은 Docker Compose가 아니라 `VMware/Vagrant VM 3대 + Ansible + kubeadm Kubernetes + Kong Gateway`입니다.
+API 서버 몇 개를 띄우는 데서 끝내지 않고, 서비스 분리부터 게이트웨이, 메시징, 관측성, 로컬 Kubernetes, AWS/GitOps 배포 준비까지 한 번에 이어서 실험합니다.
 
-## 현재 검증 상태
+## 프로젝트 소개
 
-서비스별 namespace 분리 버전 기준으로 다음 흐름이 통과했습니다.
+MediKong은 병원 업무를 작게 나눈 예제입니다. 로그인, 환자, 예약, 처방, 알림 서비스를 각각 분리하고, 외부 요청은 Kong Gateway를 통해 받습니다.
 
-```bash
-make wsl-local-k8s-bootstrap
-make IMAGE_TAG=dev-001 wsl-local-k8s-deploy
-make wsl-local-k8s-crud-smoke
-```
+각 서비스는 자기 데이터베이스만 직접 사용합니다. 예약과 처방에서 생기는 이벤트는 Kafka를 거쳐 알림 서비스로 전달됩니다.
 
-성공 로그:
+## 구현하고 실험한 내용
+
+- 서비스별 namespace와 PostgreSQL 분리
+- Kong Gateway 기반 라우팅, JWT 인증, 요청 제한
+- Kafka 이벤트 기반 예약, 처방, 알림 처리
+- Vagrant와 kubeadm으로 구성한 로컬 Kubernetes 랩
+- MetalLB, Metrics Server, Grafana를 이용한 로컬 운영 실험
+- AWS/GitOps 배포를 위한 기본 오버레이와 Argo CD 실험 구성
+
+## 전체 과정
 
 ```text
-ok: patient CRUD smoke passed with patientId=1
+사용자
+  -> Kong Gateway
+  -> FastAPI 서비스
+  -> PostgreSQL
+
+예약 서비스
+처방 서비스
+  -> Kafka
+  -> 알림 서비스
 ```
 
-## 로컬 구조
+로컬에서는 Kong Gateway가 MetalLB를 통해 노출되고, 서비스들은 Kubernetes 내부 DNS로 서로 통신합니다.
+
+## 서비스 구성
+
+| 서비스 | 역할 |
+| --- | --- |
+| `auth` | 로그인, JWT 발급, 인증 감사 로그 |
+| `patient` | 환자 정보와 의료 요약 |
+| `appointment` | 예약 요청, 확정, 취소 |
+| `prescription` | 처방 발행과 조회 |
+| `notification` | Kafka 이벤트 기반 알림 저장 |
+| `dashboard` | 브라우저에서 확인하는 간단한 화면 |
+
+## 설치 및 실행
+
+현재 로컬 표준 환경은 Docker Compose가 아니라 작은 Kubernetes 클러스터입니다.
 
 ```text
-Windows host or macOS
-├─ Docker / Docker Desktop
-│  └─ 서비스 이미지 build/push
-├─ VMware + Vagrant
-│  ├─ control-plane-1  10.10.10.10
-│  ├─ worker-1         10.10.10.11
-│  └─ worker-2         10.10.10.12
-└─ Kubernetes
-   ├─ local registry   10.10.10.10:5000
-   ├─ MetalLB          10.10.10.240-10.10.10.250
-   ├─ Kong Gateway     http://10.10.10.240
-   ├─ medical-auth
-   ├─ medical-messaging
-   ├─ medical-patient
-   ├─ medical-appointment
-   ├─ medical-prescription
-   ├─ medical-notification
-   └─ medical-dashboard
+VMware / Vagrant
+Ansible
+kubeadm Kubernetes
+Kong Gateway
+MetalLB
+PostgreSQL
+Kafka
+Grafana
 ```
 
-## 주요 구성
+루트 `Makefile`에서 로컬 실습 환경을 준비하고 앱을 배포합니다.
 
-| 영역 | 내용 |
+```bash
+make install
+make local-k8s-bootstrap
+make local-k8s-deploy
+```
+
+- `make install`: 프로젝트 실행 환경을 준비합니다.
+- `make local-k8s-bootstrap`: VMware/Vagrant VM과 kubeadm Kubernetes 클러스터를 구성합니다.
+- `make local-k8s-deploy`: 앱 이미지를 빌드한 뒤 로컬 Kubernetes에 배포합니다.
+
+## 프로젝트 구조
+
+| 경로 | 설명 |
 | --- | --- |
-| Services | `auth`, `patient`, `appointment`, `prescription`, `notification`, `dashboard` |
-| Gateway | Kong Ingress Controller |
-| Auth | KongConsumer, JWT Secret, KongClusterPlugin |
-| LoadBalancer | MetalLB |
-| Databases | PostgreSQL StatefulSet, service별 DB 분리 |
-| Messaging | Kafka StatefulSet |
-| Registry | control-plane VM의 HTTPS local registry |
-| Infra | Vagrant, VMware, Ansible, kubeadm |
-| Deploy | Kustomize overlay 직접 apply |
-
-## Windows + WSL 실행
-
-PowerShell에서 VM을 생성합니다.
-
-```powershell
-cd D:\develop\cloudnative_study\infra\cluster\providers\local-vagrant
-vagrant up --provider=vmware_desktop
-vagrant status
-```
-
-WSL에서 Kubernetes와 앱을 배포합니다.
-
-```bash
-cd /mnt/d/develop/cloudnative_study/infra/cluster
-cp .env.example .env  # 이미 있으면 생략
-
-make wsl-local-k8s-bootstrap
-make IMAGE_TAG=dev-001 wsl-local-k8s-deploy
-make wsl-local-k8s-crud-smoke
-```
-
-처음부터 다시 만들려면 PowerShell에서 VM을 삭제한 뒤 다시 시작합니다.
-
-```powershell
-cd D:\develop\cloudnative_study\infra\cluster\providers\local-vagrant
-vagrant destroy -f
-vagrant up --provider=vmware_desktop
-```
-
-## macOS 실행
-
-```bash
-cd infra/cluster
-cp .env.example .env  # 이미 있으면 생략
-make local-reset IMAGE_TAG=dev-001
-```
-
-이미 VM과 클러스터가 준비되어 있으면 앱만 다시 배포합니다.
-
-```bash
-make IMAGE_TAG=dev-001 local-k8s-deploy
-make local-k8s-crud-smoke
-```
-
-## 상태 확인
-
-```bash
-cd infra/cluster
-make wsl-local-k8s-status
-make wsl-local-k8s-top
-make wsl-local-k8s-crud-smoke
-```
-
-직접 확인하려면 control-plane VM에서 다음을 봅니다.
-
-```bash
-sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl get pods -A -o wide
-sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl get svc -A
-sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl get ingress -A
-sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl get pvc -A
-sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl get kongclusterplugins
-sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl get kongconsumers -n medical-auth
-```
-
-## 문서
-
-| 문서 | 목적 |
-| --- | --- |
-| [project_docs/ARCHITECTURE.md](project_docs/ARCHITECTURE.md) | 전체 서비스 구조 이해 |
-| [project_docs/SIMPLE_RUN_GUIDE.md](project_docs/SIMPLE_RUN_GUIDE.md) | 가장 짧은 실행 순서 |
-| [project_docs/DOCKER_GUIDE.md](project_docs/DOCKER_GUIDE.md) | 이미지 빌드, push, 재배포 |
-| [project_docs/SCENARIO_TEST_GUIDE.md](project_docs/SCENARIO_TEST_GUIDE.md) | 정상 업무 흐름과 장애 시나리오 검증 |
-| [infra/cluster/README.md](infra/cluster/README.md) | 로컬 VM/Kubernetes 인프라 실행 |
-| [k8s/README.md](k8s/README.md) | Kubernetes manifest 구조 |
-| [tests/README.md](tests/README.md) | 테스트 실행 |
-
-`project_docs/doc1/`은 개인 학습용 문서 폴더이며 Git 추적 대상에서 제외합니다.
+| `services/` | FastAPI 서비스 코드 |
+| `dashboard/` | 정적 대시보드 화면 |
+| `k8s/` | Kubernetes 매니페스트와 Kustomize 오버레이 |
+| `infra/cluster/` | 로컬 Kubernetes 랩 구성 |
+| `argo/` | Argo CD 실험 구성 |
+| `tests/` | 단위 테스트와 E2E 테스트 |
