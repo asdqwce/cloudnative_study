@@ -267,6 +267,19 @@
       changed_when: "'created' in ns_create.stdout"
       failed_when: ns_create.rc != 0 and 'already exists' not in ns_create.stderr
 
+    - name: Deploy namespaces
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - apply
+          - -f
+          - k8s/namespaces/namespaces.yaml
+      args:
+        chdir: "/home/{{ ansible_user }}/cloudnative_study"
+      environment:
+        KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
+      changed_when: false
+
     - name: Deploy K8s dependencies (DB, Kafka, Outbox)
       ansible.builtin.command:
         argv:
