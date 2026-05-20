@@ -1,3 +1,6 @@
+[extend]
+useDefault = true
+
 [allowlist]
 description = "Allow the fixed local JWT test key used by the sample gateway."
 regexes = [

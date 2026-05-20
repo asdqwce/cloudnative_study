@@ -1,0 +1,91 @@
+Diagram:
+  DefinitionFiles:
+    - Type: URL
+      Url: "https://raw.githubusercontent.com/awslabs/diagram-as-code/main/definitions/definition-for-aws-icons-light.yaml"
+
+  Resources:
+    Canvas:
+      Type: AWS::Diagram::Canvas
+      Direction: horizontal
+      Children:
+        - ValidationLane
+        - RuntimeLane
+        - ReleaseLane
+
+    ValidationLane:
+      Type: AWS::Diagram::Resource
+      Direction: vertical
+      BorderType: dashed
+      Title: "1. 로컬에서 먼저 확인"
+      Children:
+        - UnitRunner
+        - ComposeE2E
+        - LocalKubernetes
+    UnitRunner:
+      Type: AWS::Diagram::Resource
+      Title: "Docker pytest runner"
+    ComposeE2E:
+      Type: AWS::Diagram::Resource
+      Title: "Compose E2E"
+    LocalKubernetes:
+      Type: AWS::Diagram::Resource
+      Title: "VMware / Vagrant K8s"
+
+    RuntimeLane:
+      Type: AWS::Diagram::Resource
+      Direction: vertical
+      BorderColor: "rgba(53,109,191,255)"
+      Title: "2. 서비스 런타임"
+      Children:
+        - Gateway
+        - ServiceRow
+        - DataRow
+    Gateway:
+      Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+      Preset: Application Load Balancer
+      Title: "Kong Gateway"
+    ServiceRow:
+      Type: AWS::Diagram::HorizontalStack
+      Children:
+        - AuthService
+        - PatientService
+        - AppointmentService
+    AuthService:
+      Type: AWS::Diagram::Resource
+      Title: "auth"
+    PatientService:
+      Type: AWS::Diagram::Resource
+      Title: "patient"
+    AppointmentService:
+      Type: AWS::Diagram::Resource
+      Title: "appointment"
+    DataRow:
+      Type: AWS::Diagram::HorizontalStack
+      Children:
+        - DatabasePlane
+        - EventPlane
+    DatabasePlane:
+      Type: AWS::RDS::DBInstance
+      Title: "PostgreSQL per service"
+    EventPlane:
+      Type: AWS::Diagram::Resource
+      Title: "Kafka events"
+
+    ReleaseLane:
+      Type: AWS::Diagram::Cloud
+      Preset: AWSCloudNoLogo
+      Direction: vertical
+      Title: "3. AWS GitOps 릴리스"
+      Children:
+        - ReleaseAutomation
+        - Registry
+        - AwsCluster
+    ReleaseAutomation:
+      Type: AWS::Diagram::Resource
+      Title: "GitHub Actions + OIDC"
+    Registry:
+      Type: AWS::ECR
+      Title: "Private ECR"
+    AwsCluster:
+      Type: AWS::EC2::Instance
+      Title: "EC2 Kubernetes + Argo CD"

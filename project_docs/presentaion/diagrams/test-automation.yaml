@@ -1,0 +1,76 @@
+Diagram:
+  DefinitionFiles:
+    - Type: URL
+      Url: "https://raw.githubusercontent.com/awslabs/diagram-as-code/main/definitions/definition-for-aws-icons-light.yaml"
+
+  Resources:
+    Canvas:
+      Type: AWS::Diagram::Canvas
+      Direction: vertical
+      Children:
+        - UnitLane
+        - E2ELane
+
+    UnitLane:
+      Type: AWS::Diagram::Resource
+      Direction: horizontal
+      BorderType: dashed
+      Title: "단위 테스트: Docker Python runner"
+      Children:
+        - MakeUnit
+        - RunnerImage
+        - ServicePytest
+        - CIUnit
+    MakeUnit:
+      Type: AWS::Diagram::Resource
+      Title: "make test-unit"
+    RunnerImage:
+      Type: AWS::Diagram::Resource
+      Title: "tests/docker"
+    ServicePytest:
+      Type: AWS::Diagram::Resource
+      Title: "service pytest"
+    CIUnit:
+      Type: AWS::Diagram::Resource
+      Title: "ci.yml"
+
+    E2ELane:
+      Type: AWS::Diagram::Resource
+      Direction: horizontal
+      BorderColor: "rgba(53,109,191,255)"
+      Title: "E2E: Compose network + Newman"
+      Children:
+        - MakeE2E
+        - ComposeNetwork
+        - NewmanCollection
+        - CIE2E
+    MakeE2E:
+      Type: AWS::Diagram::Resource
+      Title: "make test-e2e"
+    ComposeNetwork:
+      Type: AWS::Diagram::Resource
+      Direction: vertical
+      Title: "Docker Compose"
+      Children:
+        - ComposeData
+        - ComposeServices
+    ComposeData:
+      Type: AWS::Diagram::HorizontalStack
+      Children:
+        - Postgres
+        - Kafka
+    Postgres:
+      Type: AWS::RDS::DBInstance
+      Title: "PostgreSQL"
+    Kafka:
+      Type: AWS::Diagram::Resource
+      Title: "Kafka"
+    ComposeServices:
+      Type: AWS::Diagram::Resource
+      Title: "FastAPI DNS names"
+    NewmanCollection:
+      Type: AWS::Diagram::Resource
+      Title: "Postman / Newman"
+    CIE2E:
+      Type: AWS::Diagram::Resource
+      Title: "e2e.yml"

@@ -1,0 +1,89 @@
+Diagram:
+  DefinitionFiles:
+    - Type: URL
+      Url: "https://raw.githubusercontent.com/awslabs/diagram-as-code/main/definitions/definition-for-aws-icons-light.yaml"
+
+  Resources:
+    Canvas:
+      Type: AWS::Diagram::Canvas
+      Direction: horizontal
+      Children:
+        - ReleaseInput
+        - ActionWorkflow
+        - AwsOutputs
+        - ClusterRollout
+
+    ReleaseInput:
+      Type: AWS::Diagram::Resource
+      Direction: vertical
+      BorderType: dashed
+      Title: "release input"
+      Children:
+        - GitTag
+        - ImageTag
+    GitTag:
+      Type: AWS::Diagram::Resource
+      Title: "Git tag v*"
+    ImageTag:
+      Type: AWS::Diagram::Resource
+      Title: "same image tag"
+
+    ActionWorkflow:
+      Type: AWS::Diagram::Resource
+      Direction: vertical
+      BorderColor: "rgba(53,109,191,255)"
+      Title: "release.yml"
+      Children:
+        - SourceSecurity
+        - BuildMatrix
+        - ImageGate
+        - ManifestUpdate
+    SourceSecurity:
+      Type: AWS::Diagram::Resource
+      Title: "source-security"
+    BuildMatrix:
+      Type: AWS::Diagram::Resource
+      Title: "build-images matrix"
+    ImageGate:
+      Type: AWS::Diagram::Resource
+      Title: "Trivy + history"
+    ManifestUpdate:
+      Type: AWS::Diagram::Resource
+      Title: "update manifests"
+
+    AwsOutputs:
+      Type: AWS::Diagram::Cloud
+      Preset: AWSCloudNoLogo
+      Direction: vertical
+      Title: "AWS / Git outputs"
+      Children:
+        - ReleaseRole
+        - PrivateECR
+        - ReleaseOverlay
+    ReleaseRole:
+      Type: AWS::IAM::Role
+      Title: "OIDC role"
+    PrivateECR:
+      Type: AWS::ECR
+      Title: "Private ECR"
+    ReleaseOverlay:
+      Type: AWS::Diagram::Resource
+      Title: "release branch overlay"
+
+    ClusterRollout:
+      Type: AWS::Diagram::Resource
+      Direction: vertical
+      Title: "cluster rollout"
+      Children:
+        - ArgoCD
+        - KubeletPull
+        - Services
+    ArgoCD:
+      Type: AWS::Diagram::Resource
+      Title: "Argo CD sync"
+    KubeletPull:
+      Type: AWS::Diagram::Resource
+      Title: "ECR image pull"
+    Services:
+      Type: AWS::EC2::Instance
+      Title: "EC2 K8s services"

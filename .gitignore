@@ -511,3 +511,5 @@ project_docs/doc1/
 # Pytest cache
 .pytest_cache/
 **/.pytest_cache/
+
+.agents

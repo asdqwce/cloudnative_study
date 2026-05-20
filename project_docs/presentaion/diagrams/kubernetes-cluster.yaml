@@ -1,0 +1,135 @@
+Diagram:
+  DefinitionFiles:
+    - Type: URL
+      Url: "https://raw.githubusercontent.com/awslabs/diagram-as-code/main/definitions/definition-for-aws-icons-light.yaml"
+
+  Resources:
+    Canvas:
+      Type: AWS::Diagram::Canvas
+      Direction: horizontal
+      Children:
+        - LocalCluster
+        - ClusterInside
+        - AwsCluster
+
+    LocalCluster:
+      Type: AWS::Diagram::Resource
+      Direction: vertical
+      BorderType: dashed
+      Title: "로컬 Kubernetes"
+      Children:
+        - LocalNodes
+        - LocalAddons
+        - LocalEntry
+    LocalNodes:
+      Type: AWS::Diagram::Resource
+      Direction: horizontal
+      Title: "VMware / Vagrant"
+      Children:
+        - LocalControlPlane
+        - LocalWorker
+    LocalControlPlane:
+      Type: AWS::Diagram::Resource
+      Title: "control-plane"
+    LocalWorker:
+      Type: AWS::Diagram::Resource
+      Title: "workers"
+    LocalAddons:
+      Type: AWS::Diagram::Resource
+      Direction: horizontal
+      Title: "로컬 운영 부품"
+      Children:
+        - LocalRegistry
+        - MetalLB
+    LocalRegistry:
+      Type: AWS::Diagram::Resource
+      Title: "local registry"
+    MetalLB:
+      Type: AWS::Diagram::Resource
+      Title: "MetalLB"
+    LocalEntry:
+      Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+      Preset: Application Load Balancer
+      Title: "Kong LoadBalancer"
+
+    ClusterInside:
+      Type: AWS::Diagram::Resource
+      Direction: vertical
+      BorderColor: "rgba(53,109,191,255)"
+      Title: "클러스터 내부"
+      Children:
+        - IngressLayer
+        - NamespaceLayer
+        - DataLayer
+        - PolicyLayer
+    IngressLayer:
+      Type: AWS::Diagram::Resource
+      Direction: horizontal
+      Title: "ingress"
+      Children:
+        - KongIngress
+        - KongPlugins
+    KongIngress:
+      Type: AWS::Diagram::Resource
+      Title: "Kong Ingress"
+    KongPlugins:
+      Type: AWS::Diagram::Resource
+      Title: "JWT / rate limit"
+    NamespaceLayer:
+      Type: AWS::Diagram::Resource
+      Direction: horizontal
+      Title: "FastAPI namespaces"
+      Children:
+        - CoreServices
+        - EdgeServices
+    CoreServices:
+      Type: AWS::Diagram::Resource
+      Title: "auth / patient / appointment"
+    EdgeServices:
+      Type: AWS::Diagram::Resource
+      Title: "prescription / notification / dashboard"
+    DataLayer:
+      Type: AWS::Diagram::Resource
+      Direction: horizontal
+      Title: "data plane"
+      Children:
+        - ServiceDatabases
+        - Kafka
+    ServiceDatabases:
+      Type: AWS::RDS::DBInstance
+      Title: "PostgreSQL per service"
+    Kafka:
+      Type: AWS::Diagram::Resource
+      Title: "Kafka"
+    PolicyLayer:
+      Type: AWS::Diagram::Resource
+      Direction: horizontal
+      Title: "guard rails"
+      Children:
+        - NamespacePolicy
+        - NetworkPolicy
+    NamespacePolicy:
+      Type: AWS::Diagram::Resource
+      Title: "namespace / quota"
+    NetworkPolicy:
+      Type: AWS::Diagram::Resource
+      Title: "NetworkPolicy"
+
+    AwsCluster:
+      Type: AWS::Diagram::Cloud
+      Preset: AWSCloudNoLogo
+      Direction: vertical
+      Title: "AWS 실행 형태"
+      Children:
+        - AwsNodes
+        - AwsImageSource
+        - AwsGitOps
+    AwsNodes:
+      Type: AWS::EC2::Instance
+      Title: "EC2 self-managed K8s"
+    AwsImageSource:
+      Type: AWS::ECR
+      Title: "Private ECR"
+    AwsGitOps:
+      Type: AWS::Diagram::Resource
+      Title: "Argo CD sync"

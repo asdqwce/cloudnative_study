@@ -1,0 +1,81 @@
+Diagram:
+  DefinitionFiles:
+    - Type: URL
+      Url: "https://raw.githubusercontent.com/awslabs/diagram-as-code/main/definitions/definition-for-aws-icons-light.yaml"
+
+  Resources:
+    Canvas:
+      Type: AWS::Diagram::Canvas
+      Direction: horizontal
+      Children:
+        - SourceGate
+        - ReleaseGate
+        - RegistryGate
+
+    SourceGate:
+      Type: AWS::Diagram::Resource
+      Direction: vertical
+      BorderType: dashed
+      Title: "source gate"
+      Children:
+        - PrePush
+        - Gitleaks
+        - ContextCheck
+        - DockerfileLint
+    PrePush:
+      Type: AWS::Diagram::Resource
+      Title: "pre-push / security.yml"
+    Gitleaks:
+      Type: AWS::Diagram::Resource
+      Title: "gitleaks"
+    ContextCheck:
+      Type: AWS::Diagram::Resource
+      Title: "build context"
+    DockerfileLint:
+      Type: AWS::Diagram::Resource
+      Title: "hadolint"
+
+    ReleaseGate:
+      Type: AWS::Diagram::Resource
+      Direction: vertical
+      BorderColor: "rgba(53,109,191,255)"
+      Title: "release image gate"
+      Children:
+        - BuildImage
+        - TrivyScan
+        - HistoryScan
+    BuildImage:
+      Type: AWS::Diagram::Resource
+      Title: "Docker build"
+    TrivyScan:
+      Type: AWS::Diagram::Resource
+      Title: "Trivy image scan"
+    HistoryScan:
+      Type: AWS::Diagram::Resource
+      Title: "docker history scan"
+
+    RegistryGate:
+      Type: AWS::Diagram::Resource
+      Direction: vertical
+      Title: "registry boundary"
+      Children:
+        - ReleaseRole
+        - PrivateECR
+    ReleaseRole:
+      Type: AWS::IAM::Role
+      Title: "OIDC release role"
+    PrivateECR:
+      Type: AWS::ECR
+      Title: "Private ECR push"
+
+  Links:
+    - Source: SourceGate
+      Target: ReleaseGate
+      TargetArrowHead:
+        Type: Open
+      Type: orthogonal
+    - Source: ReleaseGate
+      Target: RegistryGate
+      TargetArrowHead:
+        Type: Open
+      Type: orthogonal

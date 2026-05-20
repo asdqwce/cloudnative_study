@@ -1,0 +1,185 @@
+Diagram:
+  DefinitionFiles:
+    - Type: URL
+      Url: "https://raw.githubusercontent.com/awslabs/diagram-as-code/main/definitions/definition-for-aws-icons-light.yaml"
+
+  Resources:
+    Canvas:
+      Type: AWS::Diagram::Canvas
+      Direction: horizontal
+      Children:
+        - ExternalAccess
+        - AwsInfra
+        - DeliveryOps
+
+    ExternalAccess:
+      Type: AWS::Diagram::Resource
+      Direction: vertical
+      BorderType: dashed
+      Title: "외부 접근"
+      Children:
+        - Client
+        - Firewall
+        - IngressEntry
+    Client:
+      Type: AWS::Diagram::Resource
+      Title: "외부 클라이언트"
+    Firewall:
+      Type: AWS::EC2
+      Title: "firewall / SG"
+    IngressEntry:
+      Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+      Preset: Application Load Balancer
+      Title: "Kong Gateway"
+
+    AwsInfra:
+      Type: AWS::Diagram::Cloud
+      Preset: AWSCloudNoLogo
+      Direction: vertical
+      BorderColor: "rgba(53,109,191,255)"
+      Title: "AWS ap-northeast-2 / EC2 self-managed Kubernetes"
+      Children:
+        - ProvisioningRow
+        - ClusterRow
+        - PlatformRow
+        - ObservabilityRow
+
+    ProvisioningRow:
+      Type: AWS::Diagram::Resource
+      Direction: horizontal
+      BorderType: dashed
+      Title: "인프라 구성"
+      Children:
+        - Terraform
+        - Ansible
+        - EC2Nodes
+    Terraform:
+      Type: AWS::Diagram::Resource
+      Title: "Terraform"
+    Ansible:
+      Type: AWS::Diagram::Resource
+      Title: "Ansible"
+    EC2Nodes:
+      Type: AWS::EC2::Instance
+      Title: "master / workers"
+
+    ClusterRow:
+      Type: AWS::Diagram::Resource
+      Direction: horizontal
+      Title: "Kubernetes cluster"
+      Children:
+        - GatewayLayer
+        - ServiceLayer
+        - DataLayer
+    GatewayLayer:
+      Type: AWS::Diagram::Resource
+      Direction: vertical
+      Title: "Gateway"
+      Children:
+        - KongRouting
+        - KongAuth
+    KongRouting:
+      Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+      Preset: Application Load Balancer
+      Title: "routing"
+    KongAuth:
+      Type: AWS::IAM
+      Title: "JWT / auth"
+    ServiceLayer:
+      Type: AWS::Diagram::Resource
+      Direction: vertical
+      Title: "FastAPI services"
+      Children:
+        - CoreServices
+        - PortalDashboard
+    CoreServices:
+      Type: AWS::Diagram::Resource
+      Title: "auth / patient / appointment"
+    PortalDashboard:
+      Type: AWS::Diagram::Resource
+      Title: "prescription / notification / dashboard"
+    DataLayer:
+      Type: AWS::Diagram::Resource
+      Direction: vertical
+      Title: "Data / events"
+      Children:
+        - ServiceDatabases
+        - KafkaStatefulSet
+    ServiceDatabases:
+      Type: AWS::RDS::DBInstance
+      Title: "PostgreSQL / MongoDB"
+    KafkaStatefulSet:
+      Type: AWS::Diagram::Resource
+      Title: "Kafka StatefulSet"
+
+    PlatformRow:
+      Type: AWS::Diagram::Resource
+      Direction: horizontal
+      Title: "운영 구성"
+      Children:
+        - Namespaces
+        - PersistentVolumes
+        - NetworkPolicies
+    Namespaces:
+      Type: AWS::Diagram::Resource
+      Title: "namespace"
+    PersistentVolumes:
+      Type: AWS::Diagram::Resource
+      Title: "PV / PVC"
+    NetworkPolicies:
+      Type: AWS::Diagram::Resource
+      Title: "NetworkPolicy"
+
+    ObservabilityRow:
+      Type: AWS::Diagram::Resource
+      Direction: horizontal
+      BorderColor: "rgba(0,128,80,255)"
+      Title: "검증 / 모니터링"
+      Children:
+        - Prometheus
+        - Grafana
+        - Newman
+    Prometheus:
+      Type: AWS::CloudWatch
+      Title: "Prometheus"
+    Grafana:
+      Type: AWS::CloudWatch
+      Title: "Grafana"
+    Newman:
+      Type: AWS::Diagram::Resource
+      Title: "Newman E2E"
+
+    DeliveryOps:
+      Type: AWS::Diagram::Resource
+      Direction: vertical
+      BorderType: dashed
+      Title: "배포 자동화"
+      Children:
+        - GitHubActions
+        - SecurityScan
+        - PrivateECR
+        - ArgoCD
+    GitHubActions:
+      Type: AWS::Diagram::Resource
+      Title: "GitHub Actions"
+    SecurityScan:
+      Type: AWS::Inspector
+      Title: "test / security scan"
+    PrivateECR:
+      Type: AWS::ECR
+      Title: "Private ECR"
+    ArgoCD:
+      Type: AWS::Diagram::Resource
+      Title: "release overlay / Argo CD"
+
+  Links:
+    - Source: ExternalAccess
+      Target: AwsInfra
+      TargetArrowHead:
+        Type: Open
+      Type: orthogonal
+    - Source: DeliveryOps
+      Target: AwsInfra
+      TargetArrowHead:
+        Type: Open
+      Type: orthogonal

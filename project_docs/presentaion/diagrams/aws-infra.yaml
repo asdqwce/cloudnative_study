@@ -1,0 +1,125 @@
+Diagram:
+  DefinitionFiles:
+    - Type: URL
+      Url: "https://raw.githubusercontent.com/awslabs/diagram-as-code/main/definitions/definition-for-aws-icons-light.yaml"
+
+  Resources:
+    Canvas:
+      Type: AWS::Diagram::Canvas
+      Direction: horizontal
+      Children:
+        - Region
+        - ReleasePath
+
+    Region:
+      Type: AWS::Diagram::Cloud
+      Preset: AWSCloudNoLogo
+      Direction: vertical
+      Title: "AWS ap-northeast-2"
+      Children:
+        - GuardRailRow
+        - ComputeRow
+        - RegistryRow
+
+    GuardRailRow:
+      Type: AWS::Diagram::HorizontalStack
+      Children:
+        - IdentityPlane
+        - AccessPlane
+    IdentityPlane:
+      Type: AWS::Diagram::Resource
+      Direction: vertical
+      Title: "IAM / OIDC"
+      Children:
+        - OIDCProvider
+        - ReleaseRole
+        - WorkerProfile
+    OIDCProvider:
+      Type: AWS::IAM
+      Title: "GitHub OIDC"
+    ReleaseRole:
+      Type: AWS::IAM::Role
+      Title: "release role"
+    WorkerProfile:
+      Type: AWS::IAM
+      Title: "worker profile"
+    AccessPlane:
+      Type: AWS::Diagram::Resource
+      Direction: vertical
+      Title: "EC2 access"
+      Children:
+        - KeyPair
+        - SecurityGroup
+    KeyPair:
+      Type: AWS::EC2
+      Title: "Key Pair"
+    SecurityGroup:
+      Type: AWS::EC2
+      Title: "Security Group"
+
+    ComputeRow:
+      Type: AWS::Diagram::Resource
+      Direction: horizontal
+      Title: "EC2 self-managed Kubernetes"
+      Children:
+        - MasterNode
+        - WorkerNodeOne
+        - WorkerNodeTwo
+    MasterNode:
+      Type: AWS::EC2::Instance
+      Title: "master"
+    WorkerNodeOne:
+      Type: AWS::EC2::Instance
+      Title: "worker-1"
+    WorkerNodeTwo:
+      Type: AWS::EC2::Instance
+      Title: "worker-2"
+
+    RegistryRow:
+      Type: AWS::Diagram::Resource
+      Direction: horizontal
+      Title: "Private ECR repositories"
+      Children:
+        - AuthRepo
+        - PatientRepo
+        - AppointmentRepo
+        - OtherRepo
+    AuthRepo:
+      Type: AWS::ECR
+      Title: "auth"
+    PatientRepo:
+      Type: AWS::ECR
+      Title: "patient"
+    AppointmentRepo:
+      Type: AWS::ECR
+      Title: "appointment"
+    OtherRepo:
+      Type: AWS::ECR
+      Title: "prescription / notification / dashboard"
+
+    ReleasePath:
+      Type: AWS::Diagram::Resource
+      Direction: vertical
+      BorderType: dashed
+      Title: "GitOps release path"
+      Children:
+        - GitHubActions
+        - ReleaseBranch
+        - AwsOverlay
+        - ArgoCD
+        - ImagePull
+    GitHubActions:
+      Type: AWS::Diagram::Resource
+      Title: "GitHub Actions"
+    ReleaseBranch:
+      Type: AWS::Diagram::Resource
+      Title: "release branch"
+    AwsOverlay:
+      Type: AWS::Diagram::Resource
+      Title: "k8s/overlays/aws"
+    ArgoCD:
+      Type: AWS::Diagram::Resource
+      Title: "Argo CD sync"
+    ImagePull:
+      Type: AWS::Diagram::Resource
+      Title: "ECR image pull"
