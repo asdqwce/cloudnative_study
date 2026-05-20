@@ -481,6 +481,8 @@
             <div class="field"><label>성별</label><select id="patientGender"><option value="">선택하세요</option><option value="F">여성</option><option value="M">남성</option></select></div>
             <div class="field"><label>연락처</label><input id="patientContact" value="" placeholder="연락처를 입력하세요"></div>
             <div class="field"><label>담당 의사</label><select id="patientDoctorId"><option value="">선택하세요</option><option value="10">박준호 전문의</option></select></div>
+            <div class="field"><label>알레르기</label><input id="patientAllergies" value="" placeholder="없으면 비워두세요"></div>
+            <div class="field"><label>복약 주의</label><textarea id="patientMedicationWarnings" placeholder="없으면 비워두세요"></textarea></div>
             <button class="btn" type="button" onclick="createPatient()">등록</button>
           </div>
         </div>
@@ -760,8 +762,8 @@
         gender: value("patientGender"),
         contact: value("patientContact"),
         primaryDoctorId: Number(value("patientDoctorId")),
-        allergies: "특이 알레르기 없음",
-        medicationWarnings: "초진 상담 후 복약 주의사항 확인"
+        allergies: optionalValue("patientAllergies"),
+        medicationWarnings: optionalValue("patientMedicationWarnings")
       };
       if (!payload.name || !payload.birthDate || !payload.gender || !payload.contact || !payload.primaryDoctorId) {
         toast("환자 등록 정보를 모두 입력하세요.");
@@ -819,8 +821,7 @@
         method: "POST",
         body: JSON.stringify(payload)
       });
-      const snapshot = prescription.patientSnapshotAvailable ? "환자 확인 완료" : "부분 저장";
-      toast(`${patientName(prescription.patientId)} 환자 처방 발행 완료 · ${snapshot}`);
+      toast(`${patientName(prescription.patientId)} 환자 처방 발행 완료`);
       await loadPrescriptions();
     }
 
@@ -894,19 +895,19 @@
         doctorName(item.doctorId),
         medicationName(item.medicationName),
         item.dosage,
-        item.patientSnapshotAvailable ? "환자 확인 완료" : "부분 저장",
+        item.patientSnapshotAvailable ? "연동 완료" : "연동 실패",
         (item.warnings || []).join(" / ") || "-"
       ]);
       if (state.user.role === "STAFF") {
-        renderTable("staffPrescriptionsTable", ["환자", "담당의", "약품", "용량", "환자 확인", "경고"], rows);
+        renderTable("staffPrescriptionsTable", ["환자", "담당의", "약품", "용량", "환자 정보 연동", "경고"], rows);
         setUpdated("staffPrescriptionsUpdatedAt", prescriptions.length);
       }
       if (state.user.role === "PATIENT") {
-        renderTable("patientPrescriptionsTable", ["환자", "담당의", "약품", "용량", "환자 확인", "경고"], rows);
+        renderTable("patientPrescriptionsTable", ["환자", "담당의", "약품", "용량", "환자 정보 연동", "경고"], rows);
         setUpdated("patientPrescriptionsUpdatedAt", prescriptions.length);
       }
       if (state.user.role === "DOCTOR") {
-        renderTable("doctorPrescriptionsTable", ["환자", "담당의", "약품", "용량", "환자 확인", "경고"], rows);
+        renderTable("doctorPrescriptionsTable", ["환자", "담당의", "약품", "용량", "환자 정보 연동", "경고"], rows);
         setUpdated("doctorPrescriptionsUpdatedAt", prescriptions.length);
       }
     }
@@ -1063,6 +1064,11 @@
 
     function value(id) {
       return document.getElementById(id).value;
+    }
+
+    function optionalValue(id) {
+      const current = value(id);
+      return current || null;
     }
 
     function saveSession() {
