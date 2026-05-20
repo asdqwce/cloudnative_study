@@ -6,6 +6,7 @@ key_dir="${2:-$HOME/.ssh/cloudnative-vagrant}"
 
 if [[ -f .env ]]; then
   while IFS='=' read -r key value; do
+    value="${value%$'\r'}"
     [[ -z "${key}" || "${key}" == \#* ]] && continue
     if [[ "${key}" == "CLUSTER_TOPOLOGY" && -z "${CLUSTER_TOPOLOGY:-}" ]]; then
       export CLUSTER_TOPOLOGY="${value}"

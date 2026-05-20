@@ -12,7 +12,7 @@
         dest: /etc/default/kubelet
         mode: "0644"
         content: |
-          KUBELET_EXTRA_ARGS=--node-ip={{ ansible_host }}
+          KUBELET_EXTRA_ARGS=--node-ip={{ node_ip | default(ansible_host) }}
       register: kubelet_default
 
     - name: Check whether node already joined a cluster
@@ -44,6 +44,9 @@
       retries: 6
       delay: 10
       until: calico_image_pull.rc == 0
+      when:
+        - local_registry_enabled | bool
+        - not (use_upstream_calico_images | default(false) | bool)
 
 - name: Initialize Kubernetes control plane
   hosts: control_plane
@@ -82,7 +85,7 @@
           - "{{ kubeadm_init_timeout }}"
           - kubeadm
           - init
-          - "--apiserver-advertise-address={{ ansible_host }}"
+          - "--apiserver-advertise-address={{ node_ip | default(ansible_host) }}"
           - "--pod-network-cidr={{ kubernetes_pod_network_cidr }}"
           - "--cri-socket={{ kubernetes_cri_socket }}"
         creates: "{{ kubernetes_admin_conf_path }}"
@@ -118,6 +121,9 @@
         regexp: "{{ item | regex_escape }}"
         replace: "{{ local_registry_endpoint }}/{{ item }}"
       loop: "{{ calico_images }}"
+      when:
+        - local_registry_enabled | bool
+        - not (use_upstream_calico_images | default(false) | bool)
 
     - name: Install Calico CNI
       ansible.builtin.command:

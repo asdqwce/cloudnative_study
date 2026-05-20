@@ -1,26 +1,49 @@
 provider "aws" {
-  region     = "ap-northeast-2"  # 서울 리전
+  region     = var.aws_region
   access_key = var.aws_access_key
   secret_key = var.aws_secret_key
 }
 
+locals {
+  name_prefix = "${var.project_name}-${terraform.workspace}"
+  common_tags = {
+    Project     = var.project_name
+    Environment = terraform.workspace
+  }
+}
+
+data "aws_vpc" "default" {
+  default = true
+}
+
+data "aws_subnets" "default" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
+  }
+}
+
 # 키페어 등록
 resource "aws_key_pair" "k8s_key" {
-  key_name   = "k8s-key-${terraform.workspace}"
+  key_name   = "${local.name_prefix}-k8s-key"
   public_key = file(var.public_key_path)
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-k8s-key"
+  })
 }
 
 # 보안그룹
 resource "aws_security_group" "k8s_sg" {
-  name        = "k8s-sg-${terraform.workspace}"
-  description = "Security group for K8s cluster (${terraform.workspace})"
+  name        = "${local.name_prefix}-k8s-sg"
+  description = "Security group for ${local.name_prefix} Kubernetes cluster"
 
   # SSH
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.allowed_ssh_cidrs
   }
   # HTTP
   ingress {
@@ -41,14 +64,7 @@ resource "aws_security_group" "k8s_sg" {
     from_port   = 6443
     to_port     = 6443
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  # NodePort 범위
-  ingress {
-    from_port   = 30000
-    to_port     = 32767
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.allowed_k8s_api_cidrs
   }
   # 노드간 통신
   ingress {
@@ -65,59 +81,154 @@ resource "aws_security_group" "k8s_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = {
-    Name      = "k8s-sg-${terraform.workspace}"
-    Workspace = terraform.workspace
-  }
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-k8s-sg"
+  })
 }
 
 # 마스터 노드
 resource "aws_instance" "master" {
-  ami                    = "ami-0f5ddb19e2fbe4cc4"  # Ubuntu 24.04 ARM64 서울 리전
-  instance_type          = "r6g.large"
+  ami                    = var.ami_id
+  instance_type          = var.master_instance_type
   key_name               = aws_key_pair.k8s_key.key_name
   vpc_security_group_ids = [aws_security_group.k8s_sg.id]
 
   root_block_device {
-    volume_size = 30
-    volume_type = "gp3"
+    volume_size = var.master_volume_size
+    volume_type = var.volume_type
   }
 
-  tags = {
-    Name      = "k8s-master-${terraform.workspace}"
-    Role      = "master"
-    Workspace = terraform.workspace
-  }
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-master"
+    Role = "master"
+  })
 }
 
-# 워커 노드 2개
+# 워커 노드
 resource "aws_instance" "worker" {
-  count                  = 2
-  ami                    = "ami-0f5ddb19e2fbe4cc4"  # Ubuntu 24.04 ARM64 서울 리전
-  instance_type          = "r6g.medium"
+  count                  = var.worker_count
+  ami                    = var.ami_id
+  instance_type          = var.worker_instance_type
   key_name               = aws_key_pair.k8s_key.key_name
   vpc_security_group_ids = [aws_security_group.k8s_sg.id]
   depends_on             = [aws_instance.master]
 
   root_block_device {
-    volume_size = 20
-    volume_type = "gp3"
+    volume_size = var.worker_volume_size
+    volume_type = var.volume_type
   }
 
-  tags = {
-    Name      = "k8s-worker-${terraform.workspace}-${count.index + 1}"
-    Role      = "worker"
-    Workspace = terraform.workspace
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-worker-${count.index + 1}"
+    Role = "worker"
+  })
+}
+
+# 서비스 이미지 저장소
+resource "aws_ecr_repository" "service" {
+  for_each = var.ecr_repositories
+
+  name         = "${local.name_prefix}-${each.key}"
+  force_delete = var.ecr_force_delete
+
+  image_tag_mutability = "MUTABLE"
+
+  tags = merge(local.common_tags, {
+    Name    = "${local.name_prefix}-${each.key}"
+    Service = each.key
+  })
+}
+
+# 외부 HTTP 진입점
+resource "aws_lb" "kong" {
+  name               = "${local.name_prefix}-kong-nlb"
+  internal           = var.nlb_internal
+  load_balancer_type = "network"
+  subnets            = data.aws_subnets.default.ids
+
+  enable_cross_zone_load_balancing = true
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-kong-nlb"
+  })
+}
+
+resource "aws_lb_target_group" "kong" {
+  name        = "${local.name_prefix}-kong-tg"
+  port        = var.nlb_target_port
+  protocol    = "TCP"
+  vpc_id      = data.aws_vpc.default.id
+  target_type = "instance"
+
+  health_check {
+    enabled  = true
+    protocol = var.nlb_health_check_protocol
+    port     = "traffic-port"
   }
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-kong-tg"
+  })
+}
+
+resource "aws_lb_listener" "kong_http" {
+  load_balancer_arn = aws_lb.kong.arn
+  port              = var.nlb_listener_port
+  protocol          = "TCP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.kong.arn
+  }
+
+  tags = merge(local.common_tags, {
+    Name = "${local.name_prefix}-kong-http"
+  })
+}
+
+resource "aws_lb_target_group_attachment" "kong_worker" {
+  count = var.worker_count
+
+  target_group_arn = aws_lb_target_group.kong.arn
+  target_id        = aws_instance.worker[count.index].id
+  port             = var.nlb_target_port
 }
 
 # 출력
 output "master_public_ip" {
   value = aws_instance.master.public_ip
 }
+
 output "worker_public_ips" {
   value = aws_instance.worker[*].public_ip
 }
+
+output "master_private_ip" {
+  value = aws_instance.master.private_ip
+}
+
+output "worker_private_ips" {
+  value = aws_instance.worker[*].private_ip
+}
+
+output "security_group_id" {
+  value = aws_security_group.k8s_sg.id
+}
+
+output "ecr_repository_urls" {
+  value = {
+    for name, repo in aws_ecr_repository.service : name => repo.repository_url
+  }
+}
+
+output "nlb_dns_name" {
+  value = aws_lb.kong.dns_name
+}
+
+output "nlb_target_group_arn" {
+  value = aws_lb_target_group.kong.arn
+}
+
 output "workspace" {
   value = terraform.workspace
 }

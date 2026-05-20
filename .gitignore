@@ -487,6 +487,8 @@ tests/e2e/newman/reports/
 crash.log
 crash.*.log
 *.retry
+infra/cluster/provision/ansible/inventory.ini
+infra/cluster/provision/ansible/inventories/aws/*.ini
 
 # Local credentials and kubeconfig files
 .env.*

@@ -16,7 +16,7 @@ client = TestClient(app)
 def test_login_me_logout_and_audit_logs() -> None:
     login_response = client.post(
         "/auth/login",
-        json={"email": "staff@medikong.local", "password": "staff1234"},
+        json={"email": "staff", "password": "staff1234"},
     )
     assert login_response.status_code == 200
     body = login_response.json()
@@ -28,7 +28,7 @@ def test_login_me_logout_and_audit_logs() -> None:
     headers = {"Authorization": f"Bearer {token}"}
     me_response = client.get("/auth/me", headers=headers)
     assert me_response.status_code == 200
-    assert me_response.json()["email"] == "staff@medikong.local"
+    assert me_response.json()["email"] == "staff"
 
     audit_response = client.get("/auth/audit-logs", headers=headers)
     assert audit_response.status_code == 200
@@ -64,4 +64,4 @@ def test_demo_accounts_are_exposed_for_frontend_login_shortcuts() -> None:
     assert response.status_code == 200
     body = response.json()
     assert {account["role"] for account in body} == {"STAFF", "PATIENT", "DOCTOR"}
-    assert any(account["email"] == "patient@medikong.local" and account["patientId"] == 1 for account in body)
+    assert any(account["email"] == "patient" and account["patientId"] == 1 for account in body)

@@ -47,7 +47,10 @@ http://10.10.10.240
 | --- | --- |
 | `medikong-jwt` | JWT 서명과 만료 검증 |
 | `medikong-identity-headers` | JWT claim을 `X-User-*` 헤더로 전달 |
-| `medikong-rate-limiting` | 분당 요청 제한 |
+| `medikong-rate-limit-patients` | 환자 API 분당 60회 요청 제한 |
+| `medikong-rate-limit-appointments` | 예약 API 분당 60회 요청 제한 |
+| `medikong-rate-limit-prescriptions` | 처방 API 분당 30회 요청 제한 |
+| `medikong-rate-limit-notifications` | 알림 API 분당 120회 요청 제한 |
 | `medikong-correlation-id` | `X-Request-Id` 생성/전달 |
 | `medikong-prometheus` | Kong metrics 노출 |
 

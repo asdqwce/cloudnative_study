@@ -1,2 +1,39 @@
+project_name = "medikong"
+aws_region   = "ap-northeast-2"
+
 aws_access_key = "여기에_ACCESS_KEY_입력"
 aws_secret_key = "여기에_SECRET_KEY_입력"
+
+public_key_path = "C:/.ssh/k8s-key.pub"
+
+# 현재 기본값은 Ubuntu 24.04 ARM64 서울 리전 AMI와 Graviton(r6g) 인스턴스입니다.
+# x86_64로 진행하려면 ami_id와 instance_type을 함께 바꿔야 합니다.
+ami_id               = "ami-0f5ddb19e2fbe4cc4"
+master_instance_type = "r6g.large"
+worker_instance_type = "r6g.medium"
+worker_count         = 2
+
+master_volume_size = 30
+worker_volume_size = 20
+volume_type        = "gp3"
+
+# 실제 실행 전에는 0.0.0.0/0 대신 본인 공인 IP/32로 줄이는 것을 권장합니다.
+allowed_ssh_cidrs     = ["0.0.0.0/0"]
+allowed_k8s_api_cidrs = ["0.0.0.0/0"]
+
+ecr_repositories = [
+  "auth-service",
+  "patient-service",
+  "appointment-service",
+  "prescription-service",
+  "notification-service",
+  "dashboard",
+]
+
+# smoke workspace 테스트에서는 이미지가 남아 있어도 destroy가 가능하도록 true를 권장합니다.
+ecr_force_delete = true
+
+nlb_internal              = false
+nlb_listener_port         = 80
+nlb_target_port           = 80
+nlb_health_check_protocol = "TCP"
