@@ -1,0 +1,148 @@
+$schema: ./linear-workplan.schema.json
+version: 1
+
+defaults:
+  team: Medikong
+  project: Cloud Native Study Planning
+  state: Backlog
+  priority: 3
+  labels:
+    - planning
+
+milestones:
+  - id: week-1-foundation
+    title: 1주차 - 기반 환경과 서비스 경계 정리
+    goal: PRD의 기본 프로젝트 범위를 작업 단위로 분해하고 로컬 클러스터 검증 기준을 정한다.
+
+  - id: week-2-observability
+    title: 2주차 - 배포와 관측성 확보
+    goal: 서비스 배포 후 요청 수, 응답 시간, 에러율을 수집할 수 있는 상태를 만든다.
+
+  - id: week-3-experiment
+    title: 3주차 - 실험 실행과 메트릭 수집
+    goal: 클러스터 구성 시나리오별 실험 결과를 수치로 남긴다.
+
+tasks:
+  - local_id: planning.service-boundary
+    title: 서비스 경계와 통신 원칙 정리
+    type: design
+    milestone: week-1-foundation
+    labels:
+      - architecture
+      - planning
+    depends_on: []
+    description: |
+      ## 목표
+      PRD의 의료 정보 플랫폼 예시를 기준으로 서비스 경계, 동기/비동기 통신 기준, 데이터 소유 원칙을 정리한다.
+
+      ## 완료 조건
+      - 서비스별 책임과 데이터 소유 범위가 정리되어 있다.
+      - REST API와 Kafka 이벤트 적용 기준이 문서화되어 있다.
+      - 독립 배포와 장애 격리 기준이 설명되어 있다.
+
+      ## 남길 증거
+      - 아키텍처 문서 링크
+      - 서비스 간 통신 결정 기록
+    done_when:
+      - 서비스별 책임과 데이터 소유 범위가 문서화되어 있다.
+      - REST API와 Kafka 이벤트 적용 기준이 문서화되어 있다.
+    evidence:
+      - project_docs/ARCHITECTURE.md
+
+  - local_id: cluster.local-balanced
+    title: 로컬 Kubernetes balanced topology 검증
+    type: experiment
+    milestone: week-1-foundation
+    labels:
+      - cluster
+      - experiment
+    depends_on:
+      - planning.service-boundary
+    description: |
+      ## 목표
+      balanced topology로 로컬 Kubernetes 클러스터를 구성하고, 이후 배포와 관측성 실험을 진행할 수 있는지 확인한다.
+
+      ## 완료 조건
+      - 모든 node가 Ready 상태다.
+      - platform, app, data 역할 배치가 의도대로 동작한다.
+      - 기본 system pod와 registry가 정상 동작한다.
+
+      ## 남길 증거
+      - node 상태 캡처
+      - VM 리소스 사용량 기록
+      - 클러스터 bootstrap 로그 요약
+    done_when:
+      - 모든 node가 Ready 상태다.
+      - 역할별 배치 기준이 확인되어 있다.
+    evidence:
+      - kubectl get nodes 결과
+      - VM별 CPU/Memory 사용량 스냅샷
+    metrics:
+      - node_cpu_usage
+      - node_memory_usage
+
+  - local_id: observability.service-metrics
+    title: 서비스 메트릭 수집과 Grafana 대시보드 확인
+    type: implementation
+    milestone: week-2-observability
+    labels:
+      - observability
+    depends_on:
+      - cluster.local-balanced
+    description: |
+      ## 목표
+      Prometheus/Grafana로 서비스별 요청 수, 응답 시간, 에러율을 수집하고 대시보드에서 확인한다.
+
+      ## 완료 조건
+      - 서비스별 request count를 확인할 수 있다.
+      - 서비스별 latency와 error rate를 확인할 수 있다.
+      - 부하 테스트 중 메트릭 변화가 Grafana에서 보인다.
+
+      ## 남길 증거
+      - Grafana 대시보드 링크 또는 스크린샷
+      - Prometheus query 결과
+    done_when:
+      - 서비스별 request count, latency, error rate를 확인할 수 있다.
+    evidence:
+      - Grafana 대시보드 스크린샷
+      - Prometheus query 결과
+    metrics:
+      - http_requests_total
+      - http_request_duration_seconds
+      - error_rate
+
+  - local_id: experiment.cluster-scenarios
+    title: 클러스터 구성 시나리오별 부하 테스트 실행
+    type: experiment
+    milestone: week-3-experiment
+    labels:
+      - experiment
+      - metrics
+    priority: 2
+    depends_on:
+      - observability.service-metrics
+    description: |
+      ## 목표
+      compact, balanced 등 클러스터 구성 시나리오별로 동일한 부하를 실행하고 응답 시간, 에러율, 리소스 사용량을 비교한다.
+
+      ## 완료 조건
+      - 최소 2개 이상의 클러스터 구성 시나리오를 비교한다.
+      - 각 시나리오의 p95 latency, error rate, CPU/Memory 사용량을 기록한다.
+      - 실험 결과와 해석을 문서로 남긴다.
+
+      ## 남길 증거
+      - 실험 결과 CSV
+      - Grafana 스크린샷
+      - 실험 요약 문서
+    done_when:
+      - 최소 2개 이상의 클러스터 구성 시나리오 결과가 비교되어 있다.
+      - p95 latency, error rate, CPU/Memory 사용량이 기록되어 있다.
+    evidence:
+      - 실험 결과 CSV
+      - Grafana 스크린샷
+      - 실험 요약 문서
+    metrics:
+      - p95_latency
+      - error_rate
+      - node_cpu_usage
+      - node_memory_usage

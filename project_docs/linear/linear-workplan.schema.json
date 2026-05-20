@@ -1,0 +1,240 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://medikong.local/schemas/linear-workplan.schema.json",
+  "title": "MediKong Linear Workplan",
+  "description": "Local planning schema for turning PRD work into Linear issues with dependency metadata.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "defaults", "tasks"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Optional editor hint that points to this JSON Schema."
+    },
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "defaults": {
+      "$ref": "#/$defs/defaults"
+    },
+    "milestones": {
+      "type": "array",
+      "description": "Optional local milestone catalog. Linear project milestones can be created separately in the UI.",
+      "items": {
+        "$ref": "#/$defs/milestone"
+      },
+      "default": []
+    },
+    "tasks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/task"
+      }
+    }
+  },
+  "$defs": {
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["team"],
+      "properties": {
+        "team": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Linear team name or ID. Required when creating issues."
+        },
+        "project": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Linear project name, slug, or ID."
+        },
+        "state": {
+          "type": "string",
+          "minLength": 1,
+          "default": "Backlog"
+        },
+        "priority": {
+          "$ref": "#/$defs/priority"
+        },
+        "assignee": {
+          "type": ["string", "null"],
+          "description": "Linear user ID, name, email, 'me', or null."
+        },
+        "labels": {
+          "$ref": "#/$defs/stringList"
+        }
+      }
+    },
+    "milestone": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/localId"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "goal": {
+          "type": "string"
+        },
+        "start_date": {
+          "$ref": "#/$defs/date"
+        },
+        "target_date": {
+          "$ref": "#/$defs/date"
+        }
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["local_id", "title", "description", "depends_on"],
+      "properties": {
+        "local_id": {
+          "$ref": "#/$defs/localId",
+          "description": "Stable local task ID used before Linear issue IDs exist."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Markdown body for the Linear issue."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["planning", "design", "implementation", "test", "experiment", "docs", "ops", "security"],
+          "default": "implementation"
+        },
+        "team": {
+          "type": "string",
+          "minLength": 1
+        },
+        "project": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state": {
+          "type": "string",
+          "minLength": 1
+        },
+        "priority": {
+          "$ref": "#/$defs/priority"
+        },
+        "labels": {
+          "$ref": "#/$defs/stringList"
+        },
+        "milestone": {
+          "type": "string",
+          "description": "Linear project milestone name/ID or local milestone id."
+        },
+        "cycle": {
+          "type": "string",
+          "description": "Linear cycle name, number, or ID."
+        },
+        "assignee": {
+          "type": ["string", "null"],
+          "description": "Linear user ID, name, email, 'me', or null."
+        },
+        "estimate": {
+          "type": "number",
+          "minimum": 0
+        },
+        "dueDate": {
+          "$ref": "#/$defs/date"
+        },
+        "parent": {
+          "$ref": "#/$defs/localId",
+          "description": "Local parent task ID. Convert to Linear parentId after upload."
+        },
+        "depends_on": {
+          "type": "array",
+          "description": "Local task IDs that must be completed before this task. Convert to Linear blockedBy after issue creation.",
+          "items": {
+            "$ref": "#/$defs/localId"
+          },
+          "uniqueItems": true
+        },
+        "blocks": {
+          "type": "array",
+          "description": "Optional local task IDs blocked by this task. Usually derived from depends_on.",
+          "items": {
+            "$ref": "#/$defs/localId"
+          },
+          "uniqueItems": true
+        },
+        "related_to": {
+          "type": "array",
+          "description": "Optional local task IDs to convert to Linear relatedTo links.",
+          "items": {
+            "$ref": "#/$defs/localId"
+          },
+          "uniqueItems": true
+        },
+        "done_when": {
+          "$ref": "#/$defs/stringList"
+        },
+        "evidence": {
+          "$ref": "#/$defs/stringList"
+        },
+        "metrics": {
+          "$ref": "#/$defs/stringList"
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/link"
+          },
+          "default": []
+        }
+      }
+    },
+    "link": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "url"],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    },
+    "priority": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4,
+      "description": "Linear priority: 0=None, 1=Urgent, 2=High, 3=Normal, 4=Low."
+    },
+    "localId": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "stringList": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true,
+      "default": []
+    }
+  }
+}
