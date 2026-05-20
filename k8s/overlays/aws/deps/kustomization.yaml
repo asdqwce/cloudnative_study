@@ -3,7 +3,6 @@ kind: Kustomization
 namespace: medical-platform
 resources:
   - ../../../base/deps
-  - local-pv.yaml
 images:
   - name: postgres
     newName: postgres
