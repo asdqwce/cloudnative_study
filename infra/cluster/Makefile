@@ -253,7 +253,7 @@ export LOCAL_DEV_REDIS_PORT
 export LOCAL_DEV_KAFKA_PORT
 export LOCAL_DEV_KAFKA_ADVERTISED_HOST
 
-.PHONY: help install-tools check-tools check-kubectl check-helm check-docker-registry-proxy local-vms-up local-vms-status local-vms-ssh local-vms-ssh-config local-vms-stop local-vms-halt local-vms-destroy local-vms-reset local-inventory ansible-ping servers-bootstrap servers-verify cluster-bootstrap cluster-verify metallb-bootstrap metallb-verify helm-bootstrap kong-bootstrap kong-verify observability-storage-bootstrap local-servers-bootstrap local-cluster-bootstrap local-bootstrap \
+.PHONY: help install-tools check-tools check-wsl-tools check-kubectl check-helm check-docker-tools check-docker-registry-proxy local-vms-up local-vms-status local-vms-ssh local-vms-ssh-config local-vms-stop local-vms-halt local-vms-destroy local-vms-reset local-inventory ansible-ping servers-bootstrap servers-verify cluster-bootstrap cluster-verify metallb-bootstrap metallb-verify helm-bootstrap kong-bootstrap kong-verify observability-storage-bootstrap local-servers-bootstrap local-cluster-bootstrap local-bootstrap \
 	registry-bootstrap registry-verify registry-pull-verify registry-ca-install registry-ca-install-mac registry-ca-install-linux registry-ca-install-wsl registry-ca-trust-macos registry-ca-curl-verify \
 	metrics-bootstrap metrics-verify observability-images-push observability-template observability-install observability-status grafana observability-grafana-port-forward \
 	check-local-dev-tools local-dev-config local-dev-up local-dev-kafka-up local-dev-down local-dev-reset local-dev-ps local-dev-logs \
@@ -266,6 +266,7 @@ help:
 	@printf "%s\n" "로컬 도구 확인"
 	@printf "%s\n" "  make install-tools          macOS 환경에 필요한 CLI 도구 설치를 시도합니다."
 	@printf "%s\n" "  make check-tools            Vagrant, Ansible, VMware 플러그인 설치 여부를 확인합니다."
+	@printf "%s\n" "  make check-wsl-tools        Windows WSL에서 Ansible 실행 도구를 확인합니다."
 	@printf "%s\n" ""
 	@printf "%s\n" "개인 로컬 의존성 Docker Compose"
 	@printf "%s\n" "  make check-local-dev-tools  docker compose 사용 가능 여부를 확인합니다."
@@ -326,6 +327,13 @@ help:
 	@printf "%s\n" "  make local-k8s-top          node와 pod/container 리소스 사용량을 확인합니다."
 	@printf "%s\n" "  make local-k8s-deploy       앱 image build/push부터 앱 apply, rollout/status/top 확인까지 실행합니다."
 	@printf "%s\n" ""
+	@printf "%s\n" "Windows + WSL 전용 흐름"
+	@printf "%s\n" "  PowerShell: cd infra/cluster/providers/local-vagrant; vagrant up --provider=vmware_desktop"
+	@printf "%s\n" "  WSL: make check-wsl-tools"
+	@printf "%s\n" "  WSL: make wsl-bootstrap-after-vagrant"
+	@printf "%s\n" "  WSL: make wsl-local-k8s-bootstrap"
+	@printf "%s\n" "  WSL: make wsl-local-k8s-deploy IMAGE_TAG=dev-001"
+	@printf "%s\n" ""
 	@printf "%s\n" "정리"
 	@printf "%s\n" "  make clean                  생성된 Ansible inventory를 삭제합니다."
 	@printf "%s\n" ""
@@ -351,6 +359,18 @@ check-tools:
 	fi; \
 	exit $$missing
 
+check-wsl-tools:
+	@missing=0; \
+	for bin in ansible ansible-playbook make; do \
+		if ! command -v $$bin >/dev/null 2>&1; then \
+			printf "missing: %s\n" "$$bin"; \
+			missing=1; \
+		else \
+			printf "ok: %s -> %s\n" "$$bin" "$$(command -v $$bin)"; \
+		fi; \
+	done; \
+	exit $$missing
+
 check-kubectl:
 	@if ! command -v kubectl >/dev/null 2>&1; then \
 		printf "missing: kubectl\n" >&2; \
@@ -368,15 +388,19 @@ check-helm:
 install-tools:
 	./scripts/install-local-tools.sh
 
-check-local-dev-tools:
+check-docker-tools:
 	@if ! command -v docker >/dev/null 2>&1; then \
 		printf "missing: docker\n"; \
 		exit 1; \
 	fi
+	@docker version >/dev/null
+	@printf "%s\n" "ok: docker"
+
+check-local-dev-tools: check-docker-tools
 	@docker compose version >/dev/null
 	@printf "%s\n" "ok: docker compose"
 
-check-docker-registry-proxy: check-local-dev-tools
+check-docker-registry-proxy: check-docker-tools
 	@info="$$(docker info 2>/dev/null)"; \
 	proxy="$$(printf "%s\n" "$$info" | awk -F': ' '/^[[:space:]]*HTTPS? Proxy:/ && $$2 != "" {print $$0}')"; \
 	no_proxy="$$(printf "%s\n" "$$info" | awk -F': ' '/^[[:space:]]*No Proxy:/ {print $$2}')"; \
@@ -554,9 +578,11 @@ registry-ca-curl-verify:
 	curl --cacert "$(LOCAL_REGISTRY_CA_LOCAL_PATH)" "https://$(LOCAL_REGISTRY)/v2/"
 
 app-images-build: check-docker-registry-proxy
-	@for service in $(APP_SERVICES); do \
+	@set -euo pipefail; \
+	for service in $(APP_SERVICES); do \
 		printf "building %s/%s:%s\n" "$(LOCAL_REGISTRY)" "$$service" "$(IMAGE_TAG)"; \
-		NO_PROXY="$(DOCKER_NO_PROXY)" no_proxy="$(DOCKER_NO_PROXY)" docker build -t $(LOCAL_REGISTRY)/$$service:$(IMAGE_TAG) $(REPO_ROOT)/services/$$service; \
+		tar --exclude=.pytest_cache --exclude=__pycache__ --exclude='*.pyc' --exclude='*.pyo' --exclude='*.db' --exclude='*.sqlite' --exclude='*.sqlite3' -C $(REPO_ROOT)/services/$$service -cf - . | \
+			NO_PROXY="$(DOCKER_NO_PROXY)" no_proxy="$(DOCKER_NO_PROXY)" docker build -t $(LOCAL_REGISTRY)/$$service:$(IMAGE_TAG) -; \
 	done
 	NO_PROXY="$(DOCKER_NO_PROXY)" no_proxy="$(DOCKER_NO_PROXY)" docker build -t $(LOCAL_REGISTRY)/$(DASHBOARD_SERVICE):$(IMAGE_TAG) $(REPO_ROOT)/$(DASHBOARD_SERVICE)
 
@@ -574,7 +600,7 @@ local-kustomize-tag:
 	./scripts/update-local-image-tags.sh "$(IMAGE_TAG)" "$(LOCAL_KUSTOMIZATION)" "$(LOCAL_REGISTRY)"
 	./scripts/update-local-image-tags.sh "$(IMAGE_TAG)" "$(LOCAL_KUSTOMIZATION_ALL)" "$(LOCAL_REGISTRY)"
 
-third-party-images-push: check-local-dev-tools
+third-party-images-push: check-docker-tools
 	@set -e; \
 	for image in $(THIRD_PARTY_IMAGES); do \
 		printf "mirroring %s -> %s/%s\n" "$$image" "$(LOCAL_REGISTRY)" "$$image"; \

@@ -12,7 +12,7 @@
         dest: /etc/default/kubelet
         mode: "0644"
         content: |
-          KUBELET_EXTRA_ARGS=--node-ip={{ ansible_host }}
+          KUBELET_EXTRA_ARGS=--node-ip={{ node_ip | default(ansible_host) }}
       register: kubelet_default
 
     - name: Check whether node already joined a cluster
@@ -27,6 +27,26 @@
       when:
         - kubelet_default.changed
         - kubelet_config.stat.exists
+
+    - name: Pre-pull Calico images from local registry
+      ansible.builtin.command:
+        argv:
+          - timeout
+          - "{{ calico_image_pull_timeout }}"
+          - crictl
+          - --runtime-endpoint
+          - "{{ kubernetes_cri_socket }}"
+          - pull
+          - "{{ item }}"
+      loop: "{{ calico_local_images }}"
+      register: calico_image_pull
+      changed_when: false
+      retries: 6
+      delay: 10
+      until: calico_image_pull.rc == 0
+      when:
+        - local_registry_enabled | bool
+        - not (use_upstream_calico_images | default(false) | bool)
 
 - name: Initialize Kubernetes control plane
   hosts: control_plane
@@ -65,7 +85,7 @@
           - "{{ kubeadm_init_timeout }}"
           - kubeadm
           - init
-          - "--apiserver-advertise-address={{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}"
+          - "--apiserver-advertise-address={{ node_ip | default(ansible_host) }}"
           - "--pod-network-cidr={{ kubernetes_pod_network_cidr }}"
           - "--cri-socket={{ kubernetes_cri_socket }}"
         creates: "{{ kubernetes_admin_conf_path }}"
@@ -88,13 +108,33 @@
         mode: "0600"
         remote_src: true
 
+    - name: Download Calico manifest for local registry rendering
+      ansible.builtin.get_url:
+        url: "{{ calico_manifest_url }}"
+        dest: "{{ calico_local_manifest_path }}"
+        mode: "0644"
+        force: true
+      when:
+        - local_registry_enabled | bool
+        - not (use_upstream_calico_images | default(false) | bool)
+
+    - name: Rewrite Calico images to local registry
+      ansible.builtin.replace:
+        path: "{{ calico_local_manifest_path }}"
+        regexp: "{{ item | regex_escape }}"
+        replace: "{{ local_registry_endpoint }}/{{ item }}"
+      loop: "{{ calico_images }}"
+      when:
+        - local_registry_enabled | bool
+        - not (use_upstream_calico_images | default(false) | bool)
+
     - name: Install Calico CNI
       ansible.builtin.command:
         argv:
           - kubectl
           - apply
           - -f
-          - "{{ calico_manifest_url }}"
+          - "{{ calico_local_manifest_path if (local_registry_enabled | bool and not (use_upstream_calico_images | default(false) | bool)) else calico_manifest_url }}"
       environment:
         KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
       register: calico_apply
@@ -254,56 +294,13 @@
         force: true
       become_user: "{{ ansible_user }}"
 
-    - name: Create medical-platform namespace
-      ansible.builtin.command:
-        argv:
-          - kubectl
-          - create
-          - namespace
-          - medical-platform
-      environment:
-        KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
-      register: ns_create
-      changed_when: "'created' in ns_create.stdout"
-      failed_when: ns_create.rc != 0 and 'already exists' not in ns_create.stderr
-
-    - name: Deploy namespaces
-      ansible.builtin.command:
-        argv:
-          - kubectl
-          - apply
-          - -f
-          - k8s/namespaces/namespaces.yaml
-      args:
-        chdir: "/home/{{ ansible_user }}/cloudnative_study"
-      environment:
-        KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
-      changed_when: false
-
-    - name: Deploy K8s dependencies (DB, Kafka, Outbox)
+    - name: Deploy AWS Kubernetes overlay
       ansible.builtin.command:
         argv:
           - kubectl
           - apply
           - -k
-          - k8s/overlays/aws/deps
-          - -n
-          - medical-platform
-      args:
-        chdir: "/home/{{ ansible_user }}/cloudnative_study"
-      environment:
-        KUBECONFIG: "{{ kubernetes_admin_conf_path }}"
-      changed_when: false
-
-    - name: Deploy K8s applications
-      ansible.builtin.command:
-        argv:
-          - kubectl
-          - apply
-          - -k
-          - k8s/overlays/aws/apps
-          - -n
-          - medical-platform
+          - k8s/overlays/aws/all
       args:
         chdir: "/home/{{ ansible_user }}/cloudnative_study"
       environment:

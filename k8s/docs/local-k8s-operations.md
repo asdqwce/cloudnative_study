@@ -35,11 +35,11 @@ make local-k8s-deploy IMAGE_TAG=dev-001
 
 | 경로 | 포함 리소스 | 사용 시점 |
 |---|---|---|
-| `k8s/overlays/local/apps` | 앱 Deployment/Service, local registry image tag, NodePort, Service DNS patch | 앱 manifest 또는 이미지 태그 변경 |
-| `k8s/overlays/local/deps` | PostgreSQL PV/StatefulSet/Service, Kafka PV/PVC/StatefulSet/Service | DB/Kafka manifest 변경 |
-| `k8s/overlays/local/all` | namespace, deps, apps | 최초 전체 적용 또는 전체 상태 동기화 |
+| `k8s/overlays/local/apps` | namespace, Kong plugins/consumers, 앱 Deployment/Service/Ingress, local registry image tag | 앱 manifest 또는 이미지 태그 변경 |
+| `k8s/overlays/local/deps` | namespace, PostgreSQL PV/StatefulSet/Service, Kafka PV/PVC/StatefulSet/Service | DB/Kafka manifest 변경 |
+| `k8s/overlays/local/all` | namespace, storage, Kong, network policy, deps, apps | 최초 전체 적용 또는 전체 상태 동기화 |
 
-Kafka는 `medical-platform` 네임스페이스의 `kafka` Service로 노출되며 앱은 `kafka:9092`를 사용한다. 로컬 hostPath Kafka PV는 `k8s/overlays/local/deps/local-pv.yaml`에 둔다.
+Kafka는 `medical-messaging` 네임스페이스의 `kafka` Service로 노출되며 앱은 `kafka.medical-messaging.svc.cluster.local:9092`를 사용한다. 로컬 hostPath PV는 `k8s/storage/pv.yaml`에 둔다.
 
 로컬 overlay는 topology별 역할 노드에 맞춰 workload 배치를 제한한다. 앱 Deployment는 `app-1`, `app-a-1`, `app-b-1` 또는 compact fallback인 `worker-1`, `worker-2`에만 배치한다. PostgreSQL은 `data-1`, `postgres-1`, `worker-1`, `worker-2`에, Kafka는 `data-1`, `kafka-1`, `worker-1`, `worker-2`에 배치한다. 이 방식은 compact 기본 구성을 유지하면서 balanced와 role-separated에서 플랫폼 노드로 앱/데이터 workload가 섞이지 않도록 한다.
 
@@ -61,10 +61,10 @@ vagrant ssh control-plane-1
 ```
 
 ```bash
-sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl get pods -n medical-platform -o wide
-sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl get svc -n medical-platform
-sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl get pvc -n medical-platform
-sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl get events -n medical-platform --sort-by=.lastTimestamp | tail -n 40
+sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl get pods -A -o wide
+sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl get svc -A
+sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl get pvc -A
+sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl get events -A --sort-by=.lastTimestamp | tail -n 40
 ```
 
 ## 확인 항목
@@ -72,12 +72,12 @@ sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl get events -n medical-platfor
 | 확인 | 명령 | 통과 기준 |
 |---|---|---|
 | pod Ready | `make local-k8s-verify` | 앱 Deployment rollout 완료 |
-| service 통신 | `curl http://10.10.10.10:30080/patient-service/patients` | API Gateway가 Kubernetes Service DNS로 내부 서비스를 호출 |
-| resource limit | `kubectl -n medical-platform get deploy patient-service -o yaml` | `JAVA_TOOL_OPTIONS`, `resources.requests`, `resources.limits`가 manifest 값과 일치 |
+| service 통신 | `curl http://10.10.10.240/patients` | Kong Gateway가 Kubernetes Service DNS로 내부 서비스를 호출 |
+| resource limit | `kubectl -n medical-patient get deploy patient-service -o yaml` | `resources.requests`, `resources.limits`가 manifest 값과 일치 |
 | runtime 사용량 | `make local-k8s-top` | Metrics Server가 node와 pod/container 사용량 출력 |
-| CRUD 흐름 | `make local-k8s-crud-smoke` | API Gateway NodePort로 환자 생성/조회 성공 |
+| CRUD 흐름 | `make local-k8s-crud-smoke` | Kong Gateway로 환자 생성/조회 성공 |
 
-`make local-k8s-crud-smoke`는 환자 생성과 조회만 확인한다. appointment, prescription, notification까지 포함한 전체 흐름은 기존 Newman E2E collection을 Kubernetes NodePort base URL로 별도 실행한다.
+`make local-k8s-crud-smoke`는 환자 생성과 조회만 확인한다. appointment, prescription, notification까지 포함한 전체 흐름은 기존 Newman E2E collection을 Kong base URL로 별도 실행한다.
 
 ## 접속
 

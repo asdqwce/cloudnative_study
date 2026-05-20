@@ -22,6 +22,7 @@ calico_local_images: "{{ calico_images | map('regex_replace', '^', local_registr
 local_registry_host: "{{ lookup('env', 'LOCAL_REGISTRY_HOST') | default('10.10.10.10', true) }}"
 local_registry_port: "{{ lookup('env', 'LOCAL_REGISTRY_PORT') | default('5000', true) }}"
 local_registry_endpoint: "{{ local_registry_host }}:{{ local_registry_port }}"
+local_registry_enabled: "{{ lookup('env', 'LOCAL_REGISTRY_ENABLED') | default('true', true) | bool }}"
 local_registry_storage_path: "{{ lookup('env', 'LOCAL_REGISTRY_STORAGE_PATH') | default('/var/lib/docker-registry', true) }}"
 local_registry_tls_dir: "{{ lookup('env', 'LOCAL_REGISTRY_TLS_DIR') | default('/etc/docker/registry/tls', true) }}"
 local_registry_host_tls_dir: "{{ lookup('env', 'LOCAL_REGISTRY_HOST_TLS_DIR') | default(lookup('env', 'HOME') ~ '/.cache/cloudnative-study/infra-cluster/local-registry', true) }}"
@@ -37,6 +38,7 @@ registry_pull_test_image: "{{ lookup('env', 'REGISTRY_PULL_TEST_IMAGE') | defaul
 metrics_server_version: "{{ lookup('env', 'METRICS_SERVER_VERSION') | default('v0.8.1', true) }}"
 metrics_server_manifest_url: "{{ lookup('env', 'METRICS_SERVER_MANIFEST_URL') | default('https://github.com/kubernetes-sigs/metrics-server/releases/download/' ~ metrics_server_version ~ '/components.yaml', true) }}"
 metrics_server_wait_timeout: "{{ lookup('env', 'METRICS_SERVER_WAIT_TIMEOUT') | default('300s', true) }}"
+metrics_server_node_selector_hostname: "{{ lookup('env', 'METRICS_SERVER_NODE_SELECTOR_HOSTNAME') | default(groups['control_plane'][0], true) }}"
 helm_version: "{{ lookup('env', 'HELM_VERSION') | default('v3.15.4', true) }}"
 helm_install_script_url: "{{ lookup('env', 'HELM_INSTALL_SCRIPT_URL') | default('https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3', true) }}"
 helm_install_script_path: /tmp/get-helm-3

@@ -12,6 +12,34 @@ log() {
   printf "%s\n" "$*"
 }
 
+load_wsl_sudo_password() {
+  if [ -n "${WSL_SUDO_PASSWORD:-}" ] || [ ! -f ".env" ]; then
+    return 0
+  fi
+
+  WSL_SUDO_PASSWORD="$(
+    awk '
+      /^WSL_SUDO_PASSWORD=/ {
+        sub(/^WSL_SUDO_PASSWORD=/, "")
+        sub(/\r$/, "")
+        print
+        exit
+      }
+    ' .env
+  )"
+  export WSL_SUDO_PASSWORD
+}
+
+sudo_run() {
+  if sudo -n true 2>/dev/null; then
+    sudo "$@"
+  elif [ -n "${WSL_SUDO_PASSWORD:-}" ]; then
+    printf "%s\n" "${WSL_SUDO_PASSWORD}" | sudo -S -p "" "$@"
+  else
+    sudo "$@"
+  fi
+}
+
 is_wsl() {
   grep -qiE "microsoft|wsl" /proc/version 2>/dev/null
 }
@@ -93,8 +121,9 @@ install_user_docker_cert() {
 install_linux_engine_cert() {
   local target="/etc/docker/certs.d/${registry}/ca.crt"
   if command -v sudo >/dev/null 2>&1; then
-    sudo mkdir -p "$(dirname "${target}")"
-    sudo install -m 0644 "${cache_ca}" "${target}"
+    load_wsl_sudo_password
+    sudo_run mkdir -p "$(dirname "${target}")"
+    sudo_run install -m 0644 "${cache_ca}" "${target}"
     log "installed Docker engine cert: ${target}"
   else
     log "skip: sudo is not available; install ${cache_ca} to ${target} manually."
@@ -110,11 +139,20 @@ install_windows_docker_desktop_cert() {
   local ca_windows_path
   ca_windows_path="$(wslpath -w "${cache_ca}")"
 
-  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \
-    "\$ca='${ca_windows_path}'; Import-Certificate -FilePath \$ca -CertStoreLocation Cert:\\CurrentUser\\Root | Out-Null" \
-    >/dev/null
+  if powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \
+    "\$ca='${ca_windows_path}'; Import-Module Microsoft.PowerShell.Security -ErrorAction SilentlyContinue; if (-not (Get-PSDrive -Name Cert -ErrorAction SilentlyContinue)) { throw 'PowerShell Cert provider is not available' }; Import-Certificate -FilePath \$ca -CertStoreLocation Cert:\\CurrentUser\\Root | Out-Null" \
+    >/dev/null; then
+    log "imported CA into Windows CurrentUser Root certificate store"
+  elif command -v cmd.exe >/dev/null 2>&1 && cmd.exe /C "certutil -user -addstore Root \"${ca_windows_path}\"" >/dev/null; then
+    log "imported CA into Windows CurrentUser Root certificate store with certutil"
+  else
+    log "warning: could not import CA into Windows CurrentUser Root certificate store."
+    log "manual command from WSL:"
+    log "  cmd.exe /C 'certutil -user -addstore Root \"${ca_windows_path}\"'"
+    log "continuing because the WSL Docker engine certificate was installed."
+    return 0
+  fi
 
-  log "imported CA into Windows CurrentUser Root certificate store"
   log "restart Docker Desktop if docker push still reports x509 or HTTPS errors."
 }
 

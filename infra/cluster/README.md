@@ -147,11 +147,18 @@ macOS 사용자는 Terminal에서 Vagrant와 Ansible을 모두 실행할 수 있
 - Docker 또는 Docker Desktop
 - kubectl
 
-도구 확인:
+macOS 통합 실행 도구 확인:
 
 ```bash
 cd infra/cluster
 make check-tools
+```
+
+Windows + WSL 분리 실행에서는 WSL에서 Ansible 실행 도구만 확인합니다.
+
+```bash
+cd /mnt/d/develop/cloudnative_study/infra/cluster
+make check-wsl-tools
 ```
 
 macOS에서는 자동 설치 보조 스크립트를 사용할 수 있습니다.
@@ -212,7 +219,15 @@ providers/local-vagrant/.vagrant/
 
 1. VM 생성
 
-Windows PowerShell 또는 macOS Terminal:
+Windows PowerShell:
+
+```powershell
+cd D:\develop\cloudnative_study\infra\cluster\providers\local-vagrant
+vagrant up --provider=vmware_desktop
+vagrant status
+```
+
+macOS Terminal:
 
 ```bash
 cd infra/cluster
@@ -222,13 +237,33 @@ make local-vms-status
 
 2. Inventory 확인
 
+Windows + WSL:
+
 ```bash
+cd /mnt/d/develop/cloudnative_study/infra/cluster
+make wsl-local-ssh-keys-sync
+make wsl-local-inventory
+```
+
+macOS:
+
+```bash
+cd infra/cluster
 make local-inventory
 ```
 
 3. Ansible 접속 확인
 
 WSL 또는 macOS Terminal:
+
+Windows + WSL:
+
+```bash
+cd /mnt/d/develop/cloudnative_study/infra/cluster
+make ANSIBLE_INVENTORY=provision/ansible/inventory.ini ansible-ping
+```
+
+macOS:
 
 ```bash
 cd infra/cluster

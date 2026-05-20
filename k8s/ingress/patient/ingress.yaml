@@ -3,7 +3,7 @@ kind: Ingress
 metadata:
   name: patient-api
   annotations:
-    konghq.com/plugins: medikong-jwt,medikong-identity-headers,medikong-rate-limiting,medikong-correlation-id,medikong-prometheus
+    konghq.com/plugins: medikong-jwt,medikong-identity-headers,medikong-rate-limit-patients,medikong-correlation-id,medikong-prometheus
 spec:
   ingressClassName: kong
   rules:

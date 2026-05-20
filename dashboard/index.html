@@ -83,11 +83,7 @@
     }
 
     .session {
-      padding: 14px;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: var(--panel);
-      margin-bottom: 18px;
+      display: none;
     }
 
     .session strong {
@@ -104,8 +100,7 @@
     }
 
     .nav {
-      display: grid;
-      gap: 8px;
+      display: none;
     }
 
     .nav button {
@@ -307,6 +302,17 @@
       font-size: 15px;
     }
 
+    .panel-title {
+      display: grid;
+      gap: 4px;
+    }
+
+    .panel-meta {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
     .panel-body {
       padding: 16px;
     }
@@ -392,13 +398,6 @@
       font-size: 13px;
     }
 
-    .status-line {
-      margin-top: 10px;
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.5;
-    }
-
     .hidden {
       display: none !important;
     }
@@ -438,20 +437,15 @@
         </div>
         <h1>의료 운영 콘솔</h1>
         <p>환자 접수, 진료 예약, 처방, 알림 업무를 한 곳에서 처리합니다.</p>
-        <div class="demo-grid">
-          <div class="demo-account"><span><strong>직원</strong><code>staff@medikong.local / staff1234</code></span><button type="button" onclick="fillDemo('STAFF')">입력</button></div>
-          <div class="demo-account"><span><strong>환자</strong><code>patient@medikong.local / patient1234</code></span><button type="button" onclick="fillDemo('PATIENT')">입력</button></div>
-          <div class="demo-account"><span><strong>의사</strong><code>doctor@medikong.local / doctor1234</code></span><button type="button" onclick="fillDemo('DOCTOR')">입력</button></div>
-        </div>
       </div>
-      <form id="loginForm" class="login-form">
+      <form id="loginForm" class="login-form" autocomplete="off">
         <div class="field">
-          <label for="email">Email</label>
-          <input id="email" type="email" value="staff@medikong.local" autocomplete="username">
+          <label for="email">계정</label>
+          <input id="email" type="text" value="" placeholder="계정을 입력하세요" autocomplete="off" required>
         </div>
         <div class="field">
-          <label for="password">Password</label>
-          <input id="password" type="password" value="staff1234" autocomplete="current-password">
+          <label for="password">비밀번호</label>
+          <input id="password" type="password" value="" placeholder="비밀번호를 입력하세요" autocomplete="off" required>
         </div>
         <button class="btn" type="submit">로그인</button>
       </form>
@@ -464,11 +458,6 @@
         <div class="brand-mark">M</div>
         <span>MediKong</span>
       </div>
-      <div class="session">
-        <strong id="sessionName">-</strong>
-        <span id="sessionMeta">-</span>
-      </div>
-      <nav id="nav" class="nav"></nav>
     </aside>
 
     <main class="main">
@@ -487,85 +476,87 @@
         <div class="panel span-4">
           <div class="panel-header"><h2>환자 등록</h2></div>
           <div class="panel-body">
-            <div class="field"><label>이름</label><input id="patientName" value="Scenario Patient"></div>
-            <div class="field"><label>생년월일</label><input id="patientBirthDate" value="1990-01-01"></div>
-            <div class="field"><label>성별</label><select id="patientGender"><option>F</option><option>M</option></select></div>
-            <div class="field"><label>연락처</label><input id="patientContact" value="010-1111-2222"></div>
-            <div class="field"><label>담당 의사 ID</label><input id="patientDoctorId" type="number" value="10"></div>
+            <div class="field"><label>이름</label><input id="patientName" value="" placeholder="이름을 입력하세요"></div>
+            <div class="field"><label>생년월일</label><input id="patientBirthDate" type="date" value=""></div>
+            <div class="field"><label>성별</label><select id="patientGender"><option value="">선택하세요</option><option value="F">여성</option><option value="M">남성</option></select></div>
+            <div class="field"><label>연락처</label><input id="patientContact" value="" placeholder="연락처를 입력하세요"></div>
+            <div class="field"><label>담당 의사</label><select id="patientDoctorId"><option value="">선택하세요</option><option value="10">박준호 전문의</option></select></div>
+            <div class="field"><label>알레르기</label><input id="patientAllergies" value="" placeholder="없으면 비워두세요"></div>
+            <div class="field"><label>복약 주의</label><textarea id="patientMedicationWarnings" placeholder="없으면 비워두세요"></textarea></div>
             <button class="btn" type="button" onclick="createPatient()">등록</button>
           </div>
         </div>
         <div class="panel span-8">
-          <div class="panel-header"><h2>환자 목록</h2><button class="btn secondary" type="button" onclick="loadPatients()">조회</button></div>
+          <div class="panel-header"><div class="panel-title"><h2>환자 목록</h2><span id="patientsUpdatedAt" class="panel-meta"></span></div><button class="btn secondary" type="button" onclick="loadPatients()">조회</button></div>
           <div class="panel-body table-wrap"><table id="patientsTable"></table></div>
         </div>
         <div class="panel span-6">
-          <div class="panel-header"><h2>예약 현황</h2><button class="btn secondary" type="button" onclick="loadAppointments()">조회</button></div>
+          <div class="panel-header"><div class="panel-title"><h2>예약 현황</h2><span id="staffAppointmentsUpdatedAt" class="panel-meta"></span></div><button class="btn secondary" type="button" onclick="loadAppointments()">조회</button></div>
           <div class="panel-body table-wrap"><table id="staffAppointmentsTable"></table></div>
         </div>
         <div class="panel span-6">
-          <div class="panel-header"><h2>Audit Log</h2><button class="btn secondary" type="button" onclick="loadAuditLogs()">조회</button></div>
-          <div class="panel-body table-wrap"><table id="auditTable"></table></div>
-        </div>
-        <div class="panel span-6">
-          <div class="panel-header"><h2>전체 처방</h2><button class="btn secondary" type="button" onclick="loadPrescriptions()">조회</button></div>
+          <div class="panel-header"><div class="panel-title"><h2>전체 처방</h2><span id="staffPrescriptionsUpdatedAt" class="panel-meta"></span></div><button class="btn secondary" type="button" onclick="loadPrescriptions()">조회</button></div>
           <div class="panel-body table-wrap"><table id="staffPrescriptionsTable"></table></div>
         </div>
         <div class="panel span-6">
-          <div class="panel-header"><h2>전체 알림</h2><button class="btn secondary" type="button" onclick="loadNotifications()">조회</button></div>
+          <div class="panel-header"><div class="panel-title"><h2>전체 알림</h2><span id="staffNotificationsUpdatedAt" class="panel-meta"></span></div><button class="btn secondary" type="button" onclick="loadNotifications()">조회</button></div>
           <div class="panel-body table-wrap"><table id="staffNotificationsTable"></table></div>
+        </div>
+        <div class="panel span-12">
+          <div class="panel-header"><div class="panel-title"><h2>감사 로그</h2><span id="auditUpdatedAt" class="panel-meta"></span></div><button class="btn secondary" type="button" onclick="loadAuditLogs()">조회</button></div>
+          <div class="panel-body table-wrap"><table id="auditTable"></table></div>
         </div>
       </section>
 
       <section id="patientPage" class="grid hidden">
         <div class="panel span-12">
-          <div class="panel-header"><h2>내 환자 프로필</h2><button class="btn secondary" type="button" onclick="loadMyPatientProfile()">조회</button></div>
+          <div class="panel-header"><div class="panel-title"><h2>내 환자 프로필</h2><span id="patientProfileUpdatedAt" class="panel-meta"></span></div><button class="btn secondary" type="button" onclick="loadMyPatientProfile()">조회</button></div>
           <div class="panel-body table-wrap"><table id="patientProfileTable"></table></div>
         </div>
         <div class="panel span-4">
           <div class="panel-header"><h2>진료 예약</h2></div>
           <div class="panel-body">
-            <div class="field"><label>의사 ID</label><input id="appointmentDoctorId" type="number" value="10"></div>
+            <div class="field"><label>담당 의사</label><select id="appointmentDoctorId"><option value="">선택하세요</option><option value="10">박준호 전문의</option></select></div>
             <div class="field"><label>예약 일시</label><input id="appointmentAt" type="datetime-local"></div>
-            <div class="field"><label>사유</label><textarea id="appointmentReason">headache</textarea></div>
+            <div class="field"><label>사유</label><textarea id="appointmentReason" placeholder="예약 사유를 입력하세요"></textarea></div>
             <button class="btn" type="button" onclick="createAppointment()">예약 신청</button>
           </div>
         </div>
         <div class="panel span-8">
-          <div class="panel-header"><h2>내 예약</h2><button class="btn secondary" type="button" onclick="loadAppointments()">조회</button></div>
+          <div class="panel-header"><div class="panel-title"><h2>내 예약</h2><span id="patientAppointmentsUpdatedAt" class="panel-meta"></span></div><button class="btn secondary" type="button" onclick="loadAppointments()">조회</button></div>
           <div class="panel-body table-wrap"><table id="patientAppointmentsTable"></table></div>
         </div>
         <div class="panel span-6">
-          <div class="panel-header"><h2>내 처방</h2><button class="btn secondary" type="button" onclick="loadPrescriptions()">조회</button></div>
+          <div class="panel-header"><div class="panel-title"><h2>내 처방</h2><span id="patientPrescriptionsUpdatedAt" class="panel-meta"></span></div><button class="btn secondary" type="button" onclick="loadPrescriptions()">조회</button></div>
           <div class="panel-body table-wrap"><table id="patientPrescriptionsTable"></table></div>
         </div>
         <div class="panel span-6">
-          <div class="panel-header"><h2>내 알림</h2><button class="btn secondary" type="button" onclick="loadNotifications()">조회</button></div>
+          <div class="panel-header"><div class="panel-title"><h2>내 알림</h2><span id="patientNotificationsUpdatedAt" class="panel-meta"></span></div><button class="btn secondary" type="button" onclick="loadNotifications()">조회</button></div>
           <div class="panel-body table-wrap"><table id="patientNotificationsTable"></table></div>
         </div>
       </section>
 
       <section id="doctorPage" class="grid hidden">
         <div class="panel span-12">
-          <div class="panel-header"><h2>담당 환자</h2><button class="btn secondary" type="button" onclick="loadPatients()">조회</button></div>
+          <div class="panel-header"><div class="panel-title"><h2>담당 환자</h2><span id="doctorPatientsUpdatedAt" class="panel-meta"></span></div><button class="btn secondary" type="button" onclick="loadPatients()">조회</button></div>
           <div class="panel-body table-wrap"><table id="doctorPatientsTable"></table></div>
         </div>
         <div class="panel span-7">
-          <div class="panel-header"><h2>담당 예약</h2><button class="btn secondary" type="button" onclick="loadAppointments()">조회</button></div>
+          <div class="panel-header"><div class="panel-title"><h2>담당 예약</h2><span id="doctorAppointmentsUpdatedAt" class="panel-meta"></span></div><button class="btn secondary" type="button" onclick="loadAppointments()">조회</button></div>
           <div class="panel-body table-wrap"><table id="doctorAppointmentsTable"></table></div>
         </div>
         <div class="panel span-5">
           <div class="panel-header"><h2>처방 발행</h2></div>
           <div class="panel-body">
-            <div class="field"><label>환자 ID</label><input id="prescriptionPatientId" type="number" value="1"></div>
-            <div class="field"><label>약품명</label><input id="medicationName" value="Amoxicillin"></div>
-            <div class="field"><label>용량</label><input id="dosage" value="500mg"></div>
-            <div class="field"><label>복약 안내</label><textarea id="instructions">after meals</textarea></div>
+            <div class="field"><label>환자</label><select id="prescriptionPatientId"><option value="">선택하세요</option></select></div>
+            <div class="field"><label>약품명</label><input id="medicationName" value="" placeholder="약품명을 입력하세요"></div>
+            <div class="field"><label>용량</label><input id="dosage" value="" placeholder="용량을 입력하세요"></div>
+            <div class="field"><label>복약 안내</label><textarea id="instructions" placeholder="복약 안내를 입력하세요"></textarea></div>
             <button class="btn" type="button" onclick="issuePrescription()">발행</button>
           </div>
         </div>
         <div class="panel span-12">
-          <div class="panel-header"><h2>담당 처방</h2><button class="btn secondary" type="button" onclick="loadPrescriptions()">조회</button></div>
+          <div class="panel-header"><div class="panel-title"><h2>담당 처방</h2><span id="doctorPrescriptionsUpdatedAt" class="panel-meta"></span></div><button class="btn secondary" type="button" onclick="loadPrescriptions()">조회</button></div>
           <div class="panel-body table-wrap"><table id="doctorPrescriptionsTable"></table></div>
         </div>
       </section>
@@ -580,11 +571,31 @@
       refreshToken: sessionStorage.getItem("refreshToken"),
       user: JSON.parse(sessionStorage.getItem("user") || "null"),
       page: "home",
+      patientNames: { 1: "이서연" },
       demoAccounts: {
-        STAFF: { email: "staff@medikong.local", password: "staff1234" },
-        PATIENT: { email: "patient@medikong.local", password: "patient1234" },
-        DOCTOR: { email: "doctor@medikong.local", password: "doctor1234" }
+        STAFF: { email: "staff", password: "staff1234" },
+        PATIENT: { email: "patient", password: "patient1234" },
+        DOCTOR: { email: "doctor", password: "doctor1234" }
       }
+    };
+
+    const doctors = {
+      10: "박준호 전문의"
+    };
+
+    const auditEvents = {
+      LOGIN_SUCCEEDED: "로그인 성공",
+      LOGIN_FAILED: "로그인 실패",
+      ME_VIEWED: "내 계정 확인",
+      TOKEN_REFRESHED: "세션 갱신",
+      LOGOUT: "로그아웃",
+      AUDIT_LOG_VIEWED: "감사 로그 조회",
+      AUDIT_LOG_VIEW_DENIED: "감사 로그 접근 거부"
+    };
+
+    const notificationTypes = {
+      "appointment-confirmed": "예약 확정",
+      "prescription-issued": "처방 발행"
     };
 
     const rolePages = {
@@ -683,14 +694,12 @@
     function showApp() {
       document.getElementById("loginView").classList.add("hidden");
       document.getElementById("appView").classList.remove("hidden");
-      document.getElementById("sessionName").textContent = state.user.displayName;
-      document.getElementById("sessionMeta").textContent = `${state.user.email} · ${state.user.role}`;
-      renderNav();
       openPage(defaultPage());
     }
 
     function renderNav() {
       const nav = document.getElementById("nav");
+      if (!nav) return;
       nav.innerHTML = "";
       for (const item of rolePages[state.user.role] || []) {
         const button = document.createElement("button");
@@ -735,14 +744,14 @@
     }
 
     function pageTitle(page) {
-      return { staff: "운영", patient: "환자 포털", doctor: "의사 콘솔" }[page];
+      return { staff: "원무 운영", patient: "환자 포털", doctor: "진료 콘솔" }[page];
     }
 
     function pageSubtitle(page) {
       return {
-        staff: "환자 등록 · 예약 현황 · 감사 로그",
-        patient: "예약 신청 · 처방 내역 · 알림",
-        doctor: "예약 확정 · 처방 발행"
+        staff: "환자 등록, 예약 현황, 감사 로그를 관리합니다.",
+        patient: "내 진료 정보, 예약, 처방, 알림을 확인합니다.",
+        doctor: "담당 환자의 예약을 확정하고 처방을 발행합니다."
       }[page];
     }
 
@@ -753,15 +762,21 @@
         gender: value("patientGender"),
         contact: value("patientContact"),
         primaryDoctorId: Number(value("patientDoctorId")),
-        allergies: "none",
-        medicationWarnings: "none"
+        allergies: optionalValue("patientAllergies"),
+        medicationWarnings: optionalValue("patientMedicationWarnings")
       };
+      if (!payload.name || !payload.birthDate || !payload.gender || !payload.contact || !payload.primaryDoctorId) {
+        toast("환자 등록 정보를 모두 입력하세요.");
+        return;
+      }
       const patient = await api("/patients", {
         method: "POST",
         body: JSON.stringify(payload)
       });
+      state.patientNames[patient.id] = patient.name;
+      updatePatientSelects();
       document.getElementById("prescriptionPatientId").value = patient.id;
-      toast(`환자 ID ${patient.id} 등록 완료`);
+      toast(`${patient.name} 환자 등록 완료`);
       await loadPatients();
     }
 
@@ -769,20 +784,24 @@
       const payload = {
         patientId: state.user.patientId,
         doctorId: Number(value("appointmentDoctorId")),
-        appointmentAt: value("appointmentAt") || "2026-05-20T10:00:00",
+        appointmentAt: value("appointmentAt"),
         reason: value("appointmentReason")
       };
+      if (!payload.doctorId || !payload.appointmentAt || !payload.reason) {
+        toast("예약 정보를 모두 입력하세요.");
+        return;
+      }
       const appointment = await api("/appointments", {
         method: "POST",
         body: JSON.stringify(payload)
       });
-      toast(`예약 ID ${appointment.id} 신청 완료`);
+      toast(`${doctorName(appointment.doctorId)} 진료 예약 신청 완료`);
       await loadAppointments();
     }
 
     async function confirmAppointment(id) {
       await api(`/appointments/${id}/confirm`, { method: "POST" });
-      toast(`예약 ID ${id} 확정 완료`);
+      toast("예약 확정 완료");
       await loadAppointments();
     }
 
@@ -794,99 +813,133 @@
         dosage: value("dosage"),
         instructions: value("instructions")
       };
+      if (!payload.patientId || !payload.medicationName || !payload.dosage || !payload.instructions) {
+        toast("처방 정보를 모두 입력하세요.");
+        return;
+      }
       const prescription = await api("/prescriptions", {
         method: "POST",
         body: JSON.stringify(payload)
       });
-      const snapshot = prescription.patientSnapshotAvailable ? "환자 확인 완료" : "부분 저장";
-      toast(`처방 ID ${prescription.id} 발행 완료 · ${snapshot}`);
+      toast(`${patientName(prescription.patientId)} 환자 처방 발행 완료`);
       await loadPrescriptions();
     }
 
     async function loadPatients() {
       if (!["STAFF", "DOCTOR"].includes(state.user.role)) return;
       const patients = await api("/patients");
+      patients.forEach((p) => {
+        state.patientNames[p.id] = p.name;
+      });
+      updatePatientSelects();
       const rows = patients.map((p) => [
-        p.id,
         p.name,
         p.contact,
-        p.primaryDoctorId || "-",
+        doctorName(p.primaryDoctorId),
         p.allergies || "-",
         p.medicationWarnings || "-"
       ]);
-      if (state.user.role === "STAFF") renderTable("patientsTable", ["ID", "이름", "연락처", "담당의", "알레르기", "주의"], rows);
-      if (state.user.role === "DOCTOR") renderTable("doctorPatientsTable", ["ID", "이름", "연락처", "담당의", "알레르기", "주의"], rows);
+      if (state.user.role === "STAFF") {
+        renderTable("patientsTable", ["이름", "연락처", "담당의", "알레르기", "복약 주의"], rows);
+        setUpdated("patientsUpdatedAt", patients.length);
+      }
+      if (state.user.role === "DOCTOR") {
+        renderTable("doctorPatientsTable", ["이름", "연락처", "담당의", "알레르기", "복약 주의"], rows);
+        setUpdated("doctorPatientsUpdatedAt", patients.length);
+      }
     }
 
     async function loadMyPatientProfile() {
       if (state.user.role !== "PATIENT") return;
       const patient = await api(`/patients/${state.user.patientId}`);
-      renderTable("patientProfileTable", ["ID", "이름", "연락처", "담당의", "알레르기", "주의"], [[
-        patient.id,
+      state.patientNames[patient.id] = patient.name;
+      renderTable("patientProfileTable", ["이름", "연락처", "담당의", "알레르기", "복약 주의"], [[
         patient.name,
         patient.contact,
-        patient.primaryDoctorId || "-",
+        doctorName(patient.primaryDoctorId),
         patient.allergies || "-",
         patient.medicationWarnings || "-"
       ]]);
+      setUpdated("patientProfileUpdatedAt", 1);
     }
 
     async function loadAppointments() {
       const appointments = await api("/appointments");
       const rows = appointments.map((item) => [
-        item.id,
-        item.patientId,
-        item.doctorId,
-        item.appointmentAt,
+        patientName(item.patientId),
+        doctorName(item.doctorId),
+        formatDateTime(item.appointmentAt),
         statusPill(item.status),
         state.user.role === "DOCTOR" && item.status === "REQUESTED"
           ? `<button class="btn secondary" type="button" onclick="confirmAppointment(${item.id})">확정</button>`
           : "-"
       ]);
-      if (state.user.role === "STAFF") renderTable("staffAppointmentsTable", ["ID", "환자", "의사", "일시", "상태", "작업"], rows);
-      if (state.user.role === "PATIENT") renderTable("patientAppointmentsTable", ["ID", "환자", "의사", "일시", "상태", "작업"], rows);
-      if (state.user.role === "DOCTOR") renderTable("doctorAppointmentsTable", ["ID", "환자", "의사", "일시", "상태", "작업"], rows);
+      if (state.user.role === "STAFF") {
+        renderTable("staffAppointmentsTable", ["환자", "담당의", "예약 일시", "상태", "작업"], rows);
+        setUpdated("staffAppointmentsUpdatedAt", appointments.length);
+      }
+      if (state.user.role === "PATIENT") {
+        renderTable("patientAppointmentsTable", ["환자", "담당의", "예약 일시", "상태", "작업"], rows);
+        setUpdated("patientAppointmentsUpdatedAt", appointments.length);
+      }
+      if (state.user.role === "DOCTOR") {
+        renderTable("doctorAppointmentsTable", ["환자", "담당의", "예약 일시", "상태", "작업"], rows);
+        setUpdated("doctorAppointmentsUpdatedAt", appointments.length);
+      }
     }
 
     async function loadPrescriptions() {
       const prescriptions = await api("/prescriptions");
       const rows = prescriptions.map((item) => [
-        item.id,
-        item.patientId,
-        item.doctorId,
-        item.medicationName,
+        patientName(item.patientId),
+        doctorName(item.doctorId),
+        medicationName(item.medicationName),
         item.dosage,
-        item.patientSnapshotAvailable ? "OK" : "PARTIAL",
+        item.patientSnapshotAvailable ? "연동 완료" : "연동 실패",
         (item.warnings || []).join(" / ") || "-"
       ]);
-      if (state.user.role === "STAFF") renderTable("staffPrescriptionsTable", ["ID", "환자", "의사", "약품", "용량", "확인", "경고"], rows);
-      if (state.user.role === "PATIENT") renderTable("patientPrescriptionsTable", ["ID", "환자", "의사", "약품", "용량", "확인", "경고"], rows);
-      if (state.user.role === "DOCTOR") renderTable("doctorPrescriptionsTable", ["ID", "환자", "의사", "약품", "용량", "확인", "경고"], rows);
+      if (state.user.role === "STAFF") {
+        renderTable("staffPrescriptionsTable", ["환자", "담당의", "약품", "용량", "환자 정보 연동", "경고"], rows);
+        setUpdated("staffPrescriptionsUpdatedAt", prescriptions.length);
+      }
+      if (state.user.role === "PATIENT") {
+        renderTable("patientPrescriptionsTable", ["환자", "담당의", "약품", "용량", "환자 정보 연동", "경고"], rows);
+        setUpdated("patientPrescriptionsUpdatedAt", prescriptions.length);
+      }
+      if (state.user.role === "DOCTOR") {
+        renderTable("doctorPrescriptionsTable", ["환자", "담당의", "약품", "용량", "환자 정보 연동", "경고"], rows);
+        setUpdated("doctorPrescriptionsUpdatedAt", prescriptions.length);
+      }
     }
 
     async function loadNotifications() {
       const notifications = await api("/notifications");
       const rows = notifications.map((item) => [
-        item.id,
-        item.patientId,
-        item.type,
-        item.message,
-        item.status
+        patientName(item.patientId),
+        notificationType(item.type),
+        notificationMessage(item),
+        item.status === "CREATED" ? "생성됨" : item.status
       ]);
-      if (state.user.role === "STAFF") renderTable("staffNotificationsTable", ["ID", "환자", "유형", "메시지", "상태"], rows);
-      if (state.user.role === "PATIENT") renderTable("patientNotificationsTable", ["ID", "환자", "유형", "메시지", "상태"], rows);
+      if (state.user.role === "STAFF") {
+        renderTable("staffNotificationsTable", ["환자", "유형", "메시지", "상태"], rows);
+        setUpdated("staffNotificationsUpdatedAt", notifications.length);
+      }
+      if (state.user.role === "PATIENT") {
+        renderTable("patientNotificationsTable", ["환자", "유형", "메시지", "상태"], rows);
+        setUpdated("patientNotificationsUpdatedAt", notifications.length);
+      }
     }
 
     async function loadAuditLogs() {
       if (state.user.role !== "STAFF") return;
       const logs = await api("/auth/audit-logs");
-      renderTable("auditTable", ["ID", "Event", "결과", "사용자", "시간"], logs.map((item) => [
-        item.id,
-        item.eventType,
-        item.outcome,
-        item.userEmail || "-",
+      renderTable("auditTable", ["이벤트", "결과", "사용자", "시간"], logs.map((item) => [
+        auditEvent(item.eventType),
+        item.outcome === "ALLOW" ? "허용" : "거부",
+        accountLabel(item.userEmail),
         formatDate(item.createdAt)
       ]));
+      setUpdated("auditUpdatedAt", logs.length);
     }
 
     async function api(path, options = {}) {
@@ -936,11 +989,86 @@
 
     function statusPill(status) {
       const tone = status === "CONFIRMED" ? "success" : status === "CANCELLED" ? "danger" : "warning";
-      return `<span class="pill ${tone}">${status}</span>`;
+      const label = {
+        REQUESTED: "예약 신청",
+        CONFIRMED: "확정",
+        CANCELLED: "취소"
+      }[status] || status;
+      return `<span class="pill ${tone}">${label}</span>`;
+    }
+
+    function doctorName(id) {
+      if (!id) return "-";
+      return doctors[id] || `의사 ${id}`;
+    }
+
+    function patientName(id) {
+      if (!id) return "-";
+      return state.patientNames[id] || `환자 ${id}`;
+    }
+
+    function notificationType(type) {
+      return notificationTypes[type] || type;
+    }
+
+    function notificationMessage(item) {
+      if (item.type === "appointment-confirmed") return `${patientName(item.patientId)}님의 진료 예약이 확정되었습니다.`;
+      if (item.type === "prescription-issued") return `${patientName(item.patientId)}님 처방전이 발행되었습니다.`;
+      return item.message;
+    }
+
+    function medicationName(value) {
+      return {
+        Amoxicillin: "아목시실린"
+      }[value] || value;
+    }
+
+    function auditEvent(type) {
+      return auditEvents[type] || type;
+    }
+
+    function accountLabel(value) {
+      if (!value) return "-";
+      if (value === "staff" || value.startsWith("staff@")) return "원무 담당자 김민지";
+      if (value === "patient" || value.startsWith("patient@")) return "이서연";
+      if (value === "doctor" || value.startsWith("doctor@")) return "박준호 전문의";
+      return value;
+    }
+
+    function setUpdated(id, count) {
+      const target = document.getElementById(id);
+      if (!target) return;
+      target.textContent = `${count}건 · ${new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })} 조회`;
+    }
+
+    function updatePatientSelects() {
+      const patientOptions = Object.entries(state.patientNames)
+        .sort(([left], [right]) => Number(left) - Number(right))
+        .map(([id, name]) => `<option value="${id}">${escapeHtml(name)}</option>`)
+        .join("");
+      const options = `<option value="">선택하세요</option>${patientOptions}`;
+      const select = document.getElementById("prescriptionPatientId");
+      if (select) select.innerHTML = options;
+    }
+
+    function formatDateTime(value) {
+      if (!value) return "-";
+      return new Date(value).toLocaleString("ko-KR", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit"
+      });
     }
 
     function value(id) {
       return document.getElementById(id).value;
+    }
+
+    function optionalValue(id) {
+      const current = value(id);
+      return current || null;
     }
 
     function saveSession() {
