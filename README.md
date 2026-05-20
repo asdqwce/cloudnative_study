@@ -19,18 +19,53 @@ MediKong은 병원 업무를 작게 나눈 예제입니다. 로그인, 환자, �
 - MetalLB, Metrics Server, Grafana를 이용한 로컬 운영 실험
 - AWS/GitOps 배포를 위한 기본 오버레이와 Argo CD 실험 구성
 
-## 전체 과정
+## 전체 아키텍처
 
 ```text
-사용자
-  -> Kong Gateway
-  -> FastAPI 서비스
-  -> PostgreSQL
-
-예약 서비스
-처방 서비스
-  -> Kafka
-  -> 알림 서비스
+                         +-----------------------------+
+사용자 ----------------> | Kong Gateway                |
+                         | - routing                   |
+                         | - JWT                       |
+                         | - rate limit                |
+                         +--------------+--------------+
+                                        |
+                                        v
++------------------------------ Kubernetes Cluster ------------------------------+
+| 실행 환경                                                                      |
+| - Local: VMware / Vagrant -> Ansible -> kubeadm                                |
+| - AWS:   Terraform / EC2  -> Ansible -> kubeadm -> Argo CD                     |
+|                                                                                |
+| +-----------------------+    +-----------------------+                         |
+| | medical-auth          |    | medical-patient       |                         |
+| | auth-service          |    | patient-service       |                         |
+| | auth-db               |    | patient-db            |                         |
+| +-----------------------+    +-----------------------+                         |
+|                                                                                |
+| +-----------------------+    +-----------------------+                         |
+| | medical-appointment   |    | medical-prescription  |                         |
+| | appointment-service   |    | prescription-service  |                         |
+| | appointment-db        |    | prescription-db       |                         |
+| +-----------+-----------+    +-----------+-----------+                         |
+|             |                            |                                     |
+|             | appointment-confirmed      | prescription-issued                 |
+|             +-------------+--------------+                                     |
+|                           v                                                    |
+|                  +----------------+                                            |
+|                  | Kafka          |                                            |
+|                  +-------+--------+                                            |
+|                          |                                                     |
+|                          v                                                     |
+|                  +-----------------------+                                     |
+|                  | medical-notification  |                                     |
+|                  | notification-service  |                                     |
+|                  | notification-db       |                                     |
+|                  +-----------------------+                                     |
+|                                                                                |
+| +-----------------------+        +-------------------------------------------+ |
+| | medical-dashboard     |        | Metrics Server / Grafana                  | |
+| | dashboard             |        | cluster, gateway, service metrics         | |
+| +-----------------------+        +-------------------------------------------+ |
++--------------------------------------------------------------------------------+
 ```
 
 로컬에서는 Kong Gateway가 MetalLB를 통해 노출되고, 서비스들은 Kubernetes 내부 DNS로 서로 통신합니다.
