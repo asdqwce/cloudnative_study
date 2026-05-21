@@ -531,6 +531,92 @@
       font-weight: 650;
     }
 
+    .org-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+      gap: 20px;
+      align-items: stretch;
+    }
+
+    .org-panel {
+      padding: 28px;
+      border: 2px solid var(--ink);
+      border-radius: var(--radius);
+      background: #eef7e8;
+      box-shadow: 7px 7px 0 var(--ink);
+    }
+
+    .org-panel h3 {
+      font-size: 30px;
+    }
+
+    .org-panel p {
+      margin: 0;
+      color: #314251;
+      font-size: 18px;
+      font-weight: 650;
+    }
+
+    .org-cards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .org-card {
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+
+    .org-card b {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 18px;
+    }
+
+    .org-card p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .visibility-list {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .visibility {
+      padding: 16px;
+      border-radius: var(--radius);
+      background: var(--ink);
+      color: white;
+    }
+
+    .visibility span {
+      display: block;
+      margin-bottom: 5px;
+      color: #facc15;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .visibility b {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 16px;
+    }
+
+    .visibility p {
+      margin: 0;
+      color: #d8e0e8;
+      font-size: 14px;
+    }
+
     .decision {
       display: grid;
       grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
@@ -577,6 +663,8 @@
       .benefit-grid,
       .risk-grid,
       .timeline-wrap,
+      .org-grid,
+      .visibility-list,
       .decision {
         grid-template-columns: 1fr;
       }
@@ -644,6 +732,10 @@
       }
 
       .toc {
+        grid-template-columns: 1fr;
+      }
+
+      .org-cards {
         grid-template-columns: 1fr;
       }
 
@@ -715,6 +807,10 @@
             <a href="#migration">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5"></path><path d="M4 19h16"></path><path d="m7 16 4-4 3 3 5-7"></path></svg>
               단계적 이주안
+            </a>
+            <a href="#organization">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"></path><path d="M9 7h1"></path><path d="M14 7h1"></path><path d="M9 11h1"></path><path d="M14 11h1"></path><path d="M9 15h1"></path><path d="M14 15h1"></path><path d="M4 21h16"></path></svg>
+              GitHub Organization
             </a>
           </nav>
         </div>
@@ -1084,6 +1180,70 @@
         <div>
           <b>제안의 핵심</b>
           <p>GitHub repo는 책임별로 나누고, 로컬 경험은 manifest repo로 다시 하나처럼 묶습니다.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="organization">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">GitHub Organization</p>
+          <h2>repo가 4개로 나뉘면 개인 계정보다 Organization이 자연스럽습니다.</h2>
+        </div>
+        <p class="lead">
+          이 프로젝트는 실습과 시연 목적이므로 repo를 Public으로 유지해도 괜찮습니다.
+          다만 GitOps와 인프라 repo는 권한, secret, branch protection을 더 엄격하게 관리해야 합니다.
+        </p>
+      </div>
+
+      <div class="org-grid">
+        <article class="org-panel">
+          <h3>추천 운영 방식</h3>
+          <p>
+            GitHub Organization 아래에 4개 repo를 모으고, 팀과 권한을 repo 성격에 맞게 나눕니다.
+            이렇게 하면 프로젝트가 하나의 플랫폼처럼 보이고, 심화 프로젝트의 운영 책임 분리를 더 설득력 있게 보여줄 수 있습니다.
+          </p>
+          <div class="visibility-list">
+            <div class="visibility">
+              <span>Public</span>
+              <b>workspace</b>
+              <p>manifest와 bootstrap 중심이라 공개 부담이 낮습니다.</p>
+            </div>
+            <div class="visibility">
+              <span>Public</span>
+              <b>services</b>
+              <p>서비스 코드와 테스트를 포트폴리오로 보여주기 좋습니다.</p>
+            </div>
+            <div class="visibility">
+              <span>Public</span>
+              <b>gitops</b>
+              <p>단, Secret 실값 없이 overlay와 정책만 공개합니다.</p>
+            </div>
+            <div class="visibility">
+              <span>Public*</span>
+              <b>infra</b>
+              <p>공개 가능하지만 tfstate, key, 계정 정보는 절대 제외합니다.</p>
+            </div>
+          </div>
+        </article>
+
+        <div class="org-cards">
+          <article class="org-card">
+            <b>maintainers</b>
+            <p>모든 repo의 설정과 branch protection을 관리합니다.</p>
+          </article>
+          <article class="org-card">
+            <b>app-developers</b>
+            <p>medikong-services에 write 권한을 갖고, GitOps repo에는 PR로 배포 요청을 남깁니다.</p>
+          </article>
+          <article class="org-card">
+            <b>platform-operators</b>
+            <p>medikong-gitops와 medikong-infra의 리뷰와 merge를 담당합니다.</p>
+          </article>
+          <article class="org-card">
+            <b>security defaults</b>
+            <p>secret scanning, push protection, main branch protection, 최소 Actions 권한을 기본값으로 둡니다.</p>
+          </article>
         </div>
       </div>
     </section>
