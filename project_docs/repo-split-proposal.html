@@ -1,0 +1,1116 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MediKong Repo Split Proposal</title>
+  <style>
+    :root {
+      --ink: #17212b;
+      --muted: #5f6f7d;
+      --line: #d6e0e6;
+      --paper: #fbf8f1;
+      --surface: #fffdf7;
+      --blue: #2563eb;
+      --cyan: #0891b2;
+      --green: #15803d;
+      --amber: #b7791f;
+      --rose: #be123c;
+      --slate: #334155;
+      --shadow: 0 18px 48px rgba(23, 33, 43, 0.12);
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(135deg, rgba(37, 99, 235, 0.08) 0, transparent 34%),
+        linear-gradient(315deg, rgba(21, 128, 61, 0.08) 0, transparent 30%),
+        var(--paper);
+      font-family: "Pretendard", "SUIT", "Noto Sans KR", "Apple SD Gothic Neo", sans-serif;
+      line-height: 1.65;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .page {
+      width: min(1160px, calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    .hero {
+      min-height: 92vh;
+      display: grid;
+      align-items: center;
+      padding: 52px 0 40px;
+    }
+
+    .topline {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 28px;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .mark {
+      display: inline-grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border: 2px solid var(--ink);
+      background: var(--surface);
+      box-shadow: 4px 4px 0 var(--ink);
+    }
+
+    h1 {
+      max-width: 980px;
+      margin: 0;
+      font-family: "Gmarket Sans", "Pretendard", "Noto Sans KR", sans-serif;
+      font-size: clamp(48px, 9vw, 112px);
+      line-height: 0.98;
+      letter-spacing: 0;
+    }
+
+    .hero-subtitle {
+      max-width: 780px;
+      margin: 28px 0 0;
+      color: #314251;
+      font-size: clamp(18px, 2vw, 24px);
+      font-weight: 650;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 26px;
+      align-items: end;
+      margin-top: 54px;
+    }
+
+    .statement {
+      padding: 26px;
+      background: var(--ink);
+      color: white;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .statement strong {
+      display: block;
+      margin-bottom: 8px;
+      color: #facc15;
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .statement p {
+      margin: 0;
+      font-size: 21px;
+      font-weight: 750;
+    }
+
+    .toc {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .toc a {
+      min-height: 54px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255, 253, 247, 0.86);
+      color: var(--slate);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 750;
+      transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+    }
+
+    .toc a:hover {
+      transform: translateY(-2px);
+      border-color: var(--ink);
+      box-shadow: 5px 5px 0 rgba(23, 33, 43, 0.16);
+    }
+
+    .toc svg,
+    .repo-icon svg,
+    .mini-icon svg {
+      flex: 0 0 auto;
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    section {
+      padding: 70px 0;
+    }
+
+    .section-head {
+      display: grid;
+      grid-template-columns: minmax(0, 0.8fr) minmax(280px, 1fr);
+      gap: 32px;
+      align-items: start;
+      margin-bottom: 30px;
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--cyan);
+      font-size: 13px;
+      font-weight: 850;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h2 {
+      margin: 0;
+      font-family: "Gmarket Sans", "Pretendard", "Noto Sans KR", sans-serif;
+      font-size: clamp(32px, 5vw, 62px);
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      margin: 0;
+      color: #34495a;
+      font-size: 19px;
+      font-weight: 650;
+    }
+
+    .problem-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .problem {
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+
+    .problem b {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 18px;
+    }
+
+    .problem p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .repo-map {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 18px;
+    }
+
+    .manifest-card {
+      position: relative;
+      overflow: hidden;
+      padding: 28px;
+      border: 2px solid var(--ink);
+      border-radius: var(--radius);
+      background: #fff7cc;
+      box-shadow: 7px 7px 0 var(--ink);
+    }
+
+    .manifest-card::after {
+      content: "";
+      position: absolute;
+      inset: auto 24px 24px auto;
+      width: 160px;
+      height: 160px;
+      border: 2px solid rgba(23, 33, 43, 0.18);
+      transform: rotate(8deg);
+    }
+
+    .repo-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+      font-size: 24px;
+      font-weight: 900;
+    }
+
+    .repo-icon {
+      display: inline-grid;
+      place-items: center;
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius);
+      background: var(--ink);
+      color: white;
+    }
+
+    .manifest-card p,
+    .repo-card p {
+      margin: 0;
+      color: #314251;
+      font-weight: 650;
+    }
+
+    .repo-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .repo-card {
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .repo-card.services {
+      border-top: 6px solid var(--blue);
+    }
+
+    .repo-card.gitops {
+      border-top: 6px solid var(--green);
+    }
+
+    .repo-card.infra {
+      border-top: 6px solid var(--rose);
+    }
+
+    .repo-card ul,
+    .benefit ul,
+    .risk ul,
+    .timeline ul {
+      margin: 18px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .repo-card li,
+    .benefit li,
+    .risk li,
+    .timeline li {
+      position: relative;
+      margin-top: 10px;
+      padding-left: 20px;
+      color: var(--muted);
+    }
+
+    .repo-card li::before,
+    .benefit li::before,
+    .risk li::before,
+    .timeline li::before {
+      content: "";
+      position: absolute;
+      top: 0.72em;
+      left: 0;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .flow {
+      display: grid;
+      gap: 14px;
+      padding: 28px;
+      border-radius: var(--radius);
+      background: var(--ink);
+      color: white;
+      box-shadow: var(--shadow);
+    }
+
+    .flow-row {
+      display: grid;
+      grid-template-columns: 1fr 36px 1fr 36px 1fr;
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .flow-step {
+      min-height: 138px;
+      padding: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .flow-step span {
+      display: inline-block;
+      margin-bottom: 8px;
+      color: #facc15;
+      font-size: 13px;
+      font-weight: 900;
+    }
+
+    .flow-step b {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 20px;
+    }
+
+    .flow-step p {
+      margin: 0;
+      color: #d8e0e8;
+      font-size: 15px;
+    }
+
+    .arrow {
+      display: grid;
+      place-items: center;
+      color: #facc15;
+      font-size: 24px;
+      font-weight: 900;
+    }
+
+    .split-table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .split-table th,
+    .split-table td {
+      padding: 18px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .split-table th {
+      background: #e8f3ef;
+      color: #19342b;
+      font-size: 14px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .split-table tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .split-table td:first-child {
+      width: 24%;
+      font-weight: 850;
+    }
+
+    .benefit-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .benefit,
+    .risk,
+    .timeline {
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+
+    .benefit {
+      border-left: 6px solid var(--green);
+    }
+
+    .risk-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .risk {
+      border-left: 6px solid var(--amber);
+    }
+
+    .timeline-wrap {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      counter-reset: step;
+    }
+
+    .timeline {
+      position: relative;
+      min-height: 260px;
+      padding-top: 54px;
+      counter-increment: step;
+    }
+
+    .timeline::before {
+      content: counter(step);
+      position: absolute;
+      top: 18px;
+      left: 22px;
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--ink);
+      color: white;
+      font-weight: 900;
+    }
+
+    h3 {
+      margin: 0 0 10px;
+      font-size: 22px;
+      line-height: 1.25;
+    }
+
+    .timeline p,
+    .benefit p,
+    .risk p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .callout {
+      display: grid;
+      grid-template-columns: 72px 1fr;
+      gap: 20px;
+      align-items: center;
+      margin-top: 34px;
+      padding: 26px;
+      border: 2px solid var(--ink);
+      border-radius: var(--radius);
+      background: #dff4ff;
+      box-shadow: 7px 7px 0 var(--ink);
+    }
+
+    .mini-icon {
+      display: grid;
+      place-items: center;
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: var(--blue);
+      color: white;
+    }
+
+    .callout b {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 24px;
+    }
+
+    .callout p {
+      margin: 0;
+      color: #314251;
+      font-size: 18px;
+      font-weight: 650;
+    }
+
+    .decision {
+      display: grid;
+      grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+      gap: 20px;
+      align-items: stretch;
+    }
+
+    .decision-panel {
+      padding: 28px;
+      border-radius: var(--radius);
+      background: var(--ink);
+      color: white;
+      box-shadow: var(--shadow);
+    }
+
+    .decision-panel p {
+      margin: 0;
+      color: #d8e0e8;
+    }
+
+    .question-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .question {
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      font-weight: 800;
+    }
+
+    footer {
+      padding: 42px 0 70px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    @media (max-width: 900px) {
+      .hero-grid,
+      .section-head,
+      .repo-row,
+      .benefit-grid,
+      .risk-grid,
+      .timeline-wrap,
+      .decision {
+        grid-template-columns: 1fr;
+      }
+
+      .flow-row {
+        grid-template-columns: 1fr;
+      }
+
+      .arrow {
+        min-height: 22px;
+        transform: rotate(90deg);
+      }
+
+      .split-table,
+      .split-table tbody,
+      .split-table tr,
+      .split-table td,
+      .split-table th {
+        display: block;
+      }
+
+      .split-table thead {
+        display: none;
+      }
+
+      .split-table tr {
+        border-bottom: 1px solid var(--line);
+      }
+
+      .split-table tr:last-child {
+        border-bottom: 0;
+      }
+
+      .split-table td {
+        width: 100%;
+        border-bottom: 0;
+        padding: 12px 18px;
+      }
+
+      .split-table td:first-child {
+        width: 100%;
+        padding-top: 18px;
+      }
+
+      .split-table td::before {
+        content: attr(data-label);
+        display: block;
+        margin-bottom: 4px;
+        color: var(--cyan);
+        font-size: 12px;
+        font-weight: 900;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+    }
+
+    @media (max-width: 620px) {
+      .page {
+        width: min(100% - 24px, 1160px);
+      }
+
+      .hero {
+        min-height: auto;
+        padding-top: 34px;
+      }
+
+      .toc {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: clamp(42px, 15vw, 72px);
+      }
+
+      section {
+        padding: 52px 0;
+      }
+
+      .manifest-card,
+      .flow,
+      .callout,
+      .decision-panel {
+        padding: 20px;
+      }
+
+      .callout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html {
+        scroll-behavior: auto;
+      }
+
+      .toc a {
+        transition: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div>
+        <div class="topline">
+          <span class="mark">MK</span>
+          <span>MediKong repo split proposal</span>
+          <span>서비스와 배포 책임을 분리하기 위한 팀 제안서</span>
+        </div>
+
+        <h1>서비스 개발과 인프라 운영을 같은 repo에 묶어두지 않기.</h1>
+        <p class="hero-subtitle">
+          현재 구조를 한 번에 버리는 제안이 아닙니다. 앱, 배포 선언, 클라우드 인프라를 분리하고
+          로컬에서는 manifest repo로 하나의 작업공간처럼 다루자는 제안입니다.
+        </p>
+
+        <div class="hero-grid">
+          <div class="statement">
+            <strong>Proposal</strong>
+            <p>핵심 repo는 4개입니다. 하나는 작업공간을 묶는 manifest repo, 나머지 셋은 실제 작업 repo입니다.</p>
+          </div>
+          <nav class="toc" aria-label="문서 목차">
+            <a href="#why">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6l4 2"></path></svg>
+              왜 지금 분리하는가
+            </a>
+            <a href="#structure">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+              4개 repo 구조
+            </a>
+            <a href="#flow">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path><path d="m13 6 6 6-6 6"></path></svg>
+              개발과 배포 흐름
+            </a>
+            <a href="#migration">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5"></path><path d="M4 19h16"></path><path d="m7 16 4-4 3 3 5-7"></path></svg>
+              단계적 이주안
+            </a>
+          </nav>
+        </div>
+      </div>
+    </header>
+
+    <section id="why">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Problem</p>
+          <h2>지금 고민은 repo 구조 문제가 아니라 책임 경계 문제입니다.</h2>
+        </div>
+        <p class="lead">
+          서비스 코드는 "어떻게 동작하는가"를 설명하고, 배포와 인프라는 "어디에, 얼마나, 어떤 정책으로 운영되는가"를 설명합니다.
+          이 둘이 계속 같은 변경 단위로 묶이면 심화 프로젝트로 갈수록 리뷰와 배포 판단이 흐려집니다.
+        </p>
+      </div>
+
+      <div class="problem-grid">
+        <article class="problem">
+          <b>서비스 변경과 인프라 변경의 속도가 다릅니다.</b>
+          <p>Python 서비스는 자주 바뀌지만 VPC, IAM, 클러스터, 배포 정책은 더 느리고 신중하게 바뀌어야 합니다.</p>
+        </article>
+        <article class="problem">
+          <b>리뷰 관점이 섞입니다.</b>
+          <p>API 코드 리뷰와 Terraform, Argo CD, HPA, NetworkPolicy 리뷰는 보는 사람이 달라야 할 수 있습니다.</p>
+        </article>
+        <article class="problem">
+          <b>앱 개발자가 배포 세부를 계속 의식하게 됩니다.</b>
+          <p>앱 개발자는 테스트와 이미지 빌드까지만 책임지고, 배포 반영은 GitOps 흐름이 맡는 구조가 더 좋습니다.</p>
+        </article>
+        <article class="problem">
+          <b>심화 과제가 repo 경계를 요구합니다.</b>
+          <p>독립 배포, DevSecOps, 관측성, 권한 분리, 환경별 운영 정책은 repo 구조에서도 분리되어야 설명하기 쉽습니다.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="structure">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Target Structure</p>
+          <h2>repo는 4개. 로컬에서는 하나의 프로젝트처럼.</h2>
+        </div>
+        <p class="lead">
+          GitHub상 책임은 분리하고, 로컬 개발자는 manifest repo 하나를 기준으로 전체 작업공간을 받습니다.
+          manifest repo는 코드를 소유하지 않고 repo 목록과 bootstrap 도구만 관리합니다.
+        </p>
+      </div>
+
+      <div class="repo-map">
+        <article class="manifest-card">
+          <div class="repo-title">
+            <span class="repo-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16"></path><path d="M4 12h16"></path><path d="M4 18h10"></path></svg>
+            </span>
+            medikong-workspace
+          </div>
+          <p>repo manifest, bootstrap, update, status 스크립트를 제공하는 진입점입니다. 팀원은 이 repo 하나로 전체 작업공간을 구성합니다.</p>
+        </article>
+
+        <div class="repo-row">
+          <article class="repo-card services">
+            <div class="repo-title">
+              <span class="repo-icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 9-4 3 4 3"></path><path d="m16 9 4 3-4 3"></path><path d="m14 5-4 14"></path></svg>
+              </span>
+              medikong-services
+            </div>
+            <p>서비스가 어떻게 돌아가는지를 관리합니다.</p>
+            <ul>
+              <li>FastAPI 서비스 코드</li>
+              <li>dashboard 화면</li>
+              <li>pytest와 E2E 테스트</li>
+              <li>Docker image build</li>
+              <li>ECR push 또는 image publish</li>
+            </ul>
+          </article>
+
+          <article class="repo-card gitops">
+            <div class="repo-title">
+              <span class="repo-icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3v6"></path><path d="M18 15v6"></path><path d="M6 9a6 6 0 0 0 6 6h6"></path><path d="M18 15l-3-3"></path><path d="M18 15l-3 3"></path></svg>
+              </span>
+              medikong-gitops
+            </div>
+            <p>서비스가 어디에 어떻게 배포되는지를 관리합니다.</p>
+            <ul>
+              <li>Kubernetes base와 overlays</li>
+              <li>Argo CD Application</li>
+              <li>image tag와 replica 정책</li>
+              <li>HPA, PDB, NetworkPolicy</li>
+              <li>observability와 배포 runbook</li>
+            </ul>
+          </article>
+
+          <article class="repo-card infra">
+            <div class="repo-title">
+              <span class="repo-icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18h16"></path><path d="M7 18V9l5-4 5 4v9"></path><path d="M9 18v-6h6v6"></path></svg>
+              </span>
+              medikong-infra
+            </div>
+            <p>클러스터와 클라우드 자원 자체를 관리합니다.</p>
+            <ul>
+              <li>Terraform</li>
+              <li>AWS VPC, EC2/EKS, ECR, IAM</li>
+              <li>Ansible과 kubeadm 구성</li>
+              <li>로컬 Kubernetes lab</li>
+              <li>인프라 운영 문서</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="flow">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Operating Model</p>
+          <h2>앱 repo는 이미지를 만들고, GitOps repo가 배포를 결정합니다.</h2>
+        </div>
+        <p class="lead">
+          Python 서비스 개발자는 브랜치, PR, 테스트, 이미지 publish까지만 신경 씁니다.
+          운영 환경에 반영할지, 어떤 tag를 어느 환경에 올릴지는 GitOps repo에서 추적합니다.
+        </p>
+      </div>
+
+      <div class="flow" aria-label="서비스 개발에서 배포까지의 흐름">
+        <div class="flow-row">
+          <div class="flow-step">
+            <span>01</span>
+            <b>서비스 코드 변경</b>
+            <p>개발자는 medikong-services에서 브랜치를 만들고 Python 서비스 코드를 수정합니다.</p>
+          </div>
+          <div class="arrow">-&gt;</div>
+          <div class="flow-step">
+            <span>02</span>
+            <b>테스트와 이미지 publish</b>
+            <p>CI가 pytest, E2E, image build를 실행하고 ECR 또는 registry에 immutable tag를 push합니다.</p>
+          </div>
+          <div class="arrow">-&gt;</div>
+          <div class="flow-step">
+            <span>03</span>
+            <b>GitOps PR 생성</b>
+            <p>자동화가 medikong-gitops의 image tag 변경 PR을 만들고, 배포 변경은 별도 리뷰를 받습니다.</p>
+          </div>
+        </div>
+        <div class="flow-row">
+          <div class="flow-step">
+            <span>04</span>
+            <b>배포 선언 merge</b>
+            <p>GitOps repo의 overlay가 업데이트되면 해당 환경의 원하는 상태가 Git에 기록됩니다.</p>
+          </div>
+          <div class="arrow">-&gt;</div>
+          <div class="flow-step">
+            <span>05</span>
+            <b>Argo CD sync</b>
+            <p>Argo CD는 앱 source repo가 아니라 medikong-gitops를 바라보고 클러스터 상태를 맞춥니다.</p>
+          </div>
+          <div class="arrow">-&gt;</div>
+          <div class="flow-step">
+            <span>06</span>
+            <b>운영 검증</b>
+            <p>관측성, smoke test, rollback 기준이 GitOps repo의 runbook과 함께 관리됩니다.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Responsibility Split</p>
+          <h2>두 질문을 repo 수준에서 분리합니다.</h2>
+        </div>
+        <p class="lead">
+          좋은 분리는 폴더를 나누는 것이 아니라 의사결정 위치를 나누는 것입니다.
+          아래 기준으로 PR 책임자, CI, 승인 기준을 다르게 가져갈 수 있습니다.
+        </p>
+      </div>
+
+      <table class="split-table">
+        <thead>
+          <tr>
+            <th>질문</th>
+            <th>관리 위치</th>
+            <th>예시</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td data-label="질문">서비스가 어떻게 돌아가는가?</td>
+            <td data-label="관리 위치">medikong-services</td>
+            <td data-label="예시">API, 비즈니스 로직, 테스트, Dockerfile, 의존성, health check 구현</td>
+          </tr>
+          <tr>
+            <td data-label="질문">서비스가 어디에 배포되는가?</td>
+            <td data-label="관리 위치">medikong-gitops</td>
+            <td data-label="예시">local, aws-smoke, staging, prod overlay와 Argo CD Application</td>
+          </tr>
+          <tr>
+            <td data-label="질문">얼마나 배포되는가?</td>
+            <td data-label="관리 위치">medikong-gitops</td>
+            <td data-label="예시">replica, HPA, resource request, PDB, rollout 정책</td>
+          </tr>
+          <tr>
+            <td data-label="질문">클러스터는 무엇으로 구성되는가?</td>
+            <td data-label="관리 위치">medikong-infra</td>
+            <td data-label="예시">Terraform, AWS 네트워크, IAM, ECR, kubeadm, Ansible</td>
+          </tr>
+          <tr>
+            <td data-label="질문">팀원은 어디서 시작하는가?</td>
+            <td data-label="관리 위치">medikong-workspace</td>
+            <td data-label="예시">manifest.yaml, bootstrap.sh, update.sh, status.sh</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Benefits</p>
+          <h2>분리했을 때 얻는 것.</h2>
+        </div>
+        <p class="lead">
+          가장 큰 이점은 앱 개발자와 플랫폼 운영자가 같은 repo에서 서로의 발을 밟지 않게 되는 것입니다.
+          심화 프로젝트의 독립 배포, DevSecOps, 관측성 과제를 설명하기도 쉬워집니다.
+        </p>
+      </div>
+
+      <div class="benefit-grid">
+        <article class="benefit">
+          <h3>독립 배포</h3>
+          <p>한 서비스의 코드 변경이 곧바로 클러스터 설정 변경이 되지 않습니다.</p>
+          <ul>
+            <li>서비스별 release tag 관리</li>
+            <li>GitOps PR 기반 배포 승인</li>
+            <li>rollback 지점 명확화</li>
+          </ul>
+        </article>
+        <article class="benefit">
+          <h3>권한 분리</h3>
+          <p>앱 repo 권한과 AWS/Terraform 권한을 다르게 운영할 수 있습니다.</p>
+          <ul>
+            <li>인프라 변경 리뷰 강화</li>
+            <li>secret 접근 범위 축소</li>
+            <li>운영 사고 반경 축소</li>
+          </ul>
+        </article>
+        <article class="benefit">
+          <h3>학습 주제 강화</h3>
+          <p>심화 프로젝트에서 요구하는 운영 관점을 repo 구조로도 보여줄 수 있습니다.</p>
+          <ul>
+            <li>GitOps와 Argo CD</li>
+            <li>환경별 overlay 전략</li>
+            <li>관측성과 보안 정책</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Trade-offs</p>
+          <h2>분리하면 생기는 비용도 있습니다.</h2>
+        </div>
+        <p class="lead">
+          repo를 나누면 구조는 명확해지지만, 조합을 관리하는 비용이 새로 생깁니다.
+          그래서 manifest repo와 자동화된 GitOps PR이 같이 필요합니다.
+        </p>
+      </div>
+
+      <div class="risk-grid">
+        <article class="risk">
+          <h3>여러 repo를 함께 바꿔야 할 수 있음</h3>
+          <p>새 서비스 추가, 포트 변경, env var 추가는 services와 gitops를 함께 건드릴 수 있습니다.</p>
+          <ul>
+            <li>해결: 서비스 배포 계약 문서화</li>
+            <li>해결: GitOps PR 자동 생성</li>
+          </ul>
+        </article>
+        <article class="risk">
+          <h3>버전 조합 관리가 필요함</h3>
+          <p>어떤 서비스 image tag가 어떤 manifest와 맞는지 추적해야 합니다.</p>
+          <ul>
+            <li>해결: immutable image tag 사용</li>
+            <li>해결: manifest repo에 repo 조합 기록</li>
+          </ul>
+        </article>
+        <article class="risk">
+          <h3>로컬 진입이 복잡해질 수 있음</h3>
+          <p>한 repo clone으로 끝나지 않기 때문에 초기 진입점이 필요합니다.</p>
+          <ul>
+            <li>해결: medikong-workspace bootstrap 제공</li>
+            <li>해결: 전체 repo status 명령 제공</li>
+          </ul>
+        </article>
+        <article class="risk">
+          <h3>E2E 검증 위치가 애매해질 수 있음</h3>
+          <p>앱 테스트와 실제 배포 manifest 검증을 어떤 CI에서 묶을지 정해야 합니다.</p>
+          <ul>
+            <li>해결: services CI는 앱 검증</li>
+            <li>해결: gitops CI는 manifest 렌더링과 배포 smoke 검증</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="migration">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Migration Plan</p>
+          <h2>현재 repo는 보존하고, 옆에 새 구조를 세웁니다.</h2>
+        </div>
+        <p class="lead">
+          한 번에 갈아엎지 않습니다. 현재 repo는 기준점으로 두고, 새 repo들을 만든 뒤 CI, 이미지, Argo CD sync까지 검증되면
+          기존 repo를 legacy reference로 전환합니다.
+        </p>
+      </div>
+
+      <div class="timeline-wrap">
+        <article class="timeline">
+          <h3>services 먼저 분리</h3>
+          <p>Python 서비스 코드, dashboard, 테스트, image build workflow를 옮깁니다.</p>
+          <ul>
+            <li>pytest 유지</li>
+            <li>E2E 유지</li>
+            <li>ECR push 검증</li>
+          </ul>
+        </article>
+        <article class="timeline">
+          <h3>gitops 분리</h3>
+          <p>k8s manifest와 Argo CD Application을 옮기고 Argo CD의 repoURL을 전환합니다.</p>
+          <ul>
+            <li>overlay 정리</li>
+            <li>tag update PR</li>
+            <li>sync smoke test</li>
+          </ul>
+        </article>
+        <article class="timeline">
+          <h3>infra 분리</h3>
+          <p>Terraform, Ansible, 로컬 Kubernetes lab을 운영 repo로 분리합니다.</p>
+          <ul>
+            <li>권한 정리</li>
+            <li>secret 제외 확인</li>
+            <li>bootstrap runbook</li>
+          </ul>
+        </article>
+        <article class="timeline">
+          <h3>workspace 추가</h3>
+          <p>repo manifest와 bootstrap 스크립트로 로컬 작업공간을 하나처럼 묶습니다.</p>
+          <ul>
+            <li>clone 자동화</li>
+            <li>update/status 명령</li>
+            <li>팀 온보딩 문서</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="callout">
+        <span class="mini-icon">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h18"></path><path d="m15 6 6 6-6 6"></path><path d="M3 6v12"></path></svg>
+        </span>
+        <div>
+          <b>제안의 핵심</b>
+          <p>GitHub repo는 책임별로 나누고, 로컬 경험은 manifest repo로 다시 하나처럼 묶습니다.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="decision">
+        <div class="decision-panel">
+          <p class="eyebrow">For Discussion</p>
+          <h2>팀에서 먼저 합의할 질문.</h2>
+          <p>
+            이 구조는 기술보다 운영 약속이 중요합니다. repo를 나누기 전에 어떤 변경을 누가 승인하고,
+            어떤 자동화가 어떤 repo를 수정할 수 있는지 먼저 정해야 합니다.
+          </p>
+        </div>
+        <div class="question-list">
+          <div class="question">서비스 image tag 규칙은 무엇으로 할 것인가? commit SHA, semantic version, release tag 중 선택</div>
+          <div class="question">GitOps repo의 환경 이름은 어떻게 둘 것인가? local, aws-smoke, staging, prod 등</div>
+          <div class="question">앱 repo CI가 GitOps repo PR을 자동 생성해도 되는가?</div>
+          <div class="question">인프라 repo의 Terraform apply 권한은 누가 가질 것인가?</div>
+          <div class="question">기존 cloudnative_study repo는 언제 archive 또는 legacy reference로 바꿀 것인가?</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="page">
+    MediKong repo split proposal. 이 문서는 심화 프로젝트의 독립 배포, GitOps, DevSecOps, 관측성 확장을 위한 구조 제안입니다.
+  </footer>
+</body>
+</html>
