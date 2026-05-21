@@ -1,0 +1,203 @@
+"$schema": "../linear-workplan.schema.json"
+version: 1
+defaults:
+  team: Medikong
+  project: Cloud Native Study Planning
+  state: Backlog
+  priority: 3
+  labels:
+  - prd
+milestones:
+- id: milestone-6-resilience-experiment
+  title: 6차 - 장애 대응과 실험 측정
+  goal: 장애 격리, 부하 테스트, 클러스터 시나리오별 메트릭 측정을 수행한다.
+tasks:
+- local_id: resilience.failure-isolation-design
+  title: 서비스 장애 격리 시나리오 설계
+  type: design
+  milestone: milestone-6-resilience-experiment
+  labels:
+  - resilience
+  - planning
+  depends_on:
+  - planning.communication-pattern
+  - platform.gateway-auth-routing
+  description: |
+    ## 목표
+    의존 서비스 다운 시 부분 응답 또는 장애 전파 차단이 필요한 시나리오를 설계한다.
+
+    ## 완료 조건
+    - 장애 격리 대상 호출이 정리되어 있다.
+    - 부분 응답 또는 fallback 기준이 문서화되어 있다.
+    - 실제 장애 주입 검증 계획이 정리되어 있다.
+
+    ## 남길 증거
+    - 장애 격리 시나리오 문서
+    - 검증 계획
+  done_when:
+  - 장애 격리 시나리오와 fallback 기준이 문서화되어 있다.
+  evidence:
+  - 장애 격리 시나리오 문서
+- local_id: resilience.circuit-breaker-fallback
+  title: Circuit Breaker와 Fallback 검증
+  type: implementation
+  milestone: milestone-6-resilience-experiment
+  labels:
+  - resilience
+  - experiment
+  depends_on:
+  - resilience.failure-isolation-design
+  - quality.e2e-postman
+  description: |
+    ## 목표
+    처방 서비스 장애 시 환자기록 서비스가 처방 정보 없이도 부분 응답을 반환하는 흐름을 구현하고 검증한다.
+
+    ## 완료 조건
+    - Circuit Breaker 또는 fallback 로직이 적용되어 있다.
+    - 의존 서비스 장애 주입 후 부분 응답이 확인된다.
+    - 장애 전후 응답 시간이 기록되어 있다.
+
+    ## 남길 증거
+    - 장애 주입 테스트 결과
+    - 부분 응답 캡처
+  done_when:
+  - 장애 주입 후 부분 응답이 검증되어 있다.
+  - 장애 전후 응답 시간이 기록되어 있다.
+  evidence:
+  - 장애 주입 테스트 결과
+  - 부분 응답 캡처
+  metrics:
+  - fallback_success_rate
+  - degraded_latency
+- local_id: resilience.gateway-rate-limit
+  title: Gateway Rate Limiting 구성과 검증
+  type: implementation
+  milestone: milestone-6-resilience-experiment
+  labels:
+  - gateway
+  - resilience
+  depends_on:
+  - platform.gateway-auth-routing
+  description: |
+    ## 목표
+    서비스별 분당 요청 제한을 Gateway에 적용하고 제한 초과 동작을 검증한다.
+
+    ## 완료 조건
+    - 서비스별 rate limit 정책이 설정되어 있다.
+    - 제한 초과 요청이 의도한 상태 코드로 차단된다.
+    - 정상 요청에는 영향이 없음을 확인한다.
+
+    ## 남길 증거
+    - Rate limit 설정
+    - 제한 초과 요청 결과
+  done_when:
+  - 제한 초과 요청 차단이 검증되어 있다.
+  evidence:
+  - Rate limit 설정
+  - 제한 초과 요청 결과
+  metrics:
+  - rate_limited_requests
+- local_id: experiment.cluster-load-metrics
+  title: 클러스터 구성 시나리오별 부하 테스트와 메트릭 비교
+  type: experiment
+  milestone: milestone-6-resilience-experiment
+  priority: 2
+  labels:
+  - experiment
+  - metrics
+  - cluster
+  depends_on:
+  - planning.experiment-scenarios
+  - quality.e2e-postman
+  - observability.prometheus-grafana
+  - tracing.otel-tempo-jaeger
+  description: |
+    ## 목표
+    클러스터 구성 시나리오별로 동일한 부하를 실행하고 성능과 리소스 사용량을 비교한다.
+
+    ## 완료 조건
+    - 최소 2개 이상의 클러스터 구성 시나리오를 비교한다.
+    - p95 latency, error rate, CPU/Memory 사용량을 기록한다.
+    - 실험 결과와 해석을 문서로 남긴다.
+
+    ## 남길 증거
+    - 실험 결과 CSV
+    - Grafana 스크린샷
+    - 실험 요약 문서
+  done_when:
+  - 최소 2개 이상의 클러스터 구성 결과가 비교되어 있다.
+  - 핵심 메트릭이 수치로 기록되어 있다.
+  evidence:
+  - 실험 결과 CSV
+  - Grafana 스크린샷
+  - 실험 요약 문서
+  metrics:
+  - p95_latency
+  - error_rate
+  - node_cpu_usage
+  - node_memory_usage
+- local_id: experiment.failure-injection
+  title: 장애 주입 실험과 복구 지표 측정
+  type: experiment
+  milestone: milestone-6-resilience-experiment
+  labels:
+  - experiment
+  - chaos
+  - resilience
+  depends_on:
+  - resilience.circuit-breaker-fallback
+  - observability.logs-alerts
+  - tracing.otel-tempo-jaeger
+  description: |
+    ## 목표
+    의존 서비스 중단, Pod 삭제, 네트워크 차단 같은 장애를 주입하고 fallback, trace, alert, 복구 시간을 함께 측정한다.
+
+    ## 완료 조건
+    - 장애 주입 시나리오별 기대 동작이 정리되어 있다.
+    - 장애 중 fallback 또는 오류 응답이 의도대로 발생한다.
+    - 복구 시간, alert 발생 시간, trace 가시성이 기록되어 있다.
+
+    ## 남길 증거
+    - 장애 주입 실험 로그
+    - Grafana/Tempo 스크린샷
+    - 복구 지표 표
+  done_when:
+  - 최소 2개 장애 시나리오가 실행되고 결과가 기록되어 있다.
+  - 알림, trace, fallback 동작이 같은 실험 결과에 함께 남아 있다.
+  evidence:
+  - 장애 주입 실험 로그
+  - 복구 지표 표
+  metrics:
+  - mean_time_to_detect_seconds
+  - mean_time_to_recover_seconds
+  - fallback_success_rate
+- local_id: experiment.kafka-lag-alert
+  title: Kafka Consumer Lag 수집과 알림 검증
+  type: experiment
+  milestone: milestone-6-resilience-experiment
+  labels:
+  - kafka
+  - observability
+  - alerting
+  depends_on:
+  - platform.kafka-events
+  - observability.prometheus-grafana
+  description: |
+    ## 목표
+    Kafka consumer lag을 수집하고 이벤트 처리 지연을 조기 감지할 수 있는 알림을 검증한다.
+
+    ## 완료 조건
+    - Kafka lag 지표가 Prometheus에 수집된다.
+    - lag 증가 상황을 재현하고 알림이 발생한다.
+    - 알림 기준이 문서화되어 있다.
+
+    ## 남길 증거
+    - Prometheus lag query 결과
+    - Slack 알림 캡처
+  done_when:
+  - Kafka lag 지표와 알림이 검증되어 있다.
+  evidence:
+  - Prometheus lag query 결과
+  - Slack 알림 캡처
+  metrics:
+  - kafka_consumer_lag

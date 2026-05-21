@@ -1,0 +1,294 @@
+"$schema": "../linear-workplan.schema.json"
+version: 1
+defaults:
+  team: Medikong
+  project: Cloud Native Study Planning
+  state: Backlog
+  priority: 3
+  labels:
+  - prd
+milestones:
+- id: milestone-2-cloud-platform
+  title: 2차 - 클라우드 플랫폼 기반 구성
+  goal: AWS 네트워크, IAM, 컨테이너 레지스트리, Kubernetes 클러스터, 외부 진입점, 데이터/스토리지 기반을 준비한다.
+tasks:
+- local_id: cloud.platform-architecture
+  title: AWS 클라우드 플랫폼 목표 아키텍처 결정
+  type: design
+  milestone: milestone-2-cloud-platform
+  labels:
+  - cloud
+  - aws
+  - architecture
+  depends_on:
+  - planning.service-boundary
+  - planning.data-ownership
+  - planning.experiment-scenarios
+  description: |
+    ## 목표
+    PRD 요구사항을 AWS 위에서 어떤 구성으로 검증할지 목표 아키텍처를 정한다.
+
+    ## 완료 조건
+    - EKS 또는 kubeadm on EC2 같은 Kubernetes 운영 방식을 결정한다.
+    - RDS/NoSQL, S3, ECR, Load Balancer, Route 53, IAM 사용 범위가 정리되어 있다.
+    - 로컬 실험과 AWS 실험의 차이가 문서화되어 있다.
+
+    ## 남길 증거
+    - AWS 목표 아키텍처 문서
+    - 로컬/AWS 차이점 표
+  done_when:
+  - AWS 기반 목표 아키텍처와 서비스 사용 범위가 정리되어 있다.
+  - 로컬 실험과 AWS 실험의 차이가 문서화되어 있다.
+  evidence:
+  - AWS 목표 아키텍처 문서
+  - 로컬/AWS 차이점 표
+- local_id: cloud.network-foundation
+  title: AWS VPC와 네트워크 기반 구성
+  type: ops
+  milestone: milestone-2-cloud-platform
+  labels:
+  - cloud
+  - aws
+  - networking
+  depends_on:
+  - cloud.platform-architecture
+  description: |
+    ## 목표
+    클러스터, 데이터베이스, 게이트웨이가 올라갈 AWS 네트워크 기반을 구성한다.
+
+    ## 완료 조건
+    - VPC, public/private subnet, route table 구성이 정리되어 있다.
+    - DB는 private subnet에 격리된다.
+    - 필요한 VPC Endpoint와 Security Group 기준이 정리되어 있다.
+
+    ## 남길 증거
+    - VPC 구성 결과
+    - subnet/security group 설계
+  done_when:
+  - VPC와 subnet 구성이 준비되어 있다.
+  - DB 격리와 외부 진입 경로 기준이 정리되어 있다.
+  evidence:
+  - VPC 구성 결과
+  - subnet/security group 설계
+- local_id: cloud.terraform-foundation-hardening
+  title: Terraform AWS 기반 구성 하드닝
+  type: ops
+  milestone: milestone-2-cloud-platform
+  labels:
+  - cloud
+  - aws
+  - terraform
+  - security
+  depends_on:
+  - cloud.network-foundation
+  - cloud.iam-oidc-secrets
+  description: |
+    ## 목표
+    현재 Terraform 초안을 심화 프로젝트 운영 기준에 맞게 private subnet, backend, 변수/secret, tag, plan 검증 기준으로 보강한다.
+
+    ## 완료 조건
+    - default VPC 의존 여부와 private subnet 설계가 재검토되어 있다.
+    - 장기 access key 대신 profile 또는 OIDC 기반 실행 기준이 정리되어 있다.
+    - `terraform fmt/validate/plan` 증거와 remote state 적용 여부가 정리되어 있다.
+
+    ## 남길 증거
+    - Terraform plan 결과
+    - VPC/subnet 변경 결정 기록
+    - state/secret 관리 기준
+  done_when:
+  - Terraform 실행 방식과 state/secret 기준이 문서화되어 있다.
+  - AWS 네트워크와 보안 기준이 plan 결과로 검증되어 있다.
+  evidence:
+  - terraform plan 결과
+  - state/secret 관리 기준
+- local_id: cloud.iam-oidc-secrets
+  title: IAM, OIDC, Secret 관리 기준 구성
+  type: security
+  milestone: milestone-2-cloud-platform
+  labels:
+  - cloud
+  - aws
+  - security
+  - iam
+  depends_on:
+  - cloud.platform-architecture
+  description: |
+    ## 목표
+    CI/CD, 클러스터, 애플리케이션이 사용할 AWS 권한과 Secret 관리 기준을 정의한다.
+
+    ## 완료 조건
+    - GitHub Actions OIDC 또는 동등한 배포 권한 방식이 정리되어 있다.
+    - 클러스터/노드/서비스에 필요한 IAM 역할이 분리되어 있다.
+    - Secret Manager 또는 External Secrets 적용 여부가 결정되어 있다.
+
+    ## 남길 증거
+    - IAM 역할 목록
+    - Secret 관리 결정 기록
+  done_when:
+  - CI/CD와 클러스터 권한 경계가 정리되어 있다.
+  - Secret 관리 기준이 문서화되어 있다.
+  evidence:
+  - IAM 역할 목록
+  - Secret 관리 결정 기록
+- local_id: cloud.kubernetes-cluster
+  title: AWS Kubernetes 클러스터 구성
+  type: ops
+  milestone: milestone-2-cloud-platform
+  labels:
+  - cloud
+  - aws
+  - cluster
+  - kubernetes
+  depends_on:
+  - cloud.network-foundation
+  - cloud.iam-oidc-secrets
+  - cloud.terraform-foundation-hardening
+  description: |
+    ## 목표
+    AWS 위에 MSA와 관측성 스택을 실행할 Kubernetes 클러스터를 구성한다.
+
+    ## 완료 조건
+    - 클러스터 control plane과 node group 또는 EC2 node 구성이 준비되어 있다.
+    - 클러스터 접근 권한과 kubeconfig 관리 기준이 정리되어 있다.
+    - 관측성/메시징/서비스 메시를 올릴 수 있는 최소 리소스 기준이 정리되어 있다.
+
+    ## 남길 증거
+    - 클러스터 생성 결과
+    - node 상태 캡처
+    - 리소스 용량 기준
+  done_when:
+  - AWS Kubernetes 클러스터가 준비되어 있다.
+  - node 상태와 접근 권한 기준이 확인되어 있다.
+  evidence:
+  - 클러스터 생성 결과
+  - kubectl get nodes 결과
+  metrics:
+  - node_ready_count
+  - node_cpu_capacity
+  - node_memory_capacity
+- local_id: cloud.registry-release-path
+  title: ECR 이미지 레지스트리와 릴리스 경로 구성
+  type: ops
+  milestone: milestone-2-cloud-platform
+  labels:
+  - cloud
+  - aws
+  - ecr
+  - delivery
+  depends_on:
+  - cloud.iam-oidc-secrets
+  - cloud.kubernetes-cluster
+  description: |
+    ## 목표
+    서비스 이미지를 ECR에 push하고 클러스터가 이미지를 pull할 수 있는 릴리스 경로를 구성한다.
+
+    ## 완료 조건
+    - 서비스별 ECR repository 또는 repository 정책이 정리되어 있다.
+    - CI에서 이미지 build/push가 가능하다.
+    - 클러스터가 ECR 이미지를 pull할 수 있다.
+    - GitOps 또는 manifest update 방식이 정리되어 있다.
+
+    ## 남길 증거
+    - ECR repository 목록
+    - 이미지 push 결과
+    - 클러스터 image pull 검증 결과
+  done_when:
+  - 이미지 push와 cluster pull이 검증되어 있다.
+  - 릴리스 manifest 갱신 방식이 정리되어 있다.
+  evidence:
+  - ECR repository 목록
+  - 이미지 push 결과
+  - image pull 검증 결과
+- local_id: cloud.ingress-dns-tls
+  title: AWS Load Balancer, DNS, TLS 진입점 구성
+  type: ops
+  milestone: milestone-2-cloud-platform
+  labels:
+  - cloud
+  - aws
+  - networking
+  - gateway
+  depends_on:
+  - cloud.network-foundation
+  - cloud.kubernetes-cluster
+  description: |
+    ## 목표
+    외부 사용자가 Gateway로 접근할 수 있도록 Load Balancer, DNS, TLS 진입점을 구성한다.
+
+    ## 완료 조건
+    - Load Balancer 또는 Ingress Controller 연동 방식이 정리되어 있다.
+    - Route 53/DNS와 TLS 인증서 적용 기준이 정리되어 있다.
+    - Gateway 헬스체크와 외부 접근 테스트가 가능하다.
+
+    ## 남길 증거
+    - 외부 접근 URL
+    - TLS/DNS 설정 결과
+    - Gateway 헬스체크 결과
+  done_when:
+  - 외부 진입점이 준비되어 있다.
+  - DNS/TLS 적용 기준과 헬스체크 결과가 남아 있다.
+  evidence:
+  - 외부 접근 URL
+  - TLS/DNS 설정 결과
+- local_id: cloud.data-storage-platform
+  title: AWS 데이터베이스와 Object Storage 기반 구성
+  type: ops
+  milestone: milestone-2-cloud-platform
+  labels:
+  - cloud
+  - aws
+  - data
+  - storage
+  depends_on:
+  - planning.data-ownership
+  - cloud.network-foundation
+  - cloud.terraform-foundation-hardening
+  description: |
+    ## 목표
+    RDS/NoSQL 클러스터링, 백업/복구, Object Storage, 정적 웹 호스팅 기반을 준비한다.
+
+    ## 완료 조건
+    - 서비스별 DB를 AWS에서 어떻게 운영할지 결정되어 있다.
+    - private subnet 격리와 백업/복구 정책이 정리되어 있다.
+    - S3 또는 동등한 Object Storage와 정적 호스팅 방식이 정리되어 있다.
+
+    ## 남길 증거
+    - DB 운영 결정 기록
+    - 백업/복구 정책
+    - Object Storage 설정 결과
+  done_when:
+  - AWS 데이터/스토리지 운영 방식이 정리되어 있다.
+  - 백업/복구 기준이 문서화되어 있다.
+  evidence:
+  - DB 운영 결정 기록
+  - 백업/복구 정책
+  - Object Storage 설정 결과
+- local_id: cloud.observability-capacity
+  title: AWS 관측성 스택 리소스와 접근 경로 준비
+  type: ops
+  milestone: milestone-2-cloud-platform
+  labels:
+  - cloud
+  - aws
+  - observability
+  depends_on:
+  - cloud.kubernetes-cluster
+  - cloud.ingress-dns-tls
+  description: |
+    ## 목표
+    Prometheus, Grafana, Loki, Tempo 같은 관측성 스택을 AWS 클러스터에서 운영할 리소스와 접근 방식을 정한다.
+
+    ## 완료 조건
+    - 관측성 스택 배치와 리소스 요청 기준이 정리되어 있다.
+    - 대시보드 접근 방식과 인증 방식이 정리되어 있다.
+    - 메트릭 저장 용량과 보존 기간 기준이 정리되어 있다.
+
+    ## 남길 증거
+    - 관측성 리소스 산정표
+    - Grafana 접근 경로 결정 기록
+  done_when:
+  - 관측성 스택 리소스 기준과 접근 방식이 정리되어 있다.
+  - 메트릭 보존 기준이 문서화되어 있다.
+  evidence:
+  - 관측성 리소스 산정표
+  - Grafana 접근 경로 결정 기록

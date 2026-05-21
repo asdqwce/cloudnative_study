@@ -1,0 +1,224 @@
+"$schema": "../linear-workplan.schema.json"
+version: 1
+defaults:
+  team: Medikong
+  project: Cloud Native Study Planning
+  state: Backlog
+  priority: 3
+  labels:
+  - prd
+milestones:
+- id: milestone-4-basic-platform
+  title: 4차 - 기본 MSA 플랫폼 구성
+  goal: Kubernetes 기반 서비스 디스커버리, 게이트웨이, 데이터 저장소, 이벤트 흐름을 구성한다.
+tasks:
+- local_id: platform.cluster-baseline
+  title: Kubernetes 기본 클러스터와 배포 기반 검증
+  type: ops
+  milestone: milestone-4-basic-platform
+  labels:
+  - cluster
+  - ops
+  depends_on:
+  - planning.experiment-scenarios
+  - cloud.kubernetes-cluster
+  - cloud.registry-release-path
+  - gitops.argocd-app-alignment
+  description: |
+    ## 목표
+    Kubernetes 클러스터, namespace, 기본 배포 경로를 검증해 이후 MSA 배포의 기반을 만든다.
+
+    ## 완료 조건
+    - 클러스터 node가 Ready 상태다.
+    - 서비스별 namespace가 준비되어 있다.
+    - 기본 배포와 롤백 흐름을 설명할 수 있다.
+
+    ## 남길 증거
+    - node 상태 캡처
+    - namespace 목록
+    - 배포 검증 로그
+  done_when:
+  - 클러스터와 namespace가 정상 준비되어 있다.
+  - 기본 배포 검증 결과가 남아 있다.
+  evidence:
+  - kubectl get nodes 결과
+  - kubectl get namespaces 결과
+  metrics:
+  - node_ready_count
+- local_id: platform.service-discovery
+  title: ClusterIP와 DNS 기반 서비스 디스커버리 검증
+  type: implementation
+  milestone: milestone-4-basic-platform
+  labels:
+  - kubernetes
+  - networking
+  depends_on:
+  - platform.cluster-baseline
+  description: |
+    ## 목표
+    Kubernetes ClusterIP와 DNS를 통해 서비스 간 내부 통신이 가능한지 검증한다.
+
+    ## 완료 조건
+    - 서비스별 ClusterIP Service가 생성되어 있다.
+    - 서비스 간 내부 DNS 호출이 성공한다.
+    - 실패한 호출을 확인할 수 있는 기본 진단 방법이 정리되어 있다.
+
+    ## 남길 증거
+    - Service 목록
+    - 내부 호출 성공 로그
+  done_when:
+  - 서비스 간 내부 DNS 호출이 성공한다.
+  - 기본 진단 방법이 문서화되어 있다.
+  evidence:
+  - kubectl get svc 결과
+  - 내부 호출 성공 로그
+- local_id: platform.database-per-service
+  title: 서비스별 독립 데이터베이스 구성
+  type: implementation
+  milestone: milestone-4-basic-platform
+  labels:
+  - data
+  - kubernetes
+  depends_on:
+  - planning.data-ownership
+  - platform.cluster-baseline
+  - cloud.data-storage-platform
+  description: |
+    ## 목표
+    각 서비스가 자기 데이터베이스만 직접 접근하도록 독립 데이터베이스 구성을 준비한다.
+
+    ## 완료 조건
+    - 서비스별 DB가 분리되어 있다.
+    - 다른 서비스 DB를 직접 읽지 않는 원칙이 배포 구성과 문서에 반영되어 있다.
+    - 백업/복구 검토 항목이 남아 있다.
+
+    ## 남길 증거
+    - 서비스별 DB 연결 정보
+    - DB 분리 검증 기록
+  done_when:
+  - 서비스별 DB 분리가 확인되어 있다.
+  - 직접 DB 공유 금지 원칙이 문서화되어 있다.
+  evidence:
+  - 서비스별 DB 구성 표
+  - DB 연결 검증 로그
+- local_id: platform.gateway-auth-routing
+  title: API Gateway 라우팅과 JWT 인증 구성
+  type: implementation
+  milestone: milestone-4-basic-platform
+  labels:
+  - gateway
+  - security
+  - networking
+  depends_on:
+  - platform.service-discovery
+  - planning.communication-pattern
+  - cloud.ingress-dns-tls
+  description: |
+    ## 목표
+    Kong Gateway 또는 Nginx Ingress를 통해 외부 요청 라우팅과 JWT 인증 필터를 구성한다.
+
+    ## 완료 조건
+    - 서비스별 경로 라우팅이 동작한다.
+    - JWT 인증이 필요한 API에서 인증 필터가 동작한다.
+    - 인증 실패와 성공 케이스를 확인할 수 있다.
+
+    ## 남길 증거
+    - Gateway 라우팅 설정
+    - 인증 성공/실패 요청 결과
+  done_when:
+  - Gateway 라우팅과 JWT 인증이 정상 동작한다.
+  - 인증 검증 결과가 남아 있다.
+  evidence:
+  - Gateway 설정 파일
+  - 인증 요청 결과
+- local_id: platform.object-storage-static-hosting
+  title: Object Storage 연동과 정적 웹 호스팅 구성
+  type: implementation
+  milestone: milestone-4-basic-platform
+  labels:
+  - storage
+  - frontend
+  depends_on:
+  - cloud.data-storage-platform
+  description: |
+    ## 목표
+    PRD의 스토리지 요구사항에 맞춰 Object Storage 연동과 정적 웹 호스팅 구성을 검토하고 구현한다.
+
+    ## 완료 조건
+    - 정적 자산 배포 방식이 정리되어 있다.
+    - Object Storage 연동 방식이 문서화되어 있다.
+    - 필요 시 암호화와 lifecycle 관리 확장 항목이 남아 있다.
+
+    ## 남길 증거
+    - 정적 웹 호스팅 접근 결과
+    - 스토리지 구성 문서
+  done_when:
+  - 정적 웹 호스팅 접근이 확인되어 있다.
+  - Object Storage 연동 방식이 정리되어 있다.
+  evidence:
+  - 정적 웹 호스팅 접근 결과
+  - 스토리지 구성 문서
+- local_id: platform.kafka-events
+  title: Kafka 이벤트 통신 구성
+  type: implementation
+  milestone: milestone-4-basic-platform
+  labels:
+  - kafka
+  - messaging
+  depends_on:
+  - planning.communication-pattern
+  - platform.database-per-service
+  - platform.cluster-baseline
+  description: |
+    ## 목표
+    Kafka를 배포하고 예약/처방 이벤트를 통해 알림 서비스까지 이어지는 비동기 흐름을 구성한다.
+
+    ## 완료 조건
+    - Kafka가 StatefulSet 또는 동등한 운영 방식으로 배포되어 있다.
+    - `appointment-confirmed`, `prescription-issued` 이벤트가 발행된다.
+    - 알림 서비스가 이벤트를 소비한다.
+
+    ## 남길 증거
+    - Kafka pod 상태
+    - 이벤트 발행/소비 로그
+  done_when:
+  - 핵심 이벤트가 발행되고 소비된다.
+  - 이벤트 통신 검증 로그가 남아 있다.
+  evidence:
+  - Kafka pod 상태
+  - 이벤트 발행/소비 로그
+  metrics:
+  - kafka_topic_count
+- local_id: platform.k8sops-deploy-rollback-baseline
+  title: K8sOps 배포, 상태 확인, 롤백 기준선 정리
+  type: ops
+  milestone: milestone-4-basic-platform
+  labels:
+  - kubernetes
+  - k8sops
+  - rollback
+  depends_on:
+  - platform.cluster-baseline
+  - gitops.rollback-runbook
+  description: |
+    ## 목표
+    팀원이 앱 배포, 상태 확인, 문제 발생 시 롤백을 같은 절차로 수행할 수 있게 K8sOps 기준선을 정리한다.
+
+    ## 완료 조건
+    - `kubectl rollout status`, `kubectl get events`, `kubectl logs` 기반 확인 절차가 정리되어 있다.
+    - GitOps 롤백과 Kubernetes 긴급 롤백의 사용 기준이 문서화되어 있다.
+    - 배포 전후 필수 헬스체크가 서비스별로 정리되어 있다.
+
+    ## 남길 증거
+    - K8sOps runbook
+    - 배포/롤백 리허설 결과
+    - 서비스별 헬스체크 표
+  done_when:
+  - 배포, 상태 확인, 롤백 절차가 팀 공통 runbook으로 정리되어 있다.
+  - 서비스별 헬스체크와 장애 확인 명령이 문서화되어 있다.
+  evidence:
+  - K8sOps runbook
+  - 배포/롤백 리허설 결과
+  metrics:
+  - rollout_success_rate
+  - rollback_recovery_minutes

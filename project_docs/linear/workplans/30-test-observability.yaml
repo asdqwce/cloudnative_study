@@ -1,0 +1,205 @@
+"$schema": "../linear-workplan.schema.json"
+version: 1
+defaults:
+  team: Medikong
+  project: Cloud Native Study Planning
+  state: Backlog
+  priority: 3
+  labels:
+  - prd
+milestones:
+- id: milestone-5-test-observe
+  title: 5차 - 테스트와 관측성 확보
+  goal: 단위/E2E 테스트와 Prometheus/Grafana 기반 메트릭 확인 체계를 만든다.
+tasks:
+- local_id: quality.unit-tests-ci
+  title: Python 서비스 단위 테스트와 CI 자동 실행
+  type: test
+  milestone: milestone-5-test-observe
+  labels:
+  - test
+  - ci
+  depends_on:
+  - github.actions-ci-baseline
+  - planning.python-service-design
+  description: |
+    ## 목표
+    각 Python 서비스의 단위 테스트를 작성하고 CI에서 자동으로 실행되게 한다.
+
+    ## 완료 조건
+    - 서비스별 pytest 테스트가 존재한다.
+    - CI에서 테스트가 자동 실행된다.
+    - 실패 시 PR에서 확인할 수 있다.
+
+    ## 남길 증거
+    - CI 실행 결과
+    - 테스트 목록
+  done_when:
+  - pytest가 CI에서 자동 실행된다.
+  - 실패 결과를 PR에서 확인할 수 있다.
+  evidence:
+  - CI 실행 결과
+  - pytest 결과
+  metrics:
+  - test_pass_rate
+- local_id: quality.e2e-postman
+  title: 서비스 연계 E2E 테스트 작성
+  type: test
+  milestone: milestone-5-test-observe
+  labels:
+  - test
+  - e2e
+  depends_on:
+  - platform.gateway-auth-routing
+  - platform.kafka-events
+  - platform.database-per-service
+  - github.actions-ci-baseline
+  description: |
+    ## 목표
+    환자 예약, 예약 확정 이벤트, 알림 발송으로 이어지는 서비스 연계 시나리오를 E2E 테스트로 검증한다.
+
+    ## 완료 조건
+    - Postman Collection 또는 동등한 E2E 테스트가 준비되어 있다.
+    - 주요 성공 시나리오가 통과한다.
+    - Newman CLI 자동화 여부가 검토되어 있다.
+
+    ## 남길 증거
+    - E2E 테스트 실행 결과
+    - 테스트 시나리오 목록
+  done_when:
+  - 주요 서비스 연계 시나리오가 E2E로 검증되어 있다.
+  - 실행 결과가 기록되어 있다.
+  evidence:
+  - E2E 테스트 실행 결과
+  - Postman Collection 또는 Newman 결과
+  metrics:
+  - e2e_pass_rate
+- local_id: observability.service-metrics-contract
+  title: Python 서비스 메트릭 계약과 ServiceMonitor 기준 정리
+  type: implementation
+  milestone: milestone-5-test-observe
+  labels:
+  - observability
+  - python
+  - metrics
+  depends_on:
+  - planning.python-service-design
+  - platform.gateway-auth-routing
+  description: |
+    ## 목표
+    FastAPI 서비스가 Prometheus에서 일관되게 수집될 수 있도록 메트릭 이름, label, endpoint, ServiceMonitor 기준을 정리한다.
+
+    ## 완료 조건
+    - 요청 수, latency, error rate metric 이름과 label 기준이 정리되어 있다.
+    - 서비스별 `/metrics` 노출 여부와 scrape 경로가 확인되어 있다.
+    - Prometheus Operator 사용 시 ServiceMonitor 또는 PodMonitor 적용 기준이 정리되어 있다.
+
+    ## 남길 증거
+    - 메트릭 계약 문서
+    - scrape 대상 목록
+    - ServiceMonitor 적용 기준
+  done_when:
+  - 서비스별 metric 이름과 scrape 경로가 정리되어 있다.
+  - Prometheus 수집 리소스 기준이 문서화되어 있다.
+  evidence:
+  - 메트릭 계약 문서
+  - scrape 대상 목록
+  metrics:
+  - http_requests_total
+  - http_request_duration_seconds
+  - scrape_target_count
+- local_id: observability.prometheus-grafana
+  title: Prometheus와 Grafana 서비스 메트릭 수집
+  type: implementation
+  milestone: milestone-5-test-observe
+  labels:
+  - observability
+  - metrics
+  depends_on:
+  - platform.gateway-auth-routing
+  - platform.service-discovery
+  - cloud.observability-capacity
+  - observability.service-metrics-contract
+  description: |
+    ## 목표
+    Prometheus와 Grafana로 서비스별 에러율, API 응답 시간, 요청 수를 확인할 수 있게 한다.
+
+    ## 완료 조건
+    - 서비스별 요청 수, 응답 시간, 에러율이 수집된다.
+    - Grafana 대시보드에서 주요 지표를 확인할 수 있다.
+    - 배포 후 기본 관측성 확인 절차가 문서화되어 있다.
+
+    ## 남길 증거
+    - Grafana 대시보드 스크린샷
+    - Prometheus query 결과
+  done_when:
+  - 서비스별 요청 수, 응답 시간, 에러율이 확인된다.
+  - 대시보드 확인 절차가 문서화되어 있다.
+  evidence:
+  - Grafana 대시보드 스크린샷
+  - Prometheus query 결과
+  metrics:
+  - http_requests_total
+  - http_request_duration_seconds
+  - error_rate
+- local_id: observability.logs-alerts
+  title: 로그 중앙화와 임계치 기반 알림 구성
+  type: implementation
+  milestone: milestone-5-test-observe
+  labels:
+  - observability
+  - alerting
+  depends_on:
+  - observability.prometheus-grafana
+  description: |
+    ## 목표
+    로그 중앙화와 Slack 알림을 통해 운영 중 이상 징후를 확인할 수 있게 한다.
+
+    ## 완료 조건
+    - 서비스 로그를 한 곳에서 확인할 수 있다.
+    - 주요 메트릭 임계치 알림 기준이 정리되어 있다.
+    - Slack 알림 테스트 결과가 남아 있다.
+
+    ## 남길 증거
+    - 로그 조회 결과
+    - Slack 알림 캡처
+  done_when:
+  - 로그 중앙화 조회가 가능하다.
+  - Slack 알림 테스트 결과가 남아 있다.
+  evidence:
+  - 로그 조회 결과
+  - Slack 알림 캡처
+- local_id: tracing.otel-tempo-jaeger
+  title: OpenTelemetry 기반 분산 추적과 Tempo/Jaeger 검증
+  type: implementation
+  milestone: milestone-5-test-observe
+  labels:
+  - tracing
+  - observability
+  - opentelemetry
+  depends_on:
+  - observability.prometheus-grafana
+  - platform.gateway-auth-routing
+  - platform.kafka-events
+  description: |
+    ## 목표
+    요청이 Gateway, Python 서비스, Kafka 이벤트 흐름을 지날 때 trace id로 이어지는지 Tempo 또는 Jaeger에서 검증한다.
+
+    ## 완료 조건
+    - Gateway request id와 service trace id의 관계가 정리되어 있다.
+    - FastAPI 서비스에 OpenTelemetry 계측 적용 범위가 정리되어 있다.
+    - Tempo 또는 Jaeger에서 환자 예약, 처방, 알림 흐름 trace를 조회할 수 있다.
+
+    ## 남길 증거
+    - trace 조회 스크린샷
+    - trace id 전파 검증 로그
+    - 계측 적용 범위 문서
+  done_when:
+  - 핵심 E2E 시나리오의 trace가 Tempo 또는 Jaeger에서 조회된다.
+  - HTTP와 Kafka 경계의 trace 전파 기준이 문서화되어 있다.
+  evidence:
+  - trace 조회 스크린샷
+  - trace id 전파 검증 로그
+  metrics:
+  - traced_request_count
+  - trace_error_rate

@@ -1,0 +1,182 @@
+"$schema": "../linear-workplan.schema.json"
+version: 1
+defaults:
+  team: Medikong
+  project: Cloud Native Study Planning
+  state: Backlog
+  priority: 3
+  labels:
+  - prd
+milestones:
+- id: milestone-1-foundation
+  title: 1차 - 요구사항 분해와 기반 설계
+  goal: PRD를 작업 단위로 나누고 서비스 경계, 데이터 소유, 실험 기준을 합의한다.
+tasks:
+- local_id: planning.current-gap-analysis
+  title: 현재 코드베이스 기준 갭 분석 정리
+  type: planning
+  milestone: milestone-1-foundation
+  priority: 2
+  labels:
+  - planning
+  - gap-analysis
+  - prd
+  depends_on: []
+  description: |
+    ## 목표
+    `project_docs/PRD.md`와 현재 코드베이스를 대조해 이미 된 것, 미흡한 것, 새로 해야 할 것을 다음 작업 분해의 기준으로 정리한다.
+
+    ## 완료 조건
+    - 기본 프로젝트 필수/선택 과업별 현재 구현 상태가 정리되어 있다.
+    - 심화 프로젝트 필수/선택 과업별 누락 항목이 정리되어 있다.
+    - workplan에 반영해야 할 추가 작업 후보가 영역별로 분류되어 있다.
+
+    ## 남길 증거
+    - 갭 분석 표
+    - workplan 반영 체크리스트
+  done_when:
+  - PRD 기본/심화 항목이 현재 코드베이스 상태와 대조되어 있다.
+  - workplan 보강 후보가 영역별로 정리되어 있다.
+  evidence:
+  - project_docs/linear/WORKPLAN_OVERVIEW.md
+- local_id: planning.service-boundary
+  title: 서비스 경계와 책임 정의
+  type: design
+  milestone: milestone-1-foundation
+  labels:
+  - planning
+  - architecture
+  depends_on:
+  - planning.current-gap-analysis
+  description: |
+    ## 목표
+    의료 정보 플랫폼 예시를 기준으로 환자기록, 예약, 처방, 알림, 인증 서비스의 경계와 책임을 정리한다.
+
+    ## 완료 조건
+    - 도메인별 서비스 책임이 문서화되어 있다.
+    - 각 서비스가 독립 배포, 독립 확장, 장애 격리를 가질 수 있는 기준이 정리되어 있다.
+
+    ## 남길 증거
+    - 서비스 경계 문서
+    - 서비스별 책임 표
+  done_when:
+  - 서비스별 책임과 경계가 문서화되어 있다.
+  - 독립 배포, 확장, 장애 격리 기준이 정리되어 있다.
+  evidence:
+  - project_docs/ARCHITECTURE.md
+- local_id: planning.communication-pattern
+  title: REST와 이벤트 통신 적용 기준 정리
+  type: design
+  milestone: milestone-1-foundation
+  labels:
+  - planning
+  - architecture
+  - messaging
+  depends_on:
+  - planning.service-boundary
+  description: |
+    ## 목표
+    서비스 간 통신에서 동기 REST API와 비동기 Kafka 이벤트를 언제 사용할지 기준을 정한다.
+
+    ## 완료 조건
+    - 서비스 간 주요 호출 흐름이 정리되어 있다.
+    - 동기/비동기 통신 선택 기준이 문서화되어 있다.
+    - `appointment-confirmed`, `prescription-issued` 같은 핵심 이벤트가 정의되어 있다.
+
+    ## 남길 증거
+    - 통신 방식 결정 기록
+    - 이벤트 목록
+  done_when:
+  - 동기/비동기 통신 선택 기준이 문서화되어 있다.
+  - 핵심 이벤트 목록이 정리되어 있다.
+  evidence:
+  - 서비스 간 통신 결정 기록
+- local_id: planning.data-ownership
+  title: 서비스별 데이터 소유와 저장소 전략 정의
+  type: design
+  milestone: milestone-1-foundation
+  labels:
+  - planning
+  - data
+  depends_on:
+  - planning.service-boundary
+  description: |
+    ## 목표
+    Database per Service 원칙을 기준으로 서비스별 데이터 소유권과 공유 방식을 정의한다.
+
+    ## 완료 조건
+    - 서비스별 독립 데이터베이스 소유 원칙이 정리되어 있다.
+    - 데이터 공유는 API 또는 이벤트로만 한다는 원칙이 명시되어 있다.
+    - 백업/복구와 RDS/NoSQL 클러스터링 검토 항목이 정리되어 있다.
+
+    ## 남길 증거
+    - 데이터 소유 원칙 문서
+    - 백업/복구 정책 초안
+  done_when:
+  - 서비스별 데이터 소유 원칙이 문서화되어 있다.
+  - 백업/복구 정책 초안이 작성되어 있다.
+  evidence:
+  - 데이터 소유 원칙 문서
+- local_id: planning.python-service-design
+  title: Python 서비스 설계와 테스트 가능성 기준 재정리
+  type: design
+  milestone: milestone-1-foundation
+  labels:
+  - planning
+  - python
+  - architecture
+  depends_on:
+  - planning.service-boundary
+  - planning.communication-pattern
+  - planning.data-ownership
+  description: |
+    ## 목표
+    현재 FastAPI 서비스의 API, 이벤트, fallback, 테스트 구조를 심화 프로젝트 작업의 기준선으로 정리한다.
+
+    ## 완료 조건
+    - 서비스별 API와 이벤트 발행/소비 책임이 정리되어 있다.
+    - 동기 호출 실패 시 fallback 또는 에러 전파 기준이 정리되어 있다.
+    - 테스트 가능한 경계가 router, service, client, producer/consumer 단위로 나뉘어 있다.
+
+    ## 남길 증거
+    - Python 서비스 설계 기준 문서
+    - API/이벤트/fallback 표
+  done_when:
+  - 서비스별 API, 이벤트, fallback 책임이 문서화되어 있다.
+  - 단위/E2E/장애 주입 테스트 경계가 정리되어 있다.
+  evidence:
+  - Python 서비스 설계 기준 문서
+  - API와 이벤트 책임 표
+- local_id: planning.experiment-scenarios
+  title: 클러스터 실험 시나리오와 측정 지표 정의
+  type: planning
+  milestone: milestone-1-foundation
+  labels:
+  - planning
+  - experiment
+  - metrics
+  depends_on:
+  - planning.service-boundary
+  description: |
+    ## 목표
+    프로젝트 초반에 클러스터 구성 실험과 측정 지표를 합의해 구현 작업에 밀리지 않게 한다.
+
+    ## 완료 조건
+    - compact, balanced, role-separated 등 비교할 클러스터 구성이 정리되어 있다.
+    - p95 latency, error rate, CPU/Memory 사용량 같은 핵심 지표가 정해져 있다.
+    - 실험 결과를 저장할 문서 또는 표 형식이 준비되어 있다.
+
+    ## 남길 증거
+    - 실험 시나리오 표
+    - 측정 지표 목록
+  done_when:
+  - 최소 2개 이상의 클러스터 구성 시나리오가 정의되어 있다.
+  - 수집할 핵심 지표가 정리되어 있다.
+  evidence:
+  - 실험 시나리오 표
+  - 측정 지표 목록
+  metrics:
+  - p95_latency
+  - error_rate
+  - node_cpu_usage
+  - node_memory_usage

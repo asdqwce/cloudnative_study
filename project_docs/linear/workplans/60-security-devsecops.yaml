@@ -1,0 +1,333 @@
+"$schema": "../linear-workplan.schema.json"
+version: 1
+defaults:
+  team: Medikong
+  project: Cloud Native Study Planning
+  state: Backlog
+  priority: 3
+  labels:
+  - prd
+milestones:
+- id: milestone-8-security-devsecops
+  title: 8차 - 보안과 DevSecOps 강화
+  goal: RBAC, ServiceAccount, NetworkPolicy, 보안 스캔, 정책 강제와 탐지 체계를 정리한다.
+tasks:
+- local_id: devsecops.github-security-baseline
+  title: GitHub 보안 게이트와 권한 기준선 정리
+  type: security
+  milestone: milestone-8-security-devsecops
+  labels:
+  - github
+  - security
+  - ci
+  depends_on:
+  - github.actions-ci-baseline
+  - github.workflow-inventory
+  description: |
+    ## 목표
+    GitHub Actions 권한, secret 사용, PR 보안 체크, artifact 보존 기준을 DevSecOps 파이프라인의 출발점으로 정리한다.
+
+    ## 완료 조건
+    - workflow별 `permissions` 최소 권한이 정리되어 있다.
+    - 배포 secret과 OIDC 사용 기준이 문서화되어 있다.
+    - 보안 체크 실패 시 PR에서 확인할 수 있는 표시 방식이 정리되어 있다.
+
+    ## 남길 증거
+    - workflow 권한 점검표
+    - secret/OIDC 사용 기준
+    - PR 보안 체크 결과
+  done_when:
+  - GitHub Actions 권한과 secret 사용 기준이 문서화되어 있다.
+  - 보안 게이트 실패 결과를 PR에서 확인할 수 있다.
+  evidence:
+  - workflow 권한 점검표
+  - PR 보안 체크 결과
+- local_id: security.rbac-roles
+  title: Kubernetes RBAC 역할 분리
+  type: security
+  milestone: milestone-8-security-devsecops
+  labels:
+  - security
+  - rbac
+  depends_on:
+  - platform.cluster-baseline
+  description: |
+    ## 목표
+    개발자, 운영자, SRE 역할별 Kubernetes 권한을 분리한다.
+
+    ## 완료 조건
+    - 조회 전용, Deployment 수정, Namespace 전체 권한 역할이 정의되어 있다.
+    - 각 역할의 허용/차단 동작이 검증되어 있다.
+    - 과도한 ClusterRole 사용 여부가 점검되어 있다.
+
+    ## 남길 증거
+    - RBAC 매니페스트
+    - 권한 검증 결과
+  done_when:
+  - 역할별 권한이 정의되고 검증되어 있다.
+  evidence:
+  - RBAC 매니페스트
+  - 권한 검증 결과
+- local_id: security.serviceaccount-least-privilege
+  title: 서비스별 ServiceAccount 최소 권한 적용
+  type: security
+  milestone: milestone-8-security-devsecops
+  labels:
+  - security
+  - kubernetes
+  depends_on:
+  - security.rbac-roles
+  description: |
+    ## 목표
+    서비스별 ServiceAccount를 분리하고 Role + RoleBinding 기반 최소 권한 원칙을 적용한다.
+
+    ## 완료 조건
+    - 서비스별 ServiceAccount가 분리되어 있다.
+    - ClusterRole 대신 namespace 범위 Role 사용 여부가 검토되어 있다.
+    - 권한 부족/초과 케이스가 검증되어 있다.
+
+    ## 남길 증거
+    - ServiceAccount 목록
+    - RoleBinding 검증 결과
+  done_when:
+  - 서비스별 ServiceAccount와 최소 권한이 적용되어 있다.
+  evidence:
+  - ServiceAccount 목록
+  - RoleBinding 검증 결과
+- local_id: security.network-policy
+  title: NetworkPolicy 기반 서비스 간 접근 제어
+  type: security
+  milestone: milestone-8-security-devsecops
+  labels:
+  - security
+  - networking
+  depends_on:
+  - platform.service-discovery
+  - security.serviceaccount-least-privilege
+  description: |
+    ## 목표
+    서비스 간 허용된 통신만 가능하도록 NetworkPolicy를 구성하고 의도하지 않은 통신 차단을 검증한다.
+
+    ## 완료 조건
+    - 서비스별 허용 통신 경로가 정리되어 있다.
+    - NetworkPolicy가 적용되어 있다.
+    - 허용/차단 통신 테스트 결과가 남아 있다.
+
+    ## 남길 증거
+    - NetworkPolicy 매니페스트
+    - 허용/차단 테스트 결과
+  done_when:
+  - 의도한 통신은 허용되고 의도하지 않은 통신은 차단된다.
+  evidence:
+  - NetworkPolicy 매니페스트
+  - 허용/차단 테스트 결과
+- local_id: devsecops.sonarqube-quality-gate
+  title: SonarQube 정적 분석과 품질 게이트 통합
+  type: security
+  milestone: milestone-8-security-devsecops
+  labels:
+  - security
+  - ci
+  depends_on:
+  - quality.unit-tests-ci
+  - devsecops.github-security-baseline
+  description: |
+    ## 목표
+    CI에 SonarQube 정적 분석을 통합하고 커버리지 80% 미만 또는 Critical 이슈 발견 시 중단되게 한다.
+
+    ## 완료 조건
+    - SonarQube 분석이 CI에서 실행된다.
+    - 품질 게이트 실패 시 파이프라인이 중단된다.
+    - 결과가 PR 코멘트로 게시된다.
+
+    ## 남길 증거
+    - CI 실행 결과
+    - PR 코멘트 캡처
+  done_when:
+  - 품질 게이트가 CI에 통합되어 있다.
+  - 실패 결과가 PR에서 확인된다.
+  evidence:
+  - CI 실행 결과
+  - PR 코멘트 캡처
+  metrics:
+  - code_coverage
+  - critical_issue_count
+- local_id: devsecops.trivy-config-scan
+  title: Trivy Kubernetes 매니페스트 보안 스캔
+  type: security
+  milestone: milestone-8-security-devsecops
+  labels:
+  - security
+  - ci
+  - kubernetes
+  depends_on:
+  - platform.cluster-baseline
+  - devsecops.github-security-baseline
+  - gitops.argocd-app-alignment
+  description: |
+    ## 목표
+    `trivy config`로 privileged 컨테이너, 루트 실행 등 보안 위반 설정을 배포 전에 차단한다.
+
+    ## 완료 조건
+    - Kubernetes 매니페스트 스캔이 CI에서 실행된다.
+    - 주요 위반 설정이 차단된다.
+    - 실패 결과가 확인 가능한 형태로 남는다.
+
+    ## 남길 증거
+    - Trivy 실행 결과
+    - CI 실패 예시
+  done_when:
+  - Trivy config 스캔이 CI에 통합되어 있다.
+  - 위반 설정 차단 결과가 남아 있다.
+  evidence:
+  - Trivy 실행 결과
+  - CI 실패 예시
+  metrics:
+  - security_violation_count
+- local_id: devsecops.image-sbom-scan
+  title: 컨테이너 이미지 스캔과 SBOM 산출
+  type: security
+  milestone: milestone-8-security-devsecops
+  labels:
+  - security
+  - image
+  - supply-chain
+  depends_on:
+  - devsecops.trivy-config-scan
+  - cloud.registry-release-path
+  - gitops.tagged-release-manifest
+  description: |
+    ## 목표
+    서비스 이미지에 대해 취약점 스캔과 SBOM 산출을 수행하고 릴리스 증거로 남긴다.
+
+    ## 완료 조건
+    - 이미지 취약점 스캔이 릴리스 workflow에 포함되어 있다.
+    - Critical/High 취약점 차단 기준이 정리되어 있다.
+    - SBOM artifact가 서비스/태그별로 보존된다.
+
+    ## 남길 증거
+    - 이미지 스캔 결과
+    - SBOM artifact
+    - 릴리스 차단 사례
+  done_when:
+  - 이미지 취약점 스캔과 SBOM 산출이 릴리스 흐름에 연결되어 있다.
+  - 차단 기준과 artifact 보존 기준이 문서화되어 있다.
+  evidence:
+  - 이미지 스캔 결과
+  - SBOM artifact
+  metrics:
+  - critical_vulnerability_count
+  - sbom_artifact_count
+- local_id: devsecops.security-slack-report
+  title: 보안 스캔 결과 Slack 리포트 연동
+  type: security
+  milestone: milestone-8-security-devsecops
+  labels:
+  - security
+  - alerting
+  depends_on:
+  - devsecops.sonarqube-quality-gate
+  - devsecops.trivy-config-scan
+  - devsecops.image-sbom-scan
+  description: |
+    ## 목표
+    SonarQube와 Trivy 보안 스캔 결과를 Slack `#security-report` 채널에 공유한다.
+
+    ## 완료 조건
+    - 성공/실패 요약이 Slack에 게시된다.
+    - Critical 이슈 발생 시 식별 가능한 메시지가 남는다.
+    - 민감정보가 메시지에 노출되지 않는다.
+
+    ## 남길 증거
+    - Slack 알림 캡처
+    - 알림 메시지 포맷
+  done_when:
+  - 보안 스캔 결과가 Slack으로 전달된다.
+  - 메시지에 민감정보가 노출되지 않는다.
+  evidence:
+  - Slack 알림 캡처
+- local_id: devsecops.opa-policy-enforcement
+  title: OPA Gatekeeper 정책 강제 검토와 적용
+  type: security
+  milestone: milestone-8-security-devsecops
+  labels:
+  - security
+  - policy
+  depends_on:
+  - devsecops.trivy-config-scan
+  - security.serviceaccount-least-privilege
+  description: |
+    ## 목표
+    `runAsNonRoot: true`, `readOnlyRootFilesystem: true` 같은 정책을 Namespace 전체에 강제한다.
+
+    ## 완료 조건
+    - ConstraintTemplate과 Constraint가 정의되어 있다.
+    - 정책 위반 배포가 거부된다.
+    - 허용되는 배포는 정상 적용된다.
+
+    ## 남길 증거
+    - Gatekeeper 정책 매니페스트
+    - 정책 위반 거부 결과
+  done_when:
+  - 정책 위반 배포 거부가 검증되어 있다.
+  evidence:
+  - Gatekeeper 정책 매니페스트
+  - 정책 위반 거부 결과
+- local_id: devsecops.zap-dast-sarif
+  title: OWASP ZAP DAST와 SARIF 업로드 검토
+  type: security
+  milestone: milestone-8-security-devsecops
+  labels:
+  - security
+  - dast
+  depends_on:
+  - platform.gateway-auth-routing
+  - quality.e2e-postman
+  description: |
+    ## 목표
+    staging 환경 배포 후 OWASP ZAP 동적 분석을 수행하고 결과를 SARIF로 업로드할지 검토한다.
+
+    ## 완료 조건
+    - DAST 대상 URL과 인증 방식이 정리되어 있다.
+    - ZAP 실행 결과가 생성된다.
+    - SARIF 업로드 방식이 검토되어 있다.
+
+    ## 남길 증거
+    - ZAP 리포트
+    - SARIF 업로드 결과 또는 검토 기록
+  done_when:
+  - ZAP 분석 결과가 생성되어 있다.
+  - SARIF 업로드 여부가 결정되어 있다.
+  evidence:
+  - ZAP 리포트
+  - SARIF 업로드 검토 기록
+- local_id: security.incident-response-falco
+  title: Falco 탐지와 사고 대응 프로세스 정리
+  type: security
+  milestone: milestone-8-security-devsecops
+  labels:
+  - security
+  - incident-response
+  depends_on:
+  - devsecops.security-slack-report
+  - security.network-policy
+  description: |
+    ## 목표
+    컨테이너 런타임 이상 행위를 탐지하고 탐지, 격리, 분석, 복구, 회고 절차를 정리한다.
+
+    ## 완료 조건
+    - 사고 대응 5단계가 문서화되어 있다.
+    - Falco 이상 행위 탐지와 Slack 알림이 검토 또는 적용되어 있다.
+    - 자동화 가능한 대응 스크립트 후보가 정리되어 있다.
+
+    ## 남길 증거
+    - 사고 대응 문서
+    - Falco 탐지 결과
+    - Slack 알림 캡처
+  done_when:
+  - 사고 대응 절차가 문서화되어 있다.
+  - Falco 탐지와 알림 검증 결과가 남아 있다.
+  evidence:
+  - 사고 대응 문서
+  - Falco 탐지 결과
+  - Slack 알림 캡처

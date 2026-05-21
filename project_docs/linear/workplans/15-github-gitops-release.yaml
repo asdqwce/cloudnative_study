@@ -1,0 +1,171 @@
+"$schema": "../linear-workplan.schema.json"
+version: 1
+defaults:
+  team: Medikong
+  project: Cloud Native Study Planning
+  state: Backlog
+  priority: 3
+  labels:
+  - prd
+milestones:
+- id: milestone-3-delivery-gitops
+  title: 3차 - GitHub와 GitOps 릴리스 기반 정리
+  goal: GitHub Actions, 이미지 릴리스, Argo CD 동기화, 롤백 흐름을 팀 실행 단위로 만든다.
+tasks:
+- local_id: github.workflow-inventory
+  title: GitHub 저장소와 Actions 현재 상태 점검
+  type: planning
+  milestone: milestone-3-delivery-gitops
+  labels:
+  - github
+  - ci
+  depends_on:
+  - planning.current-gap-analysis
+  description: |
+    ## 목표
+    현재 `ci.yml`, `e2e.yml`, 브랜치/PR 운영 방식, artifact 보존 방식을 확인해 다음 파이프라인 작업의 기준선을 만든다.
+
+    ## 완료 조건
+    - 현재 GitHub Actions가 수행하는 테스트와 누락된 릴리스/보안 게이트가 정리되어 있다.
+    - PR 필수 체크, 브랜치 보호, artifact 보존 기준이 정리되어 있다.
+    - Linear 업로드 시 GitHub 관련 작업 묶음이 별도 label로 식별 가능하다.
+
+    ## 남길 증거
+    - GitHub Actions 현황 표
+    - PR 체크 정책 초안
+  done_when:
+  - 현재 workflow와 필요한 추가 workflow가 표로 정리되어 있다.
+  - PR 필수 체크와 artifact 보존 기준이 문서화되어 있다.
+  evidence:
+  - .github/workflows/ci.yml
+  - .github/workflows/e2e.yml
+  - GitHub Actions 현황 표
+- local_id: github.actions-ci-baseline
+  title: GitHub Actions CI 기준선 강화
+  type: implementation
+  milestone: milestone-3-delivery-gitops
+  labels:
+  - github
+  - ci
+  - test
+  depends_on:
+  - github.workflow-inventory
+  - planning.python-service-design
+  description: |
+    ## 목표
+    서비스별 pytest와 E2E workflow를 팀이 신뢰할 수 있는 CI 기준선으로 정리한다.
+
+    ## 완료 조건
+    - Python 서비스 테스트가 서비스별 실패 위치를 알 수 있게 실행된다.
+    - E2E report artifact가 실패/성공 모두에서 남는다.
+    - path filter 또는 matrix 분리 여부가 결정되어 독립 배포 작업의 전제가 마련된다.
+
+    ## 남길 증거
+    - CI 실행 결과
+    - E2E artifact
+    - workflow 분리 결정 기록
+  done_when:
+  - pytest와 E2E workflow가 PR 필수 체크 후보로 정리되어 있다.
+  - 실패 원인과 report artifact를 PR에서 추적할 수 있다.
+  evidence:
+  - GitHub Actions 실행 결과
+  - E2E report artifact
+  metrics:
+  - ci_duration_seconds
+  - test_pass_rate
+- local_id: gitops.argocd-app-alignment
+  title: Argo CD Application 경로와 overlay 정합성 정리
+  type: ops
+  milestone: milestone-3-delivery-gitops
+  labels:
+  - gitops
+  - argocd
+  - kubernetes
+  depends_on:
+  - cloud.registry-release-path
+  description: |
+    ## 목표
+    현재 Argo CD Application이 실제 Kustomize entrypoint와 릴리스 overlay를 정확히 바라보도록 정리한다.
+
+    ## 완료 조건
+    - Argo CD source path와 targetRevision 기준이 릴리스 전략과 맞다.
+    - local/aws overlay 중 운영 릴리스 대상이 명확하다.
+    - Argo CD sync, prune, self-heal 정책의 적용 범위가 문서화되어 있다.
+
+    ## 남길 증거
+    - Argo CD Application 매니페스트
+    - overlay entrypoint 결정 기록
+    - sync 결과
+  done_when:
+  - Argo CD Application 경로가 실제 배포 entrypoint와 일치한다.
+  - sync 정책과 릴리스 대상 overlay가 문서화되어 있다.
+  evidence:
+  - argo/application.yaml
+  - kubectl get application 결과
+- local_id: gitops.tagged-release-manifest
+  title: 태그 기반 이미지 릴리스와 manifest 갱신 흐름 구성
+  type: implementation
+  milestone: milestone-3-delivery-gitops
+  labels:
+  - gitops
+  - release
+  - ecr
+  depends_on:
+  - github.actions-ci-baseline
+  - cloud.registry-release-path
+  - gitops.argocd-app-alignment
+  description: |
+    ## 목표
+    서비스 이미지 태그, ECR push, Kustomize image 갱신, Argo CD sync까지 이어지는 반복 가능한 릴리스 흐름을 만든다.
+
+    ## 완료 조건
+    - immutable tag 또는 명시적 릴리스 태그 기준이 정리되어 있다.
+    - GitHub Actions가 이미지 build/push와 manifest 갱신을 수행한다.
+    - 릴리스 commit 또는 tag와 배포된 이미지 digest를 추적할 수 있다.
+
+    ## 남길 증거
+    - release workflow 실행 결과
+    - ECR image digest
+    - 갱신된 Kustomize image 설정
+  done_when:
+  - 이미지 push부터 Argo CD sync까지 릴리스 경로가 검증되어 있다.
+  - 릴리스 태그, manifest commit, image digest가 서로 연결되어 있다.
+  evidence:
+  - release workflow 실행 결과
+  - ECR image digest
+  - Argo CD sync 결과
+  metrics:
+  - release_duration_seconds
+  - image_pull_success_count
+- local_id: gitops.rollback-runbook
+  title: 배포 롤백과 장애 대응 운영 절차 정리
+  type: ops
+  milestone: milestone-3-delivery-gitops
+  labels:
+  - gitops
+  - rollback
+  - ops
+  depends_on:
+  - gitops.tagged-release-manifest
+  - platform.gateway-auth-routing
+  description: |
+    ## 목표
+    잘못된 배포를 감지했을 때 Git revert, Argo CD sync, Kubernetes rollout undo 중 어떤 흐름을 사용할지 운영 절차를 정한다.
+
+    ## 완료 조건
+    - GitOps 우선 롤백 절차가 문서화되어 있다.
+    - 긴급 롤백과 일반 롤백의 기준이 분리되어 있다.
+    - 롤백 후 Gateway와 핵심 E2E가 정상인지 확인하는 체크리스트가 있다.
+
+    ## 남길 증거
+    - 롤백 runbook
+    - 롤백 리허설 결과
+    - 배포 전후 헬스체크 결과
+  done_when:
+  - 롤백 절차와 확인 체크리스트가 문서화되어 있다.
+  - 최소 1회 롤백 리허설 결과가 남아 있다.
+  evidence:
+  - 롤백 runbook
+  - 롤백 리허설 결과
+  metrics:
+  - rollback_recovery_minutes

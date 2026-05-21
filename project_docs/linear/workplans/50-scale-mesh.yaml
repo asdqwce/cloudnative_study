@@ -1,0 +1,247 @@
+"$schema": "../linear-workplan.schema.json"
+version: 1
+defaults:
+  team: Medikong
+  project: Cloud Native Study Planning
+  state: Backlog
+  priority: 3
+  labels:
+  - prd
+milestones:
+- id: milestone-7-scale-mesh
+  title: 7차 - 확장성과 서비스 메시 고도화
+  goal: 독립 배포, 서비스 메시, PDB, 자동 확장, Canary 배포를 검토하고 적용한다.
+tasks:
+- local_id: scale.pipeline-split
+  title: 서비스별 독립 배포 파이프라인 분리
+  type: implementation
+  milestone: milestone-7-scale-mesh
+  labels:
+  - ci
+  - delivery
+  depends_on:
+  - quality.unit-tests-ci
+  - quality.e2e-postman
+  - gitops.tagged-release-manifest
+  description: |
+    ## 목표
+    한 서비스의 배포가 다른 서비스에 영향을 주지 않도록 서비스별 독립 배포 파이프라인을 분리한다.
+
+    ## 완료 조건
+    - 서비스별 배포 단위가 분리되어 있다.
+    - 한 서비스 배포 후 다른 서비스 주요 E2E가 유지됨을 확인한다.
+    - 실패 시 롤백 또는 중단 기준이 정리되어 있다.
+
+    ## 남길 증거
+    - 파이프라인 실행 결과
+    - 독립 배포 검증 결과
+  done_when:
+  - 서비스별 독립 배포가 검증되어 있다.
+  evidence:
+  - 파이프라인 실행 결과
+  - E2E 검증 결과
+- local_id: scale.gateway-mesh-decision
+  title: API Gateway와 Service Mesh 협업 구조 결정
+  type: design
+  milestone: milestone-7-scale-mesh
+  labels:
+  - service-mesh
+  - architecture
+  depends_on:
+  - platform.gateway-auth-routing
+  - observability.prometheus-grafana
+  description: |
+    ## 목표
+    API Gateway와 Service Mesh가 각각 어떤 책임을 맡을지 검토하고 적용 구조를 결정한다.
+
+    ## 완료 조건
+    - Gateway와 Mesh의 책임 경계가 정리되어 있다.
+    - Istio 또는 Linkerd 도입 기준이 문서화되어 있다.
+    - 적용하지 않을 경우의 이유도 기록되어 있다.
+
+    ## 남길 증거
+    - Gateway/Mesh 결정 기록
+    - 선택 기준 표
+  done_when:
+  - Gateway와 Mesh의 책임 경계가 문서화되어 있다.
+  - 적용 구조가 결정되어 있다.
+  evidence:
+  - Gateway/Mesh 결정 기록
+- local_id: scale.service-mesh-traffic
+  title: Service Mesh 트래픽 제어 적용
+  type: implementation
+  milestone: milestone-7-scale-mesh
+  labels:
+  - service-mesh
+  - networking
+  depends_on:
+  - scale.gateway-mesh-decision
+  description: |
+    ## 목표
+    선택한 Service Mesh로 서비스 간 트래픽 제어를 적용하고 기본 동작을 검증한다.
+
+    ## 완료 조건
+    - Service Mesh control plane과 sidecar 또는 동등한 구성이 준비되어 있다.
+    - 서비스 간 트래픽 제어 정책이 동작한다.
+    - mTLS 적용 여부와 범위가 정리되어 있다.
+
+    ## 남길 증거
+    - Mesh 리소스 상태
+    - 트래픽 제어 검증 결과
+  done_when:
+  - Mesh 트래픽 제어가 검증되어 있다.
+  - mTLS 적용 범위가 정리되어 있다.
+  evidence:
+  - Mesh 리소스 상태
+  - 트래픽 제어 검증 결과
+- local_id: scale.mesh-mtls-policy
+  title: Service Mesh mTLS 적용 범위와 보안 통신 검증
+  type: security
+  milestone: milestone-7-scale-mesh
+  labels:
+  - service-mesh
+  - mtls
+  - security
+  depends_on:
+  - scale.service-mesh-traffic
+  - security.network-policy
+  description: |
+    ## 목표
+    Istio 또는 Linkerd 도입 후 서비스 간 mTLS 적용 범위를 결정하고 허용/차단 통신을 검증한다.
+
+    ## 완료 조건
+    - namespace별 mTLS 적용 모드가 정리되어 있다.
+    - mesh traffic policy와 NetworkPolicy의 책임 경계가 문서화되어 있다.
+    - mTLS 적용 후 핵심 E2E가 통과한다.
+
+    ## 남길 증거
+    - mTLS 정책 매니페스트
+    - mesh 보안 상태 확인 결과
+    - E2E 검증 결과
+  done_when:
+  - mTLS 적용 범위와 예외가 문서화되어 있다.
+  - mTLS 적용 후 핵심 서비스 흐름이 검증되어 있다.
+  evidence:
+  - mTLS 정책 매니페스트
+  - mesh 보안 상태 확인 결과
+- local_id: scale.pdb-min-availability
+  title: PDB로 최소 Pod 수 보장
+  type: implementation
+  milestone: milestone-7-scale-mesh
+  labels:
+  - kubernetes
+  - availability
+  depends_on:
+  - platform.cluster-baseline
+  description: |
+    ## 목표
+    클러스터 유지보수 중에도 각 서비스의 최소 Pod 수를 보장하도록 PodDisruptionBudget을 구성한다.
+
+    ## 완료 조건
+    - 주요 서비스에 PDB가 적용되어 있다.
+    - 최소 Pod 수 2개 보장 기준이 정리되어 있다.
+    - drain 또는 disruption 시나리오 검증 결과가 남아 있다.
+
+    ## 남길 증거
+    - PDB 목록
+    - disruption 검증 결과
+  done_when:
+  - 주요 서비스 PDB가 적용되어 있다.
+  - disruption 검증 결과가 남아 있다.
+  evidence:
+  - kubectl get pdb 결과
+  - disruption 검증 결과
+- local_id: scale.keda-consumer-lag
+  title: KEDA 기반 이벤트 처리 자동 확장 검토와 적용
+  type: implementation
+  milestone: milestone-7-scale-mesh
+  labels:
+  - autoscaling
+  - kafka
+  depends_on:
+  - experiment.kafka-lag-alert
+  description: |
+    ## 목표
+    Kafka consumer lag 기반으로 이벤트 처리 서비스가 자동 확장되도록 KEDA ScaledObject를 검토하고 적용한다.
+
+    ## 완료 조건
+    - ScaledObject가 구성되어 있다.
+    - lag 증가 시 replica 증가가 확인된다.
+    - scale out/in 기준이 문서화되어 있다.
+
+    ## 남길 증거
+    - KEDA 리소스 상태
+    - 확장 전후 replica 변화
+  done_when:
+  - Kafka lag 기반 자동 확장이 검증되어 있다.
+  evidence:
+  - KEDA 리소스 상태
+  - replica 변화 기록
+  metrics:
+  - kafka_consumer_lag
+  - replica_count
+- local_id: scale.hpa-resource-policy
+  title: HPA와 리소스 요청/제한 기준 정리
+  type: implementation
+  milestone: milestone-7-scale-mesh
+  labels:
+  - autoscaling
+  - kubernetes
+  - k8sops
+  depends_on:
+  - observability.prometheus-grafana
+  - platform.k8sops-deploy-rollback-baseline
+  description: |
+    ## 목표
+    CPU/Memory 기반 HPA와 서비스별 resource requests/limits 기준을 정리해 자동 확장과 안정적인 스케줄링을 함께 검증한다.
+
+    ## 완료 조건
+    - 서비스별 requests/limits 기준이 문서화되어 있다.
+    - HPA 대상 서비스와 target utilization 기준이 정리되어 있다.
+    - 부하 테스트에서 replica 증가와 안정화가 확인된다.
+
+    ## 남길 증거
+    - HPA 매니페스트
+    - 리소스 기준표
+    - 부하 테스트 결과
+  done_when:
+  - HPA와 리소스 기준이 서비스별로 정리되어 있다.
+  - 부하 상황에서 replica 변화가 기록되어 있다.
+  evidence:
+  - HPA 매니페스트
+  - 리소스 기준표
+  metrics:
+  - cpu_utilization
+  - memory_usage
+  - replica_count
+- local_id: scale.canary-rollout
+  title: Canary 배포와 자동 롤백 검토
+  type: implementation
+  milestone: milestone-7-scale-mesh
+  labels:
+  - delivery
+  - rollout
+  depends_on:
+  - scale.pipeline-split
+  - observability.prometheus-grafana
+  description: |
+    ## 목표
+    주요 서비스에 Canary 배포를 적용하고 단계별 에러율 확인 후 롤백 가능한 구조를 검토한다.
+
+    ## 완료 조건
+    - Canary 대상 서비스가 선정되어 있다.
+    - 단계별 트래픽 전환과 에러율 확인 기준이 정리되어 있다.
+    - 자동 롤백 조건이 문서화되어 있다.
+
+    ## 남길 증거
+    - Rollout 설정
+    - Canary 검증 결과
+  done_when:
+  - Canary 배포 기준과 롤백 조건이 정리되어 있다.
+  - 검증 결과가 남아 있다.
+  evidence:
+  - Rollout 설정
+  - Canary 검증 결과
+  metrics:
+  - canary_error_rate
+  - rollback_count
