@@ -430,6 +430,96 @@
       gap: 18px;
     }
 
+    .validation-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .validation-card {
+      min-height: 250px;
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .validation-card.metrics {
+      border-top: 6px solid var(--cyan);
+    }
+
+    .validation-card.tests {
+      border-top: 6px solid var(--blue);
+    }
+
+    .validation-card.resilience {
+      border-top: 6px solid var(--amber);
+    }
+
+    .validation-card.security {
+      border-top: 6px solid var(--rose);
+    }
+
+    .validation-card p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .validation-card ul {
+      margin: 18px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .validation-card li {
+      position: relative;
+      margin-top: 10px;
+      padding-left: 20px;
+      color: var(--muted);
+    }
+
+    .validation-card li::before {
+      content: "";
+      position: absolute;
+      top: 0.72em;
+      left: 0;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .proof-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .proof-item {
+      padding: 18px;
+      border-radius: var(--radius);
+      background: var(--ink);
+      color: white;
+    }
+
+    .proof-item span {
+      display: block;
+      margin-bottom: 6px;
+      color: #facc15;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .proof-item b {
+      display: block;
+      font-size: 16px;
+      line-height: 1.35;
+    }
+
     .benefit,
     .risk,
     .timeline {
@@ -661,6 +751,8 @@
       .section-head,
       .repo-row,
       .benefit-grid,
+      .validation-grid,
+      .proof-strip,
       .risk-grid,
       .timeline-wrap,
       .org-grid,
@@ -811,6 +903,10 @@
             <a href="#organization">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"></path><path d="M9 7h1"></path><path d="M14 7h1"></path><path d="M9 11h1"></path><path d="M14 11h1"></path><path d="M9 15h1"></path><path d="M14 15h1"></path><path d="M4 21h16"></path></svg>
               GitHub Organization
+            </a>
+            <a href="#advanced-validation">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5"></path><path d="M8 17v-6"></path><path d="M13 17V7"></path><path d="M18 17v-3"></path><path d="M4 19h16"></path></svg>
+              심화 검증 목표
             </a>
           </nav>
         </div>
@@ -1029,6 +1125,84 @@
           </tr>
         </tbody>
       </table>
+    </section>
+
+    <section id="advanced-validation">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Advanced Validation</p>
+          <h2>심화 프로젝트에서는 운영 지표와 테스트 시나리오까지 검증합니다.</h2>
+        </div>
+        <p class="lead">
+          repo 분리는 단순 정리가 아니라 검증 범위를 넓히기 위한 기반입니다.
+          Prometheus와 Grafana로 지표를 보고, 다양한 장애와 부하 시나리오를 반복하면서 배포 정책이 실제로 안전한지 확인합니다.
+        </p>
+      </div>
+
+      <div class="validation-grid">
+        <article class="validation-card metrics">
+          <h3>관측성 지표 검증</h3>
+          <p>Grafana와 Prometheus를 통해 서비스와 클러스터 상태를 수치로 확인합니다.</p>
+          <ul>
+            <li>서비스별 요청 수, 에러율, 응답 시간</li>
+            <li>Pod CPU, memory, restart, saturation</li>
+            <li>Kafka consumer lag과 이벤트 처리 지연</li>
+            <li>배포 전후 지표 비교와 대시보드 증빙</li>
+          </ul>
+        </article>
+
+        <article class="validation-card tests">
+          <h3>테스트 시나리오 확장</h3>
+          <p>단위 테스트를 넘어 실제 운영 흐름에 가까운 E2E와 smoke 시나리오를 늘립니다.</p>
+          <ul>
+            <li>환자 예약부터 알림 발송까지의 업무 흐름</li>
+            <li>인증 실패, 권한 부족, rate limit 확인</li>
+            <li>배포 직후 smoke test와 rollback 판단</li>
+            <li>환경별 local, aws-smoke 검증 결과 기록</li>
+          </ul>
+        </article>
+
+        <article class="validation-card resilience">
+          <h3>탄력성과 장애 실험</h3>
+          <p>HPA, PDB, rollout, 장애 격리 정책이 실제 조건에서 동작하는지 확인합니다.</p>
+          <ul>
+            <li>부하 증가 시 HPA scale-out 확인</li>
+            <li>Pod 장애와 node 점검 중 최소 가용성 확인</li>
+            <li>의존 서비스 장애 시 fallback과 부분 응답 확인</li>
+            <li>Canary 또는 단계적 배포의 rollback 조건 검증</li>
+          </ul>
+        </article>
+
+        <article class="validation-card security">
+          <h3>보안과 정책 검증</h3>
+          <p>DevSecOps와 Kubernetes 정책이 배포 전후에 실제로 차단 효과를 내는지 봅니다.</p>
+          <ul>
+            <li>Trivy config/image scan과 취약 설정 차단</li>
+            <li>NetworkPolicy로 의도하지 않은 통신 차단</li>
+            <li>ServiceAccount, RBAC, secret 노출 범위 확인</li>
+            <li>정책 위반 manifest의 배포 실패 증빙</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="proof-strip">
+        <div class="proof-item">
+          <span>services</span>
+          <b>metrics endpoint, tracing hook, 테스트 코드</b>
+        </div>
+        <div class="proof-item">
+          <span>gitops</span>
+          <b>Prometheus rule, Grafana dashboard, rollout policy</b>
+        </div>
+        <div class="proof-item">
+          <span>infra</span>
+          <b>cluster capacity, node role, monitoring stack 기반</b>
+        </div>
+        <div class="proof-item">
+          <span>workspace</span>
+          <b>검증 명령과 결과 재현 절차의 진입점</b>
+        </div>
+      </div>
     </section>
 
     <section>
